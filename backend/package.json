@@ -1,0 +1,25 @@
+{
+  "name": "nova-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "verify:banking": "node scripts/verify-banking-sandbox.mjs",
+    "verify:twin": "node scripts/verify-financial-twin.mjs"
+    ,"verify:surfaces": "node scripts/verify-four-surface-consistency.mjs"
+    ,"verify:stage2": "node scripts/verify-stage2-banking-tools.mjs"
+    ,"verify:stage3": "node scripts/verify-stage3-security-console.mjs"
+    ,"eval:baseline": "node scripts/evaluate-current-baseline.mjs",
+    "eval:phase3": "node scripts/evaluate-current-baseline.mjs --phase3"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260515.1",
+    "drizzle-kit": "0.31.10",
+    "typescript": "5.9.3"
+  }
+}

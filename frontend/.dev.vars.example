@@ -1,0 +1,8 @@
+# Copy to .dev.vars for local development. Never commit real values.
+DEEPSEEK_API_KEY=
+EXTERNAL_AGENT_SIGNING_SECRET=
+NOVA_AGENT_ROLLOUT=phase4
+NOVA_EVALUATION_MODE=disabled
+NOVA_AGENT_RPM=8
+NOVA_BANKING_RPM=60
+NOVA_MCP_RPM=30
