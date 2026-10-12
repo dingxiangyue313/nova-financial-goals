@@ -61,7 +61,8 @@ export function evaluateExternalRequest(state: DemoState, request: ExternalReque
   else { status = 'executed'; reason = '模拟操作已完成；金额、授权和安全线已由服务端核对。'; }
   const operation: Operation = { operationId: crypto.randomUUID(), idempotencyKey: request.idempotencyKey,
     status, category: request.category, amountCents: request.amountCents, reason,
-    agentId: request.agentId, mandateId: mandate?.id ?? null };
+    agentId: request.agentId, mandateId: mandate?.id ?? null,
+    tool: 'external_payment', receipt: null };
   const next: DemoState = { ...state, operations: [...state.operations, operation],
     audit: pipelineAudit(state, operation) };
   if (status === 'executed') {

@@ -14,7 +14,35 @@ db.exec(`CREATE TABLE IF NOT EXISTS demo_sessions (
 CREATE TABLE IF NOT EXISTS audit_events (
   id TEXT PRIMARY KEY, session_id TEXT NOT NULL, at TEXT NOT NULL,
   action TEXT NOT NULL, outcome TEXT NOT NULL, detail TEXT NOT NULL, operation_id TEXT
+);
+CREATE TABLE IF NOT EXISTS approval_artifacts (
+  id TEXT PRIMARY KEY, session_id TEXT NOT NULL, status TEXT NOT NULL, payload_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS nonce_artifacts (
+  session_id TEXT NOT NULL, nonce TEXT NOT NULL, PRIMARY KEY(session_id, nonce)
+);
+CREATE TABLE IF NOT EXISTS operation_artifacts (
+  operation_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+  input_hash TEXT, status TEXT NOT NULL, payload_json TEXT NOT NULL,
+  UNIQUE(session_id, idempotency_key)
+);
+CREATE TABLE IF NOT EXISTS receipt_artifacts (
+  operation_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, payload_json TEXT NOT NULL
 );`);
+
+function syncArtifacts(sessionId: string, state: DemoState) {
+  for (const approval of state.approvals) db.prepare(`INSERT INTO approval_artifacts(id,session_id,status,payload_json)
+    VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,payload_json=excluded.payload_json`)
+    .run(approval.id, sessionId, approval.status, JSON.stringify(approval));
+  for (const nonce of state.consumedNonces) db.prepare('INSERT OR IGNORE INTO nonce_artifacts(session_id,nonce) VALUES(?,?)')
+    .run(sessionId, nonce);
+  for (const operation of state.operations) db.prepare(`INSERT INTO operation_artifacts(operation_id,session_id,idempotency_key,input_hash,status,payload_json)
+    VALUES(?,?,?,?,?,?) ON CONFLICT(operation_id) DO UPDATE SET input_hash=excluded.input_hash,status=excluded.status,payload_json=excluded.payload_json`)
+    .run(operation.operationId, sessionId, operation.idempotencyKey, operation.inputHash ?? null, operation.status, JSON.stringify(operation));
+  for (const receipt of state.receipts) db.prepare(`INSERT INTO receipt_artifacts(operation_id,session_id,payload_json)
+    VALUES(?,?,?) ON CONFLICT(operation_id) DO UPDATE SET payload_json=excluded.payload_json`)
+    .run(receipt.operationId, sessionId, JSON.stringify(receipt));
+}
 
 export function getState(sessionId: string): DemoState {
   const row = db.prepare('SELECT state_json FROM demo_sessions WHERE id = ?').get(sessionId) as { state_json: string } | undefined;
@@ -36,6 +64,7 @@ export function mutateState(sessionId: string, change: (state: DemoState) => Dem
     if (!result.changes) throw new Error('SESSION_NOT_FOUND');
     for (const event of newEvents) db.prepare('INSERT INTO audit_events (id,session_id,at,action,outcome,detail,operation_id) VALUES (?,?,?,?,?,?,?)')
       .run(event.id, sessionId, event.at, event.action, event.outcome, event.detail, event.operationId ?? null);
+    syncArtifacts(sessionId, next);
     db.exec('COMMIT');
     return next;
   } catch (error) { db.exec('ROLLBACK'); throw error; }
@@ -48,9 +77,22 @@ export function resetState(sessionId: string): DemoState {
     db.prepare('INSERT INTO demo_sessions (id,state_json,version,updated_at) VALUES (?,?,0,?) ON CONFLICT(id) DO UPDATE SET state_json=excluded.state_json, version=version+1, updated_at=excluded.updated_at')
       .run(sessionId, JSON.stringify(state), new Date().toISOString());
     db.prepare('DELETE FROM audit_events WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM approval_artifacts WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM nonce_artifacts WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM operation_artifacts WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM receipt_artifacts WHERE session_id=?').run(sessionId);
     db.exec('COMMIT');
     return state;
   } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+export function artifactCounts(sessionId: string) {
+  const count = (table: string) => Number((db.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE session_id=?`)
+    .get(sessionId) as { count: number }).count);
+  return {
+    approvals: count('approval_artifacts'), nonces: count('nonce_artifacts'),
+    operations: count('operation_artifacts'), receipts: count('receipt_artifacts'),
+  };
 }
 
 export function closeStore() { db.close(); }

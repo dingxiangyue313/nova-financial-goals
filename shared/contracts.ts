@@ -21,6 +21,29 @@ export const FinanceSchema = z.object({
 });
 export type Finance = z.infer<typeof FinanceSchema>;
 
+export const AccountSchema = z.object({
+  id: z.string(), label: z.string(), type: z.enum(['checking', 'emergency', 'goal', 'investment']),
+  balanceCents: MoneySchema, currency: z.string().length(3).default('CNY'), protected: z.boolean().default(false),
+});
+export type Account = z.infer<typeof AccountSchema>;
+
+export const TransactionSchema = z.object({
+  id: z.string(), accountId: z.string(), date: IsoDateSchema, title: z.string(),
+  category: z.string(), amountCents: z.number().int(),
+});
+export type Transaction = z.infer<typeof TransactionSchema>;
+
+export const BillSchema = z.object({
+  id: z.string(), title: z.string(), dueDate: IsoDateSchema, amountCents: MoneySchema, paid: z.boolean(),
+});
+export type Bill = z.infer<typeof BillSchema>;
+
+export const SubscriptionSchema = z.object({
+  id: z.string(), title: z.string(), monthlyCents: MoneySchema, nextChargeDate: IsoDateSchema,
+  status: z.enum(['active', 'cancelled']),
+});
+export type Subscription = z.infer<typeof SubscriptionSchema>;
+
 export const ImpactSchema = z.object({
   id: z.string(), title: z.string(), expenseCents: MoneySchema,
   detectedAt: IsoDateSchema, shortfallCents: MoneySchema,
@@ -39,22 +62,53 @@ export type Mandate = z.infer<typeof MandateSchema>;
 
 export const AuditSchema = z.object({
   id: z.string(), at: z.string(), action: z.string(), outcome: z.string(),
-  detail: z.string(), operationId: z.string().optional(),
+  detail: z.string(), operationId: z.string().optional(), requestId: z.string().optional(),
+  approvalId: z.string().optional(), twinVersion: z.number().int().positive().optional(),
+  sequence: z.number().int().positive().optional(), previousHash: z.string().optional(), eventHash: z.string().optional(),
 });
 export type Audit = z.infer<typeof AuditSchema>;
+
+export const ApprovalSchema = z.object({
+  id: z.string(), action: z.string(), parameters: z.record(z.string(), z.unknown()),
+  twinVersion: z.number().int().positive(), snapshotHash: z.string(), expiresAt: z.string(),
+  status: z.enum(['pending', 'confirmed', 'consumed', 'expired']), token: z.string().nullable().default(null),
+});
+export type Approval = z.infer<typeof ApprovalSchema>;
+
+export const ReceiptSchema = z.object({
+  operationId: z.string(), tool: z.string(), status: z.enum(['succeeded', 'failed', 'unknown']),
+  amountCents: MoneySchema.optional(), currency: z.string().length(3).default('CNY'),
+  executedAt: z.string(), twinVersion: z.number().int().positive(),
+});
+export type Receipt = z.infer<typeof ReceiptSchema>;
 
 export const OperationSchema = z.object({
   operationId: z.string(), idempotencyKey: z.string(),
   status: z.enum(['executed', 'ask', 'blocked', 'unknown']),
   category: z.string(), amountCents: MoneySchema, reason: z.string(),
   agentId: z.string().optional(), mandateId: z.string().nullable().optional(),
+  tool: z.string().default('external_payment'), inputHash: z.string().optional(),
+  receipt: ReceiptSchema.nullable().default(null),
 });
 export type Operation = z.infer<typeof OperationSchema>;
+
+export const FinancialTwinSchema = z.object({
+  snapshotId: z.string(), version: z.number().int().positive(), asOf: IsoDateSchema,
+  accounts: z.array(AccountSchema), transactions: z.array(TransactionSchema), bills: z.array(BillSchema),
+  subscriptions: z.array(SubscriptionSchema), goals: z.array(GoalSchema), mandates: z.array(MandateSchema),
+  safetyBufferCents: MoneySchema,
+});
+export type FinancialTwin = z.infer<typeof FinancialTwinSchema>;
 
 export const DemoStateSchema = z.object({
   clock: IsoDateSchema, goal: GoalSchema, finance: FinanceSchema,
   pendingImpact: ImpactSchema.nullable(), mandate: MandateSchema.nullable(),
   audit: z.array(AuditSchema), operations: z.array(OperationSchema),
+  twinVersion: z.number().int().positive().default(1),
+  accounts: z.array(AccountSchema).default([]), transactions: z.array(TransactionSchema).default([]),
+  bills: z.array(BillSchema).default([]), subscriptions: z.array(SubscriptionSchema).default([]),
+  approvals: z.array(ApprovalSchema).default([]), receipts: z.array(ReceiptSchema).default([]),
+  consumedNonces: z.array(z.string()).default([]),
 });
 export type DemoState = z.infer<typeof DemoStateSchema>;
 

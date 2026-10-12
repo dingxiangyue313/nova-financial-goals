@@ -19,6 +19,19 @@ export function createFixture(): DemoState {
       essentialSpendingCents: 250000, currentMonthExpenseCents: 0,
       historyMonths: 3, updatedAt: '2026-09-21',
     },
+    twinVersion: 1,
+    accounts: [
+      { id: 'checking', label: '日常活期', type: 'checking', balanceCents: 500000, currency: 'CNY', protected: false },
+      { id: 'emergency', label: '应急金', type: 'emergency', balanceCents: 2000000, currency: 'CNY', protected: true },
+      { id: 'goal-wallet', label: '旅行目标钱包', type: 'goal', balanceCents: 350000, currency: 'CNY', protected: false },
+    ],
+    transactions: [
+      { id: 'tx-salary', accountId: 'checking', date: '2026-09-01', title: '工资', category: 'income', amountCents: 900000 },
+      { id: 'tx-rent', accountId: 'checking', date: '2026-09-05', title: '房租与固定账单', category: 'bills', amountCents: -450000 },
+    ],
+    bills: [{ id: 'bill-mobile', title: '通信账单', dueDate: '2026-09-25', amountCents: 12000, paid: false }],
+    subscriptions: [{ id: 'sub-stream', title: 'StreamPlus', monthlyCents: 5500, nextChargeDate: '2026-09-23', status: 'active' }],
+    approvals: [], receipts: [], consumedNonces: [],
     pendingImpact: null, mandate: null, audit: [], operations: [],
   };
 }
