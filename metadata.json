@@ -1,0 +1,6 @@
+{
+  "name": "NOVA 智能财务目标导航",
+  "description": "基于真实生活节奏与应急金保护的个人智能财务目标规划与动态推演系统",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
