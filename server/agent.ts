@@ -50,7 +50,7 @@ export async function interpretGoal(text: string, clock: string): Promise<{ goal
       body: JSON.stringify({ model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
         thinking: { type: 'disabled' }, response_format: { type: 'json_object' }, max_tokens: 500,
         messages: [
-          { role: 'system', content: `你只解析模拟财务目标，不做财务决策。当前演示日期 ${clock}。输出 JSON object：title,targetAmount,targetDate,monthlySavings,emergencyFundProtected,flexibilityWeeks。日期用 YYYY-MM-DD；未知字段为 null。不要编造金额。` },
+          { role: 'system', content: `你只解析模拟财务目标，不做财务决策。当前演示日期 ${clock}。输出 JSON object：title,targetAmount,targetDate,monthlySavings,emergencyFundProtected,flexibilityWeeks。日期用 YYYY-MM-DD；所有金额字段必须是 JSON number；emergencyFundProtected 表示受保护应急金的金额（例如 20000），不能输出 boolean；未知字段为 null。不要编造金额。` },
           { role: 'user', content: text },
         ] }), signal: AbortSignal.timeout(12_000),
     });

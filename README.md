@@ -39,6 +39,14 @@ npm run dev
 | `npm test` | 确定性规则检查 |
 | `npm run test:e2e` | 用 Chrome 在 360、768、1440 px 跑三条主流程 |
 
+Playwright 按产品叙事分别验收：
+
+- 目标可行性：未选择方案不能激活，选择后可激活并在刷新后保留。
+- 目标影响监测：小额波动保持安静，显著支出触发解释与调整。
+- 受控自主执行：同一限定授权分别产生 Execute、Ask、Manual Review 与 Block，并留下凭证和 Hash 链审计。
+
+`.github/workflows/ci.yml` 会在提交到集成分支或更新 `main` 的 Pull Request 时自动运行类型检查、单元测试、生产构建和以上故事验收。CI 固定使用确定性模式，不读取 DeepSeek Key。
+
 生产模式本地验证：
 
 ```bash
