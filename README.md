@@ -32,24 +32,24 @@ Vite 8 的 Node.js 版本要求见 [Vite 官方文档](https://vite.dev/guide/)�
 
 此仓库当前为**私有仓库**。队友需要先由仓库管理员邀请为协作者，并接受 GitHub 邀请，之后才能克隆。
 
-\`\`\`bash
+```bash
 git clone https://github.com/dingxiangyue313/nova-financial-goals.git
 cd nova-financial-goals
-\`\`\`
+```
 
 也可以在 GitHub 页面点击 **Code → Download ZIP**，解压后在终端进入项目目录。
 
 ### 2. 安装依赖
 
-\`\`\`bash
+```bash
 npm install
-\`\`\`
+```
 
 ### 3. 启动开发服务器
 
-\`\`\`bash
+```bash
 npm run dev
-\`\`\`
+```
 
 Vite 会在终端显示本地访问地址。此项目配置的端口为 **3000**，通常可在浏览器打开：
 
@@ -61,17 +61,17 @@ Vite 会在终端显示本地访问地址。此项目配置的端口为 **3000**
 
 | 命令 | 作用 |
 | --- | --- |
-| \`npm run dev\` | 启动本地开发服务器 |
-| \`npm run build\` | 执行 TypeScript 项目构建检查并生成生产构建文件 |
-| \`npm run preview\` | 本地预览已生成的生产构建 |
-| \`npm run lint\` | 执行 TypeScript 类型检查（\`tsc --noEmit\`） |
+| `npm run dev` | 启动本地开发服务器 |
+| `npm run build` | 执行 TypeScript 项目构建检查并生成生产构建文件 |
+| `npm run preview` | 本地预览已生成的生产构建 |
+| `npm run lint` | 执行 TypeScript 类型检查（`tsc --noEmit`） |
 
 运行生产预览前，先执行：
 
-\`\`\`bash
+```bash
 npm run build
 npm run preview
-\`\`\`
+```
 
 ## API Key 与网络说明
 
