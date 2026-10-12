@@ -45,7 +45,7 @@ cd nova-financial-goals
 
 ```bash
 cp .env.example .env
-``
+```
 
 编辑项目根目录下的 `.env`，设置 `DEEPSEEK_API_KEY`。请勿把真实 API Key 发给队友或提交到 GitHub；每位队友应使用自己的密钥。没有配置密钥时，应用和模拟数据仍可打开，但 DeepSeek 智能解析不可用。
 
