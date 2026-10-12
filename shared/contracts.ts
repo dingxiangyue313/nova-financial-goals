@@ -57,6 +57,8 @@ export const MandateSchema = z.object({
   id: z.string(), goalId: z.string(), category: z.string(),
   maxPerOperationCents: MoneySchema, totalLimitCents: MoneySchema,
   spentCents: MoneySchema, expiresAt: IsoDateSchema, active: z.boolean(),
+  version: z.number().int().positive().default(1), agentId: z.string().default('travel-agent-demo'),
+  validFrom: IsoDateSchema.default('2026-09-21'),
 });
 export type Mandate = z.infer<typeof MandateSchema>;
 
@@ -81,6 +83,13 @@ export const ReceiptSchema = z.object({
   executedAt: z.string(), twinVersion: z.number().int().positive(),
 });
 export type Receipt = z.infer<typeof ReceiptSchema>;
+
+export const ToolRecordSchema = z.object({
+  id: z.string(), kind: z.enum(['transfer_draft', 'fx_quote', 'fx_draft']),
+  status: z.enum(['prepared', 'active', 'consumed', 'expired']),
+  data: z.record(z.string(), z.unknown()), expiresAt: z.string().nullable().default(null),
+});
+export type ToolRecord = z.infer<typeof ToolRecordSchema>;
 
 export const OperationSchema = z.object({
   operationId: z.string(), idempotencyKey: z.string(),
@@ -108,7 +117,7 @@ export const DemoStateSchema = z.object({
   accounts: z.array(AccountSchema).default([]), transactions: z.array(TransactionSchema).default([]),
   bills: z.array(BillSchema).default([]), subscriptions: z.array(SubscriptionSchema).default([]),
   approvals: z.array(ApprovalSchema).default([]), receipts: z.array(ReceiptSchema).default([]),
-  consumedNonces: z.array(z.string()).default([]),
+  consumedNonces: z.array(z.string()).default([]), toolRecords: z.array(ToolRecordSchema).default([]),
 });
 export type DemoState = z.infer<typeof DemoStateSchema>;
 

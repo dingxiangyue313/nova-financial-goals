@@ -34,7 +34,8 @@ export function createMandate(state: DemoState, input: {
   if (!['transport', 'shopping'].includes(category) || !Number.isInteger(maxPerOperationCents) || maxPerOperationCents <= 0 ||
       !Number.isInteger(totalLimitCents) || totalLimitCents < maxPerOperationCents || expiresAt <= state.clock) throw new Error('INVALID_MANDATE');
   const mandate: Mandate = { id: crypto.randomUUID(), goalId: state.goal.id, category,
-    maxPerOperationCents, totalLimitCents, spentCents: 0, expiresAt, active: true };
+    maxPerOperationCents, totalLimitCents, spentCents: 0, expiresAt, active: true,
+    version: 1, agentId: 'travel-agent-demo', validFrom: state.clock };
   return { ...state, mandate, audit: audit(state, 'create_mandate', 'confirmed', `${category} 授权额度已创建`) };
 }
 
