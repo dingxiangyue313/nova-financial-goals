@@ -1,0 +1,11 @@
+{
+  "name": "NOVA AI Banking Agent",
+  "short_name": "NOVA",
+  "description": "在明确授权边界内规划财务目标的本地概念应用。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f8fd",
+  "theme_color": "#1769d2",
+  "lang": "zh-CN",
+  "icons": [{"src":"/favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

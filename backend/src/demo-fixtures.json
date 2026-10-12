@@ -1,0 +1,170 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "asOf": "2026-09-19T08:30:00+08:00",
+    "timezone": "Asia/Shanghai",
+    "baseCurrency": "CNY",
+    "isSimulated": true
+  },
+  "user": {
+    "id": "usr_alex_001",
+    "name": "Alex Chen",
+    "locale": "zh-CN",
+    "riskProfile": "balanced",
+    "safetyBuffer": 300000,
+    "defaultPermissionLevel": "recommend"
+  },
+  "accounts": [
+    {
+      "id": "acc_checking_001",
+      "type": "checking",
+      "maskedName": "日常活期 · 1024",
+      "balance": 620000,
+      "currency": "CNY",
+      "status": "active"
+    },
+    {
+      "id": "acc_savings_001",
+      "type": "savings",
+      "maskedName": "目标储蓄 · 6688",
+      "balance": 1496000,
+      "currency": "CNY",
+      "protectedAmount": 1000000,
+      "goalAllocatedAmount": 496000,
+      "status": "active"
+    },
+    {
+      "id": "acc_investment_001",
+      "type": "investment",
+      "maskedName": "长期投资 · 3306",
+      "balance": 1860000,
+      "currency": "CNY",
+      "status": "active"
+    }
+  ],
+  "goal": {
+    "id": "goal_japan_001",
+    "name": "日本旅行",
+    "targetAmount": 800000,
+    "savedAmount": 496000,
+    "remainingAmount": 304000,
+    "progressPercent": 62,
+    "currency": "CNY",
+    "targetDate": "2027-01-31",
+    "tripStartDate": "2027-04-10",
+    "tripEndDate": "2027-04-17",
+    "status": "active",
+    "constraints": {
+      "protectedAmount": 1000000,
+      "doNotSellInvestments": true
+    },
+    "forecast": {
+      "flexibleRecoveryPerDay": 625,
+      "extraSpendScenario": 5000,
+      "estimatedDelayDays": 8
+    }
+  },
+  "cashflow30d": {
+    "openingCheckingBalance": 620000,
+    "knownIncome": 980000,
+    "knownBills": 621800,
+    "essentialLivingSpend": 521200,
+    "safetyBuffer": 300000,
+    "safeToSpend": 157000
+  },
+  "goalScenarios": [
+    {
+      "id": "scenario_conservative",
+      "monthlyContribution": 52000,
+      "completionDate": "2027-03-31",
+      "recommended": false
+    },
+    {
+      "id": "scenario_balanced",
+      "monthlyContribution": 76000,
+      "completionDate": "2027-01-31",
+      "recommended": true
+    },
+    {
+      "id": "scenario_accelerated",
+      "monthlyContribution": 102000,
+      "completionDate": "2026-12-31",
+      "recommended": false,
+      "warning": "两个月的 Safe-to-spend 将低于 ¥1,000"
+    }
+  ],
+  "recurringTransferPlan": {
+    "firstTransferDate": "2026-10-25",
+    "frequency": "monthly",
+    "dayOfMonth": 25,
+    "capAtRemainingGoalAmount": true
+  },
+  "externalAgent": {
+    "id": "agent_wandermate_001",
+    "name": "WanderMate Travel Agent",
+    "verificationState": "verified"
+  },
+  "mandate": {
+    "id": "mandate_japan_daily_001",
+    "name": "Japan Trip Daily Spend Mandate",
+    "validFrom": "2027-04-10T00:00:00+09:00",
+    "validTo": "2027-04-17T23:59:59+09:00",
+    "tripTotalLimit": 300000,
+    "status": "active",
+    "rules": [
+      {
+        "category": "transport",
+        "perTransactionLimit": 50000,
+        "dailyLimit": 80000,
+        "decisionWithinLimit": "execute"
+      },
+      {
+        "category": "dining",
+        "perTransactionLimit": 50000,
+        "dailyLimit": 80000,
+        "decisionWithinLimit": "execute"
+      },
+      {
+        "category": "shopping",
+        "decision": "ask"
+      },
+      {
+        "category": "other",
+        "decision": "block"
+      }
+    ]
+  },
+  "externalRequests": [
+    {
+      "id": "req_transport_001",
+      "requestedAt": "2027-04-10T10:05:00+09:00",
+      "merchant": "JR East",
+      "category": "transport",
+      "amount": 32000,
+      "currency": "CNY",
+      "decision": "execute",
+      "operationId": "op_extpay_001",
+      "idempotencyKey": "idem_req_transport_001_v1"
+    },
+    {
+      "id": "req_shopping_001",
+      "requestedAt": "2027-04-11T15:20:00+09:00",
+      "merchant": "Shibuya Loft",
+      "category": "shopping",
+      "amount": 28000,
+      "currency": "CNY",
+      "decision": "ask",
+      "approvalId": "approval_shopping_001"
+    },
+    {
+      "id": "req_dining_001",
+      "requestedAt": "2027-04-12T19:10:00+09:00",
+      "merchant": "Premium Sushi",
+      "category": "dining",
+      "amount": 68000,
+      "currency": "CNY",
+      "decision": "block",
+      "failureCode": "MANDATE_PER_TRANSACTION_LIMIT_EXCEEDED"
+    }
+  ]
+}

@@ -1,37 +1,25 @@
 {
-  "name": "react-example",
+  "name": "nova-financial-goals",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "workspaces": ["frontend", "backend"],
   "scripts": {
-    "dev": "node server.js",
-    "build": "vite build",
-    "preview": "vite preview",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
-    "start": "node server.js --production"
+    "dev": "npm --workspace nova-frontend run dev",
+    "preview:local": "npm --workspace nova-frontend run preview:local",
+    "build": "npm --workspace nova-frontend run build",
+    "start": "npm --workspace nova-frontend run start",
+    "lint": "npm --workspace nova-frontend run lint",
+    "test": "npm run verify:banking && npm run verify:twin && npm run verify:goal",
+    "verify:banking": "npm --workspace nova-backend run verify:banking",
+    "verify:twin": "npm --workspace nova-backend run verify:twin",
+    "verify:goal": "npm --workspace nova-backend run verify:goal",
+    "verify:surfaces": "npm --workspace nova-backend run verify:surfaces",
+    "verify:stage2": "npm --workspace nova-backend run verify:stage2",
+    "verify:stage3": "npm --workspace nova-backend run verify:stage3",
+    "verify:stage4": "npm --workspace nova-frontend run test:e2e",
+    "eval:baseline": "npm --workspace nova-backend run eval:baseline",
+    "eval:phase3": "npm run build && npm --workspace nova-backend run eval:phase3",
+    "db:generate": "npm --workspace nova-backend run db:generate"
   },
-  "dependencies": {
-    "@google/genai": "^2.4.0",
-    "@tailwindcss/vite": "^4.3.3",
-    "@vitejs/plugin-react": "^6.1.1",
-    "lucide-react": "^0.546.0",
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1",
-    "vite": "^8.3.0",
-    "express": "^4.21.2",
-    "dotenv": "^17.2.3",
-    "motion": "^12.23.24"
-  },
-  "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
-    "tailwindcss": "^4.3.3",
-    "tsx": "^4.21.0",
-    "typescript": "^7.0.2",
-    "@types/express": "^4.17.21"
-  }
+  "engines": { "node": ">=22.13.0" }
 }
