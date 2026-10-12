@@ -6,6 +6,7 @@ interface ProfileScreenProps {
   onNavigate: (s: ScreenId) => void;
   onTriggerImpact: () => void;
   onResetData: () => void;
+  onBankingDemo: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -13,6 +14,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onNavigate,
   onTriggerImpact,
   onResetData,
+  onBankingDemo,
 }) => {
   return (
     <div className="flex-1 flex flex-col pt-2 pb-safe px-4 overflow-y-auto no-scrollbar space-y-3.5">
@@ -48,7 +50,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <div className="flex items-center justify-between py-2 border-b border-[#F0F2F5] text-[13px]">
           <span className="text-[#646A73]">可承受时间浮动</span>
-          <span className="font-semibold text-[#1F2329]">1–2 周平滑</span>
+          <span className="font-semibold text-[#1F2329]">{goal.flexibilityWeeks} 周浮动</span>
         </div>
 
         <div className="flex items-center justify-between py-2 text-[13px]">
@@ -59,6 +61,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </span>
         </div>
       </div>
+
+      <button onClick={onBankingDemo} className="w-full bg-white border border-[#E5E8EB] rounded-xl p-4 shadow-sm flex items-center justify-between text-[#0F6B6D] font-semibold text-sm"><span>授权、外部 Agent 与执行记录</span><span className="material-symbols-outlined">arrow_forward</span></button>
 
       {/* Quick Prototype Navigation & Simulation Tools */}
       <div className="bg-[#F8FAFB] border border-[#E5E8EB] rounded-xl p-3.5 space-y-2.5">

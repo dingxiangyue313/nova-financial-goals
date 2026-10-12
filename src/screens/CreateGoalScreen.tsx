@@ -6,7 +6,7 @@ interface CreateGoalScreenProps {
   onUpdateGoal: (updated: Partial<Goal>) => void;
   onAnalyzeGoal: (text: string) => Promise<Partial<Goal>>;
   isAnalyzing: boolean;
-  onNext: () => void;
+  onNext: (updated: Partial<Goal>) => void;
   onBack: () => void;
 }
 
@@ -224,7 +224,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
                     {targetDate}
                   </span>
                 </div>
-                <p className="text-[12px] leading-tight text-[#8F959E]">距今约 85 天</p>
+                <p className="text-[12px] leading-tight text-[#8F959E]">目标日期按演示时钟计算</p>
               </div>
             </div>
 
@@ -252,7 +252,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
                 <div className="flex items-baseline justify-between">
                   <span className="text-[13px] text-[#646A73]">可调整范围</span>
                   <span className="text-[13px] text-[#1F2329] font-medium">
-                    允许 1–2 周浮动
+                    允许 {goal.flexibilityWeeks} 周浮动
                   </span>
                 </div>
               </div>
@@ -311,7 +311,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
       {/* Footer Area */}
       <div className="flex flex-col gap-2.5 pt-4 pb-2">
         <button
-          onClick={onNext}
+          onClick={() => onNext({ targetAmount, targetDate, emergencyFundProtected: emergencyFund, quote: customQuote })}
           type="button"
           id="cta-feasibility"
           className="w-full h-11 min-h-[44px] bg-[#0F6B6D] hover:bg-[#084C4E] active:scale-[0.99] text-white rounded-xl text-[14px] font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"

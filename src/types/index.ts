@@ -1,10 +1,11 @@
-export type ScreenId = 'home' | 'create_goal' | 'feasibility' | 'impact' | 'goals_list' | 'activity' | 'profile';
+export type ScreenId = 'home' | 'create_goal' | 'feasibility' | 'impact' | 'goals_list' | 'activity' | 'profile' | 'banking_demo';
 
 export interface Goal {
   id: string;
   title: string;
   targetAmount: number;
   currentAmount: number;
+  progressPercent: number;
   targetDate: string; // e.g. '2026-12-15'
   originalDate?: string;
   monthlySavings: number;
@@ -30,6 +31,7 @@ export interface ImpactScenario {
     increasePerMonth: number;
     newMonthly: number;
     completionDate: string;
+    available: boolean;
   };
   optionB: {
     title: string;

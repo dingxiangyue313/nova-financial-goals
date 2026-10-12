@@ -3,6 +3,7 @@ import { Goal } from '../types';
 
 interface GoalsListScreenProps {
   goal: Goal;
+  hasImpactPending: boolean;
   onSelectGoal: (g: Goal) => void;
   onNavigateToCreate: () => void;
   onNavigateToImpact: () => void;
@@ -10,6 +11,7 @@ interface GoalsListScreenProps {
 
 export const GoalsListScreen: React.FC<GoalsListScreenProps> = ({
   goal,
+  hasImpactPending,
   onSelectGoal,
   onNavigateToCreate,
   onNavigateToImpact,
@@ -68,7 +70,7 @@ export const GoalsListScreen: React.FC<GoalsListScreenProps> = ({
             </span>
           </div>
           <span className="text-[12px] text-[#646A73]">
-            {goal.targetDate.replace('2026年', '').replace('2027年', '27/')}
+            {goal.targetDate}
           </span>
         </div>
 
@@ -84,7 +86,7 @@ export const GoalsListScreen: React.FC<GoalsListScreenProps> = ({
         <div className="w-full h-2 rounded-full bg-[#F0F2F5] overflow-hidden">
           <div
             className="h-full bg-[#0F6B6D] rounded-full"
-            style={{ width: `${(goal.currentAmount / goal.targetAmount) * 100}%` }}
+            style={{ width: `${goal.progressPercent}%` }}
           ></div>
         </div>
 
@@ -93,42 +95,20 @@ export const GoalsListScreen: React.FC<GoalsListScreenProps> = ({
             月供计划: ¥{goal.monthlySavings.toLocaleString()}
           </span>
           <button
+            disabled={!hasImpactPending}
             onClick={(e) => {
               e.stopPropagation();
               onNavigateToImpact();
             }}
             className="text-[#0F6B6D] hover:underline flex items-center gap-0.5 font-medium cursor-pointer"
           >
-            <span>模拟影响分析</span>
+            <span>{hasImpactPending ? '查看影响分析' : '当前无显著影响'}</span>
             <span className="material-symbols-outlined text-[14px]">trending_up</span>
           </button>
         </div>
       </div>
 
-      {/* Secondary Dummy Goal */}
-      <div className="bg-white border border-[#E5E8EB] rounded-xl p-3.5 shadow-sm space-y-2.5 opacity-80">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#646A73]"></span>
-            <span className="text-[15px] font-bold text-[#1F2329]">微单相机镜头</span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#646A73] font-medium">
-              灵活心愿
-            </span>
-          </div>
-          <span className="text-[12px] text-[#646A73]">次年 3 月</span>
-        </div>
 
-        <div className="flex items-baseline justify-between text-[13px]">
-          <span className="text-[#646A73]">
-            已存 <strong className="text-[#1F2329]">¥2,400</strong>
-          </span>
-          <span className="text-[#646A73]">目标 ¥12,000</span>
-        </div>
-
-        <div className="w-full h-2 rounded-full bg-[#F0F2F5] overflow-hidden">
-          <div className="h-full bg-[#8F959E] rounded-full" style={{ width: '20%' }}></div>
-        </div>
-      </div>
     </div>
   );
 };

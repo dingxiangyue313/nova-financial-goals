@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { ScreenId, Goal, ImpactScenario } from './types';
-import { initialGoal, defaultImpactScenario } from './data/mockData';
+import { useEffect, useState } from 'react';
+import { ScreenId, Goal } from './types';
+import { api, cents, displayGoal, displayImpact } from './api';
+import { UiCardSchema, type Snapshot, type UiCard } from '../shared/contracts';
 import { TopBar } from './components/TopBar';
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './screens/HomeScreen';
@@ -10,18 +11,45 @@ import { GoalImpactScreen } from './screens/GoalImpactScreen';
 import { GoalsListScreen } from './screens/GoalsListScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { BankingDemoScreen } from './screens/BankingDemoScreen';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('home');
   const [previousScreen, setPreviousScreen] = useState<ScreenId>('home');
-  const [goal, setGoal] = useState<Goal>(initialGoal);
-  const [scenario] = useState<ImpactScenario>(defaultImpactScenario);
-  const [hasImpactPending, setHasImpactPending] = useState<boolean>(true);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [deviceFrame, setDeviceFrame] = useState<boolean>(true);
   const [showSimulateModal, setShowSimulateModal] = useState<boolean>(false);
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
+  const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
+  useEffect(() => {
+    api('/api/session').then(setSnapshot).catch(e => setLoadError(e.message));
+  }, []);
+  useEffect(() => {
+    if (!snapshot) return;
+    let current = true;
+    api<{ cards: UiCard[]; provider: string }>('/api/ui/cards').then(result => {
+      if (!current) return;
+      const cards = result.cards.map(card => UiCardSchema.parse(card));
+      setSnapshot(previous => previous ? { ...previous, cards } : previous);
+    }).catch(() => {});
+    return () => { current = false; };
+  }, [snapshot?.goal.id, snapshot?.goal.savedCents, snapshot?.goal.selectedPlanId, snapshot?.pendingImpact?.id, snapshot?.operations.length]);
+  const goal = snapshot ? displayGoal(snapshot) : null;
+  const scenario = snapshot ? displayImpact(snapshot) : null;
+  const hasImpactPending = Boolean(snapshot?.pendingImpact);
 
+  const mutate = async (url: string, method: string, body?: unknown) => {
+    try {
+      const next = await api<Snapshot>(url, method, body);
+      setSnapshot(next);
+      return next;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '操作失败');
+      throw error;
+    }
+  };
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -45,7 +73,7 @@ export default function App() {
       setCurrentScreen('home');
     } else if (currentScreen === 'impact') {
       setCurrentScreen('home');
-    } else if (currentScreen === 'goals_list' || currentScreen === 'activity' || currentScreen === 'profile') {
+    } else if (currentScreen === 'goals_list' || currentScreen === 'activity' || currentScreen === 'profile' || currentScreen === 'banking_demo') {
       setCurrentScreen('home');
     } else {
       setCurrentScreen('home');
@@ -53,107 +81,72 @@ export default function App() {
   };
 
   const handleUpdateGoal = (updated: Partial<Goal>) => {
-    setGoal((prev) => ({ ...prev, ...updated }));
-    showToast('目标参数已实时调整');
+    setDraftChanges(previous => ({ ...previous, ...updated }));
+    showToast('已更新目标草案');
   };
 
   const handleAnalyzeGoal = async (text: string): Promise<Partial<Goal>> => {
     setIsAnalyzingGoal(true);
     try {
-      const response = await fetch('/api/goal/interpret', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || 'DeepSeek 解析失败，请稍后重试。');
-      }
-
-      const parsed = payload.goal ?? {};
-      const updates: Partial<Goal> = { quote: text };
-      if (typeof parsed.title === 'string' && parsed.title.trim()) updates.title = parsed.title.trim();
-      if (typeof parsed.targetAmount === 'number') updates.targetAmount = parsed.targetAmount;
-      if (typeof parsed.targetDate === 'string' && parsed.targetDate.trim()) updates.targetDate = parsed.targetDate.trim();
-      if (typeof parsed.monthlySavings === 'number') updates.monthlySavings = parsed.monthlySavings;
-      if (typeof parsed.emergencyFundProtected === 'number') updates.emergencyFundProtected = parsed.emergencyFundProtected;
-      if (typeof parsed.flexibilityWeeks === 'number') updates.flexibilityWeeks = parsed.flexibilityWeeks;
-
-      setGoal((prev) => ({ ...prev, ...updates }));
-      showToast('DeepSeek 已生成目标草案，请核对后再继续');
-      return updates;
-    } catch (error) {
-      throw error instanceof Error ? error : new Error('DeepSeek 解析失败，请检查网络和 API 配置。');
-    } finally {
-      setIsAnalyzingGoal(false);
-    }
+      const parsed = await api<{goal: Record<string, unknown>; provider: string; notice?: string}>('/api/goal/interpret', 'POST', { text });
+      const changes: Partial<Goal> = { quote: text };
+      if (typeof parsed.goal.title === 'string') changes.title = parsed.goal.title;
+      if (typeof parsed.goal.targetAmount === 'number') changes.targetAmount = parsed.goal.targetAmount;
+      if (typeof parsed.goal.targetDate === 'string') changes.targetDate = parsed.goal.targetDate;
+      if (typeof parsed.goal.emergencyFundProtected === 'number') changes.emergencyFundProtected = parsed.goal.emergencyFundProtected;
+      if (typeof parsed.goal.flexibilityWeeks === 'number') changes.flexibilityWeeks = parsed.goal.flexibilityWeeks;
+      handleUpdateGoal(changes);
+      showToast(parsed.provider === 'deepseek' ? 'DeepSeek 已解析，请核对草案' : '已用确定性模式解析，请核对草案');
+      return changes;
+    } finally { setIsAnalyzingGoal(false); }
   };
 
-  const handleConfirmPlan = (monthlyAmount: number, delayDays: number) => {
-    const updatedStatus = delayDays > 0 ? 'delayed' : 'normal';
-    setGoal((prev) => ({
-      ...prev,
-      monthlySavings: monthlyAmount,
-      delayDays,
-      status: updatedStatus,
-      targetDate:
-        delayDays === 20
-          ? '2027年1月5日'
-          : delayDays === -25
-          ? '2026年11月20日'
-          : '2026年12月15日',
-    }));
-    showToast(`计划已确认：以每月 ¥${monthlyAmount.toLocaleString()} 节奏推进`);
+  const handleNext = async (updated: Partial<Goal>) => {
+    if (!goal) return;
+    const combined = { ...goal, ...draftChanges, ...updated };
+    await mutate('/api/goals', 'POST', {
+      title: combined.title, targetCents: cents(combined.targetAmount), targetDate: combined.targetDate,
+      protectedCents: cents(combined.emergencyFundProtected), quote: combined.quote || '',
+      flexibilityWeeks: combined.flexibilityWeeks,
+    });
+    setDraftChanges({});
+    navigateTo('feasibility');
+  };
+  const handleConfirmPlan = async (planId: string) => {
+    await mutate('/api/goals/activate', 'POST', { planId });
+    showToast('计划已激活；不会自动扣款');
     navigateTo('home');
   };
-
-  const handleApplyOption = (option: 'A' | 'B') => {
-    if (option === 'A') {
-      setGoal((prev) => ({
-        ...prev,
-        monthlySavings: scenario.optionA.newMonthly,
-        status: 'normal',
-        delayDays: 0,
-        targetDate: scenario.optionA.completionDate,
-      }));
-      showToast('已应用方案 A：微调月存 ¥1,800，保持原日期');
-    } else {
-      setGoal((prev) => ({
-        ...prev,
-        monthlySavings: scenario.optionB.newMonthly,
-        status: 'delayed',
-        delayDays: scenario.optionB.delayDays,
-        targetDate: scenario.optionB.completionDate,
-      }));
-      showToast('已应用方案 B：出行延后 18 天至 2027年1月2日');
-    }
-    setHasImpactPending(false);
+  const handleApplyOption = async (option: 'A' | 'B') => {
+    await mutate('/api/impact/decision', 'POST', { decision: option });
+    showToast(`已应用方案 ${option}`);
     navigateTo('home');
   };
-
-  const handleLater = () => {
-    showToast('已标记稍后处理，NOVA 将在下次账单日前再次提醒');
-    navigateTo('home');
+  const handleLater = async () => {
+    await mutate('/api/impact/decision', 'POST', { decision: 'later' });
+    showToast('已标记稍后处理'); navigateTo('home');
   };
-
-  const handleDismiss = () => {
-    setHasImpactPending(false);
-    showToast('已忽略本次提示');
-    navigateTo('home');
+  const handleDismiss = async () => {
+    await mutate('/api/impact/decision', 'POST', { decision: 'dismiss' });
+    showToast('已忽略本次提示'); navigateTo('home');
   };
-
-  const handleResetData = () => {
-    setGoal(initialGoal);
-    setHasImpactPending(true);
-    showToast('已重置为初始演示数据');
+  const handleResetData = async () => {
+    await mutate('/api/demo/reset', 'POST');
+    showToast('已重置演示数据');
   };
-
-  const handleTriggerImpact = () => {
-    setHasImpactPending(true);
-    navigateTo('impact');
-    showToast('已模拟 9月20日 汽车保养支出 ¥900');
+  const handleTriggerImpact = async (amount = 900) => {
+    const result = await mutate('/api/demo/expense', 'POST', { amountCents: cents(amount), title: '汽车保养' });
+    if (result.pendingImpact) { navigateTo('impact'); showToast(`已模拟 ¥${amount} 支出，目标影响已更新`); }
+    else showToast(`已模拟 ¥${amount} 支出，未触发显著影响提醒`);
   };
-
+  const handleDeposit = async () => {
+    await mutate('/api/demo/deposit', 'POST', { amountCents: 150000 });
+    showToast('已模拟存入 ¥1,500');
+  };
+  const handleScenario = async (scenario: 'insufficient_data' | 'infeasible' | 'normal') => {
+    await mutate('/api/demo/scenario', 'POST', { scenario });
+    showToast(scenario === 'insufficient_data' ? '已切换为数据不足' : scenario === 'infeasible' ? '已切换为不可行' : '已恢复正常数据');
+  };
   // Get screen titles for TopBar
   const getScreenTitle = () => {
     switch (currentScreen) {
@@ -169,6 +162,8 @@ export default function App() {
         return '动态脉络';
       case 'profile':
         return '个人设置';
+      case 'banking_demo':
+        return '授权与执行记录';
       default:
         return '';
     }
@@ -180,6 +175,8 @@ export default function App() {
     currentScreen === 'goals_list' ||
     currentScreen === 'activity' ||
     currentScreen === 'profile';
+
+  if (!snapshot || !goal) return <div className="min-h-screen grid place-items-center bg-[#F5F7F8] text-[#0F6B6D]">{loadError ? `加载失败：${loadError}。请刷新页面重试。` : 'NOVA 正在读取演示数据…'}</div>;
 
   return (
     <div className="min-h-screen bg-[#E5E8EB] flex flex-col items-center justify-center p-0 md:py-6 text-[#1F2329] selection:bg-[#E6F2F2]">
@@ -264,6 +261,7 @@ export default function App() {
           {currentScreen === 'home' && (
             <HomeScreen
               goal={goal}
+              snapshot={snapshot}
               hasImpactPending={hasImpactPending}
               onNavigateToFeasibility={() => navigateTo('feasibility')}
               onNavigateToImpact={() => navigateTo('impact')}
@@ -277,7 +275,7 @@ export default function App() {
               onUpdateGoal={handleUpdateGoal}
               onAnalyzeGoal={handleAnalyzeGoal}
               isAnalyzing={isAnalyzingGoal}
-              onNext={() => navigateTo('feasibility')}
+              onNext={handleNext}
               onBack={handleBack}
             />
           )}
@@ -285,12 +283,14 @@ export default function App() {
           {currentScreen === 'feasibility' && (
             <FeasibilityScreen
               goal={goal}
+              assessment={snapshot.assessment}
+              selectedPlanId={snapshot.goal.selectedPlanId}
               onConfirmPlan={handleConfirmPlan}
               onBack={handleBack}
             />
           )}
 
-          {currentScreen === 'impact' && (
+          {currentScreen === 'impact' && scenario && (
             <GoalImpactScreen
               goal={goal}
               scenario={scenario}
@@ -301,18 +301,23 @@ export default function App() {
             />
           )}
 
+          {currentScreen === 'impact' && !scenario && <div className="m-4 bg-white rounded-xl p-5 text-sm text-[#646A73]">目前没有显著支出影响。请先激活计划，再在模拟数据面板注入支出。</div>}
+
           {currentScreen === 'goals_list' && (
             <GoalsListScreen
               goal={goal}
               onSelectGoal={() => navigateTo('home')}
               onNavigateToCreate={() => navigateTo('create_goal')}
               onNavigateToImpact={() => navigateTo('impact')}
+              hasImpactPending={hasImpactPending}
             />
           )}
 
           {currentScreen === 'activity' && (
-            <ActivityScreen onNavigateToImpact={() => navigateTo('impact')} />
+            <ActivityScreen audit={snapshot.audit} hasImpactPending={hasImpactPending} onNavigateToImpact={() => navigateTo('impact')} />
           )}
+
+          {currentScreen === 'banking_demo' && <BankingDemoScreen snapshot={snapshot} mutate={mutate} />}
 
           {currentScreen === 'profile' && (
             <ProfileScreen
@@ -320,6 +325,7 @@ export default function App() {
               onNavigate={navigateTo}
               onTriggerImpact={handleTriggerImpact}
               onResetData={handleResetData}
+              onBankingDemo={() => navigateTo('banking_demo')}
             />
           )}
         </main>
@@ -375,7 +381,7 @@ export default function App() {
               <div className="space-y-2">
                 <button
                   onClick={() => {
-                    handleTriggerImpact();
+                    void handleTriggerImpact();
                     setShowSimulateModal(false);
                   }}
                   className="w-full py-2.5 px-3 rounded-xl bg-[#E6F2F2] hover:bg-[#0F6B6D] hover:text-white text-[#0F6B6D] font-semibold text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer"
@@ -389,9 +395,8 @@ export default function App() {
 
                 <button
                   onClick={() => {
-                    handleUpdateGoal({ currentAmount: 5000 });
+                    void handleDeposit();
                     setShowSimulateModal(false);
-                    showToast('已存入额外 ¥1,500，进度提升至 62.5%');
                   }}
                   className="w-full py-2.5 px-3 rounded-xl bg-[#F5F7F8] hover:bg-[#E5E8EB] text-[#1F2329] font-medium text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer"
                 >
@@ -404,9 +409,15 @@ export default function App() {
                   <span className="material-symbols-outlined text-[16px]">add</span>
                 </button>
 
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button onClick={() => { void handleTriggerImpact(10); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#646A73]">小额波动 ¥10</button>
+                  <button onClick={() => { void handleScenario('insufficient_data'); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#646A73]">数据不足</button>
+                  <button onClick={() => { void handleScenario('infeasible'); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#646A73]">目标不可行</button>
+                </div>
+
                 <button
                   onClick={() => {
-                    handleResetData();
+                    void handleResetData();
                     setShowSimulateModal(false);
                   }}
                   className="w-full py-2 px-3 rounded-xl border border-[#E5E8EB] hover:bg-[#F5F7F8] text-[#646A73] text-[12px] font-medium text-center transition-colors cursor-pointer"
