@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ScreenId, Goal } from './types';
 import { api, cents, displayGoal, displayImpact } from './api';
-import { UiCardSchema, type Snapshot, type UiCard } from '../shared/contracts';
+import type { Snapshot, UiCard } from '../shared/contracts';
+import { normalizeUiCard } from '../shared/generative';
 import { TopBar } from './components/TopBar';
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './screens/HomeScreen';
@@ -31,7 +32,7 @@ export default function App() {
     let current = true;
     api<{ cards: UiCard[]; provider: string }>('/api/ui/cards').then(result => {
       if (!current) return;
-      const cards = result.cards.map(card => UiCardSchema.parse(card));
+      const cards = result.cards.map(card => normalizeUiCard(card));
       setSnapshot(previous => previous ? { ...previous, cards } : previous);
     }).catch(() => {});
     return () => { current = false; };
@@ -42,7 +43,9 @@ export default function App() {
 
   const mutate = async (url: string, method: string, body?: unknown) => {
     try {
-      const next = await api<Snapshot>(url, method, body);
+      const versionedBody = body && typeof body === 'object' && !Array.isArray(body)
+        ? { ...(body as Record<string, unknown>), expectedTwinVersion: snapshot?.twinVersion } : body;
+      const next = await api<Snapshot>(url, method, versionedBody);
       setSnapshot(next);
       return next;
     } catch (error) {

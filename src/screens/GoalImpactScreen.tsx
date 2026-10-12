@@ -254,7 +254,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
               {selectedOption === 'A'
                 ? '确认应用：方案 A（保持原日期）'
                 : selectedOption === 'B'
-                ? '确认应用：方案 B（延后 18 天）'
+                ? `确认应用：方案 B（延后 ${scenario.optionB.delayDays} 天）`
                 : '请选择一个方案'}
             </span>
             {selectedOption && (

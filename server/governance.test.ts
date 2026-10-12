@@ -58,6 +58,15 @@ test('approval becomes invalid when the financial twin version changes', () => {
     'activate_goal', { goalId: base.goal.id, planId: 'balanced', twinVersion: 1 }), /TWIN_VERSION_CHANGED/);
 });
 
+test('approval rejects expired snapshots and wrong actions', () => {
+  const base = createFixture();
+  const expired = createApprovalSnapshot(base, 'activate_goal', { planId: 'balanced' }, '2026-09-21T11:59:59.000Z');
+  assert.throws(() => confirmApproval(expired.state, expired.approval.id, expired.approval.snapshotHash), /APPROVAL_EXPIRED/);
+  const valid = createApprovalSnapshot(base, 'activate_goal', { planId: 'balanced' }, '2026-09-21T12:05:00.000Z');
+  const confirmed = confirmApproval(valid.state, valid.approval.id, valid.approval.snapshotHash);
+  assert.throws(() => consumeApproval(confirmed.state, confirmed.token, 'execute_transfer', { planId: 'balanced' }), /APPROVAL_PARAMETERS_CHANGED/);
+});
+
 test('audit events form a hash chain and tampering is detectable', () => {
   const first = appendAuditEvent(createFixture(), 'approval_viewed', 'pending', 'approval-1');
   const second = appendAuditEvent(first, 'approval_confirmed', 'approved', 'approval-1');

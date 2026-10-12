@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { addDays } from './domain.ts';
 import { UiCardSchema, type UiCard } from '../shared/contracts.ts';
+import { containsPromptInjection } from './security.ts';
 
 const ParsedGoal = z.object({
   title: z.string().max(60).nullable().optional(),
@@ -37,6 +38,8 @@ function deterministic(text: string, clock: string): ParsedGoalDraft {
 
 export async function interpretGoal(text: string, clock: string): Promise<{ goal: ParsedGoalDraft; provider: 'deepseek' | 'deterministic'; notice?: string }> {
   if (!text.trim() || text.length > 500) throw new Error('目标描述不能为空，且最多 500 字。');
+  if (containsPromptInjection(text)) return { goal: deterministic('', clock), provider: 'deterministic',
+    notice: '检测到与目标规划无关的指令，未发送给模型。请只描述目标、金额和日期。' };
   const fallback = () => ({ goal: deterministic(text, clock), provider: 'deterministic' as const,
     notice: '当前使用确定性演示解析，请核对金额和日期。' });
   const key = process.env.DEEPSEEK_API_KEY;

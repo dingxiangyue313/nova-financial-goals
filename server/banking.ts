@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { DemoState, Operation, Receipt, ToolRecord } from '../shared/contracts.ts';
 import { assessGoal } from './domain.ts';
 import { activatePlan } from './domain.ts';
+import { approveOperation, evaluateExternalRequest, reconcileOperation } from './tools.ts';
 import {
   appendAuditEvent,
   confirmApproval,
@@ -44,9 +45,15 @@ const schemas = {
   prepare_fx_order: z.object({ quoteId: z.string(), sourceAccountId: z.string(), destinationAccountId: z.string() }),
   execute_fx_order: z.object({ draftId: z.string(), quoteId: z.string(), approvalToken: z.string(), idempotencyKey: z.string().min(1).max(100) }),
   create_mandate: z.object({ agentId: z.string(), category: z.string(), maxPerOperationCents: money, totalLimitCents: money, expiresAt: z.iso.date(), approvalToken: z.string() }),
+  update_mandate: z.object({ mandateId: z.string(), category: z.string(), maxPerOperationCents: money,
+    totalLimitCents: money, expiresAt: z.iso.date(), approvalToken: z.string() }),
   list_mandates: z.object({}),
   pause_mandate: z.object({ mandateId: z.string(), approvalToken: z.string() }),
   revoke_mandate: z.object({ mandateId: z.string(), approvalToken: z.string() }),
+  evaluate_external_request: z.object({ agentId: z.string(), category: z.string(), amountCents: money,
+    idempotencyKey: z.string().min(1).max(100), simulateTimeout: z.boolean().default(false) }),
+  approve_external_operation: z.object({ operationId: z.string(), approvalToken: z.string() }),
+  reconcile_operation: z.object({ operationId: z.string() }),
   detect_financial_signals: z.object({}),
   explain_decision: z.object({ operationId: z.string() }),
   get_activity: z.object({ limit: z.number().int().min(1).max(100).default(50) }),
@@ -133,13 +140,15 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
     case 'compare_scenarios': return { state, result: { scenarios: assessGoal(state).plans } };
     case 'get_goal_progress': return { state, result: { goal: state.goal, assessment: assessGoal(state) } };
     case 'create_goal': {
+      const savedCents = input.title === state.goal.title ? state.goal.savedCents : 0;
       let next: DemoState = { ...state, twinVersion: state.twinVersion + 1,
         goal: { ...state.goal, id: randomUUID(), title: input.title, targetCents: input.targetCents,
-          savedCents: 0, targetDate: input.targetDate, originalDate: input.targetDate,
+          savedCents, targetDate: input.targetDate, originalDate: input.targetDate,
           protectedCents: input.protectedCents, flexibilityWeeks: input.flexibilityWeeks, quote: input.quote,
           status: 'draft', selectedPlanId: null, monthlyContributionCents: 0 },
         finance: { ...state.finance, emergencyCents: input.protectedCents }, pendingImpact: null, mandate: null,
-        accounts: state.accounts.map(item => item.id === 'emergency' ? { ...item, balanceCents: input.protectedCents } : item) };
+        accounts: state.accounts.map(item => item.id === 'emergency' ? { ...item, balanceCents: input.protectedCents }
+          : item.id === 'goal-wallet' ? { ...item, balanceCents: savedCents } : item) };
       next = appendAuditEvent(next, 'create_goal', 'draft', input.title);
       return { state: next, result: { goal: next.goal, twinVersion: next.twinVersion } };
     }
@@ -281,6 +290,16 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       return { state: next, result: { mandateId: next.mandate!.id, version: 1, status: 'active' } };
     }
     case 'list_mandates': return { state, result: { mandates: state.mandate ? [state.mandate] : [] } };
+    case 'update_mandate': {
+      if (!state.mandate || state.mandate.id !== input.mandateId) throw new Error('MANDATE_NOT_FOUND');
+      const parameters = { mandateId: input.mandateId, category: input.category,
+        maxPerOperationCents: input.maxPerOperationCents, totalLimitCents: input.totalLimitCents, expiresAt: input.expiresAt };
+      let next = consumeApproval(state, input.approvalToken, 'update_mandate', parameters);
+      next = { ...next, twinVersion: next.twinVersion + 1, mandate: { ...state.mandate, ...parameters,
+        version: state.mandate.version + 1 } };
+      next = appendAuditEvent(next, 'mandate_updated', 'confirmed', '授权边界与版本已更新');
+      return { state: next, result: { mandateId: input.mandateId, version: next.mandate!.version, status: next.mandate!.active ? 'active' : 'paused' } };
+    }
     case 'pause_mandate':
     case 'revoke_mandate': {
       if (!state.mandate || state.mandate.id !== input.mandateId) throw new Error('MANDATE_NOT_FOUND');
@@ -289,6 +308,22 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
         mandate: { ...state.mandate, active: false, version: state.mandate.version + 1 } };
       next = appendAuditEvent(next, name === 'pause_mandate' ? 'mandate_paused' : 'mandate_revoked', 'confirmed', '授权状态已更新');
       return { state: next, result: { mandateId: input.mandateId, version: next.mandate!.version, status: name === 'pause_mandate' ? 'paused' : 'revoked' } };
+    }
+    case 'evaluate_external_request': {
+      const evaluated = evaluateExternalRequest(state, {
+        agentId: input.agentId, category: input.category, amountCents: input.amountCents,
+        idempotencyKey: input.idempotencyKey, simulateTimeout: input.simulateTimeout,
+      });
+      return { state: evaluated.state, result: evaluated.operation };
+    }
+    case 'approve_external_operation': {
+      let next = consumeApproval(state, input.approvalToken, 'approve_external_operation', { operationId: input.operationId });
+      next = approveOperation(next, input.operationId);
+      return { state: next, result: next.operations.find(item => item.operationId === input.operationId) };
+    }
+    case 'reconcile_operation': {
+      const next = reconcileOperation(state, input.operationId);
+      return { state: next, result: next.operations.find(item => item.operationId === input.operationId) };
     }
     case 'detect_financial_signals': return { state, result: { signals: state.pendingImpact ? [{ type: 'goal_impact', impact: state.pendingImpact }] : [] } };
     case 'explain_decision': {

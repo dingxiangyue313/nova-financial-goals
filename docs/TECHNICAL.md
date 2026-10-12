@@ -7,16 +7,18 @@ React 原版界面 ── same-origin /api ── Express 服务
                                    ├─ Zod 共享契约 / 白名单卡片
                                    ├─ 确定性目标与风险规则
                                    ├─ DeepSeek 可选解析 / 编排
-                                   ├─ SQLite 会话、状态、审计
+                                   ├─ SQLite 会话、Twin、Approval、Operation、Receipt、审计
                                    └─ 受保护 /mcp 模拟工具
 ```
 
 - 入口：`server/index.ts`。演示默认时钟为 `2026-09-21`；重置恢复固定夹具。
-- 状态：`server/store.ts` 为每个签名 Cookie 建立独立 SQLite 会话。应用只有模拟账户；不导入真实银行数据。
+- 状态：`server/store.ts` 为每个签名 Cookie 建立独立 SQLite 会话。版本化 Financial Twin 包含账户、交易、账单、订阅、目标和 Mandate；写入在 SQLite 事务内同步状态与证据表。
 - 契约：`shared/contracts.ts` 使用 Zod；金额均为整数分，日期是 `YYYY-MM-DD`。页面只把分转换为显示用元。
-- 规则：`server/domain.ts` 计算资金余量、预测日期、三方案和显著影响；`server/tools.ts` 判断身份、类别、额度、到期日、余额、幂等性，再执行、验证、审计。受保护应急金不进入可用余额。
+- 规则：`server/domain.ts` 计算资金余量、预测日期、三方案和显著影响；`server/banking.ts` 是统一工具运行时，覆盖目标状态、转账、换汇、Mandate、外部请求、幂等、Operation、Receipt 和审计导出。受保护应急金不进入可用余额。
+- 批准：`server/governance.ts` 冻结 action、参数、Twin Version 和过期时间并计算 SHA-256；用户确认后签发短期一次性 Token。参数、版本、期限或消费状态不匹配即拒绝。
+- 外部认证：`server/security.ts` 用 HMAC 绑定 Agent ID、会话主体、时间戳、Nonce 和请求体；5 分钟窗口和持久化 Nonce 防止重放。它同时提供 Prompt Injection 检测与本地限流。
 - 模型：`server/agent.ts` 调用 DeepSeek Chat Completions；只解析目标和排序已有 UI 卡片。模型不能写状态、生成工具参数或改变计算值。超时、无 Key、无效输出回退确定性模式。
-- MCP：`server/mcp.ts` 使用 TypeScript SDK Streamable HTTP，在 `/mcp` 注册 `read_goal`、`request_simulated_payment`、`verify_simulated_operation`。与网页模拟请求共用 `evaluateExternalRequest`。
+- MCP：`server/mcp.ts` 使用 TypeScript SDK Streamable HTTP，只暴露读取、预测、模拟请求和状态查询；它不能创建 Mandate、确认自己的 Approval 或直接写审计。
 
 ## 三条链路与状态矩阵
 
@@ -43,6 +45,12 @@ React 原版界面 ── same-origin /api ── Express 服务
 | 方法与路径 | 用途 |
 | --- | --- |
 | `GET /api/session` | 当前会话完整快照与经过服务端校验的卡片 |
+| `POST /api/agent` | 结构化意图、计划、模型来源、回退原因与工具结果 |
+| `GET/POST /api/financial-twin` | 读取版本化 Twin 或调用统一模拟工具 |
+| `GET/POST /api/goal-flow` | 读取目标状态机或执行目标迁移 |
+| `GET/POST /api/banking-tools` | 工具发现与第一方调用 |
+| `GET /api/activity`, `/api/audit/export` | Hash 链活动与 JSON/CSV 证据 |
+| `POST /api/external-agent/request` | HMAC、时间戳、Nonce 认证的外部请求 |
 | `POST /api/goal/interpret` | DeepSeek 或确定性自然语言解析 |
 | `POST /api/goals`, `PATCH /api/goals/current` | 新建、修改目标草案 |
 | `POST /api/goals/activate` | 明确选择后激活方案 |
@@ -55,8 +63,8 @@ React 原版界面 ── same-origin /api ── Express 服务
 | `GET /api/ui/cards` | 可选模型重排白名单卡片 |
 | `GET /api/health` | 健康检查 |
 
-HTTP 写入默认检查 Origin，浏览器 Cookie 为 HttpOnly、SameSite=Lax，生产环境加 Secure。MCP 使用独立 Bearer 令牌绑定同一模拟会话。所有接口只适用于可信演示环境，公网使用建议加入口访问控制与速率限制。
+HTTP 写入默认检查 Origin，浏览器 Cookie 为 HttpOnly、SameSite=Lax，生产环境加 Secure。服务按 IP/入口做本地限流，结构化日志不记录正文、Key、签名或完整账户标识。MCP 使用独立 Bearer 令牌绑定同一模拟会话。
 
 ## 项目来源与版本
 
-原版视觉来源：本仓库 `main@805a0f6`。本分支为独立重建；未导入旧 PR #1 或队友项目代码。`PRODUCT.md` 从用户维护的本地产品基线同步，Qwen 提法按最终选择更新为 DeepSeek。
+原版视觉来源：本仓库 `main@805a0f6`。本分支不合并旧 PR #1。经双方授权，后端能力与测试场景选择性参考 `Amy-Lin365/NOVA-AI-Banking-Agent@ca1124c` 的契约、状态机、安全规则和测试思想，并在 Express、TypeScript、SQLite 上重新实现。`PRODUCT.md` 使用 DeepSeek 作为可选解释模型。

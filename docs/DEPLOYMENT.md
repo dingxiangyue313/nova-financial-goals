@@ -23,6 +23,7 @@ cp .env.example .env
 在服务器本机编辑 `.env`：
 
 - `NOVA_SESSION_SECRET`：独立随机值，建议 `openssl rand -hex 32` 生成后手工写入。
+- `NOVA_EXTERNAL_AGENT_SECRET`：外部 Agent HMAC 共享密钥，使用另一份至少 32 字符的随机值并单独轮换。
 - `DEEPSEEK_API_KEY`：可留空；若启用模型，填写服务端专用 Key。
 - `NOVA_DB_PATH=/app/data/nova.sqlite`，`PORT=3000`。
 

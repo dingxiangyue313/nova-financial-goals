@@ -3,8 +3,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { getState, mutateState } from './store.ts';
-import { evaluateExternalRequest, verifyOperation } from './tools.ts';
+import { verifyOperation } from './tools.ts';
 import { snapshot } from './presentation.ts';
+import { runBankingTool } from './banking.ts';
 
 export function registerMcp(app: express.Express, authenticate: (token: string) => string | null) {
   app.post('/mcp', async (req, res) => {
@@ -15,6 +16,11 @@ export function registerMcp(app: express.Express, authenticate: (token: string) 
     server.registerTool('read_goal', { description: 'Read the current simulated goal and assessment.' }, async () => ({
       content: [{ type: 'text', text: JSON.stringify(snapshot(getState(sessionId))) }],
     }));
+    server.registerTool('forecast_cashflow', {
+      description: 'Read the deterministic simulated cash-flow forecast.',
+      inputSchema: { horizonDays: z.number().int().min(1).max(365).default(30) },
+    }, async ({ horizonDays }) => ({ content: [{ type: 'text', text: JSON.stringify(
+      runBankingTool(getState(sessionId), 'forecast_cashflow', { horizonDays }).result) }] }));
     server.registerTool('request_simulated_payment', {
       description: 'Request a simulated payment. The same Permission → Risk → Execute → Verify → Audit rules as the NOVA UI apply. Idempotency key is required.',
       inputSchema: { category: z.enum(['transport','shopping']), amountCents: z.number().int().positive(),
@@ -23,9 +29,9 @@ export function registerMcp(app: express.Express, authenticate: (token: string) 
       try {
         let operationId = '';
         mutateState(sessionId, old => {
-          const result = evaluateExternalRequest(old, { category, amountCents, idempotencyKey, agentId });
-          operationId = result.operation.operationId;
-          return result.state;
+          const outcome = runBankingTool(old, 'evaluate_external_request', { category, amountCents, idempotencyKey, agentId });
+          operationId = outcome.result.operationId;
+          return outcome.state;
         });
         return { content: [{ type: 'text', text: JSON.stringify(verifyOperation(getState(sessionId), operationId)) }] };
       } catch (error) {

@@ -100,7 +100,19 @@ test('mandate lifecycle and audit export remain verifiable', () => {
     totalLimitCents: 120000, expiresAt: '2026-12-31', approvalToken: confirmed.result.approvalToken,
   });
   assert.equal(created.state.mandate?.active, true);
-  const pauseApproval = runBankingTool(created.state, 'create_approval_snapshot', {
+  const updateParameters = { mandateId: created.result.mandateId, category: 'transport', maxPerOperationCents: 45000,
+    totalLimitCents: 100000, expiresAt: '2026-12-20' };
+  const updateApproval = runBankingTool(created.state, 'create_approval_snapshot', {
+    action: 'update_mandate', parameters: updateParameters, expiresInSeconds: 300,
+  });
+  const updateConfirmed = runBankingTool(updateApproval.state, 'confirm_approval', {
+    approvalId: updateApproval.result.approvalId, snapshotHash: updateApproval.result.snapshotHash, confirmed: true,
+  }, { userConfirmed: true });
+  const updated = runBankingTool(updateConfirmed.state, 'update_mandate', {
+    ...updateParameters, approvalToken: updateConfirmed.result.approvalToken,
+  });
+  assert.equal(updated.state.mandate?.version, 2);
+  const pauseApproval = runBankingTool(updated.state, 'create_approval_snapshot', {
     action: 'pause_mandate', parameters: { mandateId: created.result.mandateId }, expiresInSeconds: 300,
   });
   const pauseConfirmed = runBankingTool(pauseApproval.state, 'confirm_approval', {
@@ -110,7 +122,7 @@ test('mandate lifecycle and audit export remain verifiable', () => {
     mandateId: created.result.mandateId, approvalToken: pauseConfirmed.result.approvalToken,
   });
   assert.equal(paused.state.mandate?.active, false);
-  assert.equal(paused.state.mandate?.version, 2);
+  assert.equal(paused.state.mandate?.version, 3);
   const report = runBankingTool(paused.state, 'export_audit_report', { format: 'json' });
   assert.equal(report.result.chainValid, true);
   assert.ok(report.result.content.includes('mandate_paused'));

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Goal } from '../types';
-import { SnapshotSchema, UiCardSchema, type Snapshot } from '../../shared/contracts';
+import { SnapshotSchema, type Snapshot } from '../../shared/contracts';
+import { normalizeUiCard } from '../../shared/generative';
 import { readableDate, shortDate } from '../api';
 
 interface HomeScreenProps {
@@ -21,7 +22,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateToCreate,
 }) => {
   const percentage = goal.progressPercent.toFixed(1);
-  const cards = SnapshotSchema.shape.cards.parse(snapshot.cards).map(card => UiCardSchema.parse(card));
+  const cards = SnapshotSchema.shape.cards.parse(snapshot.cards).map(card => normalizeUiCard(card));
   const insight = cards.find(card => card.type === 'goal_feasibility_card');
   const impact = snapshot.pendingImpact;
 

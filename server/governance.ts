@@ -58,7 +58,7 @@ export function confirmApproval(
   if (index < 0) throw new Error('APPROVAL_NOT_FOUND');
   const approval = state.approvals[index];
   if (approval.status !== 'pending' || approval.snapshotHash !== snapshotHash) throw new Error('APPROVAL_SNAPSHOT_CHANGED');
-  if (approval.expiresAt <= `${state.clock}T00:00:00.000Z`) throw new Error('APPROVAL_EXPIRED');
+  if (approval.expiresAt <= `${state.clock}T12:00:00.000Z`) throw new Error('APPROVAL_EXPIRED');
   const token = randomUUID();
   const approvals = [...state.approvals];
   approvals[index] = { ...approval, status: 'confirmed', token };
@@ -75,7 +75,7 @@ export function consumeApproval(
   if (index < 0 || state.approvals[index].status !== 'confirmed') throw new Error('APPROVAL_TOKEN_INVALID');
   const approval = state.approvals[index];
   if (approval.twinVersion !== state.twinVersion) throw new Error('TWIN_VERSION_CHANGED');
-  if (approval.expiresAt <= `${state.clock}T00:00:00.000Z`) throw new Error('APPROVAL_EXPIRED');
+  if (approval.expiresAt <= `${state.clock}T12:00:00.000Z`) throw new Error('APPROVAL_EXPIRED');
   if (approval.action !== action || stableHash(approval.parameters) !== stableHash(parameters))
     throw new Error('APPROVAL_PARAMETERS_CHANGED');
   const approvals = [...state.approvals];

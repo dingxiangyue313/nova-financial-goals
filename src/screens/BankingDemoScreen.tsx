@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Snapshot } from '../../shared/contracts';
+import { GenerativeCard } from '../components/GenerativeCard';
 
 interface Props {
   snapshot: Snapshot;
@@ -40,8 +41,8 @@ export function BankingDemoScreen({ snapshot, mutate }: Props) {
     <div className={styles}>
       <h3 className="font-bold text-[13px] mb-1">外部 Agent 请求</h3>
       <p className="text-[12px] text-[#646A73] mb-3">用同一授权分别演示 Execute、Ask、Block。每次请求都生成独立凭证，可按请求号查询。</p>
-      <div className="grid grid-cols-3 gap-2">
-        {(['transport', 'shopping', 'over_limit'] as const).map((scenario, index) => <button key={scenario} className={button} disabled={busy || !mandate} onClick={() => run('/api/demo/agent-request', { scenario })}>{['交通 Execute', '购物 Ask', '超限 Block'][index]}</button>)}
+      <div className="grid grid-cols-2 gap-2">
+        {(['transport', 'shopping', 'manual_review', 'over_limit'] as const).map((scenario, index) => <button key={scenario} className={button} disabled={busy || !mandate} onClick={() => run('/api/demo/agent-request', { scenario })}>{['交通 Execute', '购物 Ask', '高额 Manual Review', '超限 Block'][index]}</button>)}
       </div>
       <div className="grid grid-cols-2 gap-2 mt-2">
         <button className={button} disabled={busy || !mandate} onClick={() => run('/api/demo/agent-request', { scenario: 'invalid_identity' })}>身份不符</button>
@@ -56,10 +57,19 @@ export function BankingDemoScreen({ snapshot, mutate }: Props) {
         <div className="flex justify-between"><strong>{op.category} · ¥{op.amountCents / 100}</strong><span className="text-[#0F6B6D] font-bold">{op.status.toUpperCase()}</span></div>
         <p className="text-[#646A73]">{op.reason}</p>
         <p className="text-[#8F959E] break-all">凭证 {op.operationId}</p>
-        {op.status === 'ask' && <button className={`${button} mt-2`} disabled={busy} onClick={() => run(`/api/operations/${op.operationId}/approve`, {})}>核对并确认本次模拟请求</button>}
+        {(op.status === 'ask' || op.status === 'manual_review') && <button className={`${button} mt-2`} disabled={busy} onClick={() => run(`/api/operations/${op.operationId}/approve`, {})}>核对并确认本次模拟请求</button>}
         {op.status === 'unknown' && <button className={`${button} mt-2`} disabled={busy} onClick={() => run(`/api/operations/${op.operationId}/reconcile`, {})}>查询原请求并恢复</button>}
       </div>)}
-      <p className="text-[11px] text-[#646A73] mt-2">审计事件：{snapshot.audit.length} 条 · 活期模拟余额 ¥{(snapshot.finance.checkingCents / 100).toLocaleString()} · 应急金 ¥{(snapshot.finance.emergencyCents / 100).toLocaleString()}</p>
+      <p className="text-[11px] text-[#646A73] mt-2">Twin v{snapshot.twinVersion} · 审计事件 {snapshot.audit.length} 条 · Hash 链{snapshot.auditChainValid ? '有效' : '异常'} · 凭证 {snapshot.receipts.length} 条</p>
+      <div className="mt-3 flex gap-2">
+        <a className={button} href="/api/audit/export?format=json" download>导出 JSON</a>
+        <a className={button} href="/api/audit/export?format=csv" download>导出 CSV</a>
+      </div>
+    </div>
+    <div className={`${styles} flex flex-col gap-2`}>
+      <h3 className="font-bold text-[13px]">受治理的生成式界面</h3>
+      <p className="text-[12px] text-[#646A73]">模型只能重排这些白名单组件。未知类型会降级为不可操作的说明卡。</p>
+      {snapshot.cards.slice(-2).map(card => <GenerativeCard key={card.id} value={card} />)}
     </div>
     <div className={styles}>
       <h3 className="font-bold text-[13px]">外部 MCP 接入</h3>

@@ -10,7 +10,9 @@
 
 1. **目标规划**：创建或修改目标 → 比较三种节奏 → 明确选择方案 → 激活计划。没有选择时不能激活。
 2. **目标影响**：激活计划后模拟小额与显著支出。小额波动不触发提醒；显著变化才解释目标影响和两个调整选项，应急金保持隔离。
-3. **外部 Agent**：在“我的 → 授权与执行记录”创建限额、类别、有效期授权，分别模拟 Execute、Ask、Block、身份不符和超时；查看凭证与审计，并可撤销授权。
+3. **外部 Agent**：在“我的 → 授权与执行记录”创建限额、类别、有效期授权，分别模拟 Execute、Ask、Block、Manual Review 和 Unknown；查看凭证与 Hash 审计链，并可撤销授权。
+
+后端还提供版本化 Financial Twin、一次性 Approval Token、模拟转账、换汇报价与执行、Mandate 生命周期、HMAC 签名和 Nonce 防重放、受限 MCP、结构化日志，以及 JSON/CSV 审计证据导出。
 
 金额在服务端统一用整数分，日期使用 ISO 格式。目标进度、预测、权限和执行结果由确定性规则计算。DeepSeek 只参与自然语言目标解析和白名单卡片编排；未设置 Key、超时或输出无效时自动回退，演示流程仍可完成。
 
@@ -35,6 +37,7 @@ npm run dev
 | `npm start` | 运行生产构建，需先设置 `NOVA_SESSION_SECRET` |
 | `npm run lint` | TypeScript 类型检查 |
 | `npm test` | 确定性规则检查 |
+| `npm run test:e2e` | 用 Chrome 在 360、768、1440 px 跑三条主流程 |
 
 生产模式本地验证：
 
@@ -52,8 +55,13 @@ NOVA_SESSION_SECRET="$(openssl rand -hex 32)" npm start
 ## 接口与安全
 
 - `/api/session` 提供同一体验者的页面快照。Cookie 签名且只供本站使用。
-- `/api/goals`、`/api/goals/activate`、`/api/demo/expense`、`/api/impact/decision` 组成目标主链路。
-- `/api/mandates`、`/api/demo/agent-request`、`/api/operations/:id` 提供受控模拟执行与凭证。
+- `/api/agent`、`/api/financial-twin`、`/api/goal-flow`、`/api/banking-tools` 是统一 Agent、Twin、目标状态机与工具入口；原页面 API 保留为兼容封装。
+- `/api/activity`、`/api/audit/export?format=json|csv` 提供可验证活动和证据导出。
+- `/api/external-agent/request` 要求 HMAC 签名、5 分钟时间窗口和一次性 Nonce。
 - `/mcp` 是需要会话令牌的 MCP Streamable HTTP 入口，只暴露白名单模拟工具。令牌由 `/api/mcp/token` 在当前浏览器会话内获取，不是 DeepSeek Key；不要公开分享。
 
 安全边界与已知限制见 [安全自评](docs/SECURITY_SELF_ASSESSMENT.md)。本项目只用于演示，不应存放真实金融账户或真实支付凭据。
+
+## 选择性复用来源
+
+本分支保留 `main@805a0f6` 的原版 NOVA 视觉与交互。经双方授权，后端能力与测试场景选择性参考 `Amy-Lin365/NOVA-AI-Banking-Agent@ca1124c` 的契约、状态机、安全规则和测试思想，并使用本仓库的 Express、TypeScript、SQLite 架构重新实现；未复制其前端，也未合并旧集成 PR #1。

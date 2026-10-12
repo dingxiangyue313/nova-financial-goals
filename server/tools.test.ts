@@ -28,6 +28,13 @@ test('shopping asks for approval and over-limit requests are blocked', () => {
   assert.equal(blocked.operation.status, 'blocked');
 });
 
+test('near-limit requests require manual review before execution', () => {
+  const state = createMandate(activatePlan(createFixture(), 'balanced'), { confirmed: true });
+  const result = evaluateExternalRequest(state, { agentId: 'travel-agent-demo', category: 'transport', amountCents: 40000, idempotencyKey: 'manual-1' });
+  assert.equal(result.operation.status, 'manual_review');
+  assert.equal(result.state.finance.checkingCents, state.finance.checkingCents);
+});
+
 test('timeout keeps status unknown and does not spend money on retry', () => {
   const state = createMandate(activatePlan(createFixture(), 'balanced'), { confirmed: true });
   const input = { agentId: 'travel-agent-demo', category: 'transport', amountCents: 30000, idempotencyKey: 'timeout-1', simulateTimeout: true };
@@ -36,6 +43,7 @@ test('timeout keeps status unknown and does not spend money on retry', () => {
   const second = evaluateExternalRequest(first.state, input);
   assert.equal(second.operation.status, 'unknown');
   assert.equal(second.state.finance.checkingCents, state.finance.checkingCents);
+  assert.throws(() => evaluateExternalRequest(first.state, { ...input, simulateTimeout: false }), /IDEMPOTENCY_CONFLICT/);
 });
 
 test('expired, insufficient balance and revoked mandates block writes', () => {

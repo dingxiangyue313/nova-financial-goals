@@ -93,7 +93,7 @@ export type ToolRecord = z.infer<typeof ToolRecordSchema>;
 
 export const OperationSchema = z.object({
   operationId: z.string(), idempotencyKey: z.string(),
-  status: z.enum(['executed', 'ask', 'blocked', 'unknown']),
+  status: z.enum(['executed', 'ask', 'blocked', 'manual_review', 'unknown']),
   category: z.string(), amountCents: MoneySchema, reason: z.string(),
   agentId: z.string().optional(), mandateId: z.string().nullable().optional(),
   tool: z.string().default('external_payment'), inputHash: z.string().optional(),
@@ -141,7 +141,7 @@ export const AssessmentSchema = z.object({
 export type Assessment = z.infer<typeof AssessmentSchema>;
 
 export const UiCardSchema = z.object({
-  id: z.string(), type: z.enum(['goal_progress_card','goal_feasibility_card','goal_impact_signal','scenario_compare','approval_sheet','execution_receipt','error_recovery']),
+  id: z.string(), type: z.enum(['goal_input','goal_progress_card','goal_feasibility_card','assumption_editor','scenario_compare','goal_impact_signal','approval_sheet','risk_disclosure','execution_receipt','error_recovery','explanation']),
   title: z.string(), body: z.string(), tone: z.enum(['neutral','good','warning','danger']),
   action: z.object({ id: z.string(), label: z.string() }).nullable(),
 });
@@ -151,6 +151,8 @@ export const SnapshotSchema = z.object({
   goal: GoalSchema, finance: FinanceSchema, assessment: AssessmentSchema,
   pendingImpact: ImpactSchema.nullable(), mandate: MandateSchema.nullable(),
   audit: z.array(AuditSchema), operations: z.array(OperationSchema),
+  receipts: z.array(ReceiptSchema), approvalSummaries: z.array(ApprovalSchema.omit({ token: true })),
+  auditChainValid: z.boolean(), twinVersion: z.number().int().positive(),
   cards: z.array(UiCardSchema), clock: IsoDateSchema,
 });
 export type Snapshot = z.infer<typeof SnapshotSchema>;
