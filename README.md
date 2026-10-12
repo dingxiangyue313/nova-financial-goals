@@ -62,7 +62,7 @@ Vite 会在终端显示本地访问地址。此项目配置的端口为 **3000**
 | 命令 | 作用 |
 | --- | --- |
 | `npm run dev` | 启动本地开发服务器 |
-| `npm run build` | 执行 TypeScript 项目构建检查并生成生产构建文件 |
+| `npm run build` | 生成生产构建文件到 `dist/` |
 | `npm run preview` | 本地预览已生成的生产构建 |
 | `npm run lint` | 执行 TypeScript 类型检查（`tsc --noEmit`） |
 
