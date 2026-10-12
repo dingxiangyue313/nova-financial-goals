@@ -20,4 +20,5 @@ export async function mutateTwin(userId:string,action:Exclude<TwinAction,{type:"
  if(Number(result.meta.changes)===1)return next;if(attempt<2)return mutateTwin(userId,action,attempt+1);throw new Error("TWIN_CONCURRENT_UPDATE");
 }
 
-export async function getTwinView(userId:string){const state=await getOrCreateTwin(userId);return {state,forecast:forecastTwin(state),derived:{totalBalance:state.accounts.reduce((sum,item)=>sum+item.balance,0),protectedFunds:state.accounts.filter(item=>item.protected).reduce((sum,item)=>sum+item.balance,0)}};}
+export function deriveTwin(state:FinancialTwinState){return {totalBalance:state.accounts.reduce((sum,item)=>sum+item.balance,0),protectedFunds:state.accounts.filter(item=>item.protected).reduce((sum,item)=>sum+item.balance,0),goalProgress:Object.fromEntries(state.goals.map(goal=>[goal.id,goal.targetAmount?Math.min(100,Math.round(goal.savedAmount/goal.targetAmount*100)):0]))};}
+export async function getTwinView(userId:string){const state=await getOrCreateTwin(userId);return {state,forecast:forecastTwin(state),derived:deriveTwin(state)};}

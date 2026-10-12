@@ -11,25 +11,29 @@ const tool=(name,input)=>request("/api/banking-tools",{method:"POST",headers,bod
 const initial=await getTwin();
 assert.equal(initial.response.status,200);
 assert.equal(initial.body.state.version,1);
+assert.equal(initial.body.state.goals.find(goal=>goal.id==="goal_japan_001").selectedPlan,null,"方案初始应由用户选择");
 const initialChecking=initial.body.state.accounts.find(account=>account.type==="checking").balance;
 const initialMandate=initial.body.state.mandate.remainingLimit;
 
 const simulation=await action({type:"simulate_expense",amount:5000,goalId:"goal_japan_001",strategy:"adjust_contribution"});
 assert.equal(simulation.response.status,200);
 assert.equal(simulation.body.state.version,1,"情景模拟不能修改正式状态");
-assert.equal(simulation.body.simulation.impact.completionDelayDays,7);
+assert.equal(simulation.body.simulation.impact.completionDelayDays,0);
 assert.equal(simulation.body.simulation.impact.strategy,"adjust_contribution");
-assert.equal(simulation.body.simulation.impact.recommendedMonthlyAdjustment,1667);
-const dateScenario=await action({type:"simulate_expense",amount:5000,goalId:"goal_japan_001",strategy:"adjust_date"});
+assert.equal(simulation.body.simulation.impact.recommendedMonthlyAdjustment,0);
+assert.equal(simulation.body.simulation.impact.qualifies,false,"小额波动不应触发提醒");
+const dateScenario=await action({type:"simulate_expense",amount:500000,goalId:"goal_japan_001",strategy:"adjust_date"});
 assert.equal(dateScenario.response.status,200);
 assert.equal(dateScenario.body.state.version,1);
-assert.equal(dateScenario.body.simulation.impact.completionDelayDays,10);
+assert.ok(dateScenario.body.simulation.impact.completionDelayDays>0);
+assert.equal(dateScenario.body.simulation.impact.qualifies,true);
 assert.equal(dateScenario.body.simulation.impact.strategy,"adjust_date");
 assert.ok(dateScenario.body.simulation.impact.recommendedTargetDate);
 
 const plan=await action({type:"select_goal_plan",goalId:"goal_japan_001",plan:"accelerated"});
 assert.equal(plan.response.status,200);
 assert.equal(plan.body.state.version,2);
+assert.equal(plan.body.state.goals.find(goal=>goal.id==="goal_japan_001").selectedPlan,"accelerated");
 const initialGoal=initial.body.state.goals.find(goal=>goal.id==="goal_japan_001");
 const months=Math.max(1,Math.max(1,Math.ceil((new Date(`${initialGoal.targetDate}T00:00:00Z`).getTime()-Date.now())/86_400_000))/30);
 const balanced=Math.ceil(Math.ceil((initialGoal.targetAmount-initialGoal.savedAmount)/months/1000)*1000);

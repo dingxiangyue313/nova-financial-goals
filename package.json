@@ -1,5 +1,5 @@
 {
-  "name": "nova-ai-banking-agent",
+  "name": "nova-financial-goals",
   "version": "1.0.0",
   "private": true,
   "workspaces": ["frontend", "backend"],
@@ -9,9 +9,10 @@
     "build": "npm --workspace nova-frontend run build",
     "start": "npm --workspace nova-frontend run start",
     "lint": "npm --workspace nova-frontend run lint",
-    "test": "npm run verify:banking && npm run verify:twin",
+    "test": "npm run verify:banking && npm run verify:twin && npm run verify:goal",
     "verify:banking": "npm --workspace nova-backend run verify:banking",
     "verify:twin": "npm --workspace nova-backend run verify:twin",
+    "verify:goal": "npm --workspace nova-backend run verify:goal",
     "verify:surfaces": "npm --workspace nova-backend run verify:surfaces",
     "verify:stage2": "npm --workspace nova-backend run verify:stage2",
     "verify:stage3": "npm --workspace nova-backend run verify:stage3",

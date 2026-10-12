@@ -68,3 +68,20 @@
 @media(min-width:601px) and (max-width:900px){.fusion-sync-strip{grid-template-columns:auto auto 1fr}.fusion-sync-strip small{grid-column:1/-1;text-align:left}}
 .fusion-replan{display:grid;gap:14px}.fusion-replan p,.fusion-replan small{color:var(--fusion-muted);line-height:1.6}.fusion-replan textarea{width:100%;min-height:150px;resize:vertical;padding:14px;border:1px solid var(--fusion-line);border-radius:10px;background:#fff;color:var(--fusion-text);font:inherit;line-height:1.6}.fusion-replan textarea:focus{outline:2px solid var(--fusion);outline-offset:2px}
 .fusion-profile-action{width:100%;border:0;background:transparent;text-align:left;cursor:pointer}.fusion-profile-action:hover{color:var(--fusion-dark);background:var(--fusion-soft)}.fusion-profile-action>b{display:flex;align-items:center;gap:3px}.fusion-profile-action>b svg{width:14px}
+
+/* NOVA goal-first presentation: same visual language for governed components. */
+.fusion-app{--fusion:#0f6b6d;--fusion-dark:#084c4e;--fusion-soft:#e6f2f2;--fusion-line:#e5e8eb;--fusion-text:#1f2329;--fusion-muted:#68747b;background:#f5f7f8}
+.fusion-generated{width:min(100%,720px);margin:18px auto}
+.fusion-generated .generated-canvas{margin-top:0}
+.fusion-generated .generated-card{border-color:var(--fusion-line);border-radius:16px;box-shadow:0 4px 18px rgba(13,68,68,.05)}
+.fusion-generated .generated-heading>div{color:var(--fusion)}
+.fusion-generated .generated-scenarios article{border-color:var(--fusion-line)}
+.fusion-generated .generated-scenarios article.selected{border-color:var(--fusion);background:#f1faf7}
+.fusion-generated .generated-scenarios .recommended{background:var(--fusion-soft);color:var(--fusion-dark)}
+.fusion-generated .generated-scenarios button{margin-top:auto}
+.fusion-impact-alert{width:100%;display:flex;align-items:center;gap:9px;padding:15px 17px;border:1px solid #f2cf86;border-radius:14px;background:#fffaf0;color:#9b4b0d;text-align:left;font-weight:700}
+.fusion-impact-alert svg{width:18px;height:18px;flex:none}
+.fusion-impact-alert svg:last-child{margin-left:auto}
+.fusion-app [data-slot="progress"]{background:#d8eae9}
+.fusion-app [data-slot="progress-indicator"]{background:var(--fusion)}
+@media(max-width:600px){.fusion-generated{width:100%}.fusion-generated .generated-scenarios{grid-template-columns:1fr}.fusion-generated .generated-scenarios article{min-height:0}}

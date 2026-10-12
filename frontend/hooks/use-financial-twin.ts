@@ -4,12 +4,12 @@ import { useCallback,useRef,useState } from "react";
 import type { FinancialTwinState,TwinAction } from "@backend/financial-twin-contracts";
 import type { CashflowForecast } from "@backend/financial-twin-engine";
 
-export type TwinView={state:FinancialTwinState;forecast:CashflowForecast;derived:{totalBalance:number;protectedFunds:number}};
+export type TwinView={state:FinancialTwinState;forecast:CashflowForecast;derived:{totalBalance:number;protectedFunds:number;goalProgress:Record<string,number>}};
 type Headers=Record<string,string>|null;
 
 function normalize(payload:any):TwinView{
  const state=payload.state as FinancialTwinState;
- return {state,forecast:payload.forecast,derived:payload.derived??{totalBalance:state.accounts.reduce((sum,item)=>sum+item.balance,0),protectedFunds:state.accounts.filter(item=>item.protected).reduce((sum,item)=>sum+item.balance,0)}};
+ return {state,forecast:payload.forecast,derived:payload.derived??{totalBalance:0,protectedFunds:0,goalProgress:{}}};
 }
 
 export function useFinancialTwin(headers:Headers,onError:(message:string)=>void){

@@ -14,6 +14,12 @@ if (managedLinux && command === "build") {
   process.exit(result.status ?? 1);
 }
 
+if (!managedLinux && command === "dev") {
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL("./ensure-local-db.mjs", import.meta.url))], { stdio: "inherit" });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
 // Import in this process so the preview owner retains its PID and signals.
 const cli = new URL(managedLinux
   ? "../../node_modules/vite/bin/vite.js"

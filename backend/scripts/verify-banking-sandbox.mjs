@@ -25,11 +25,11 @@ const snapshot=await tool("get_financial_snapshot",{});
 assert.equal(snapshot.response.status,200);
 assert.match(snapshot.body.result.snapshotId,/^snap_sandbox_/);
 
-const risk=await tool("risk_check",{action:"execute_transfer",amount:400000,snapshotId:snapshot.body.result.snapshotId,idempotencyKey:`risk-${session}`});
+const risk=await tool("risk_check",{action:"execute_transfer",amount:800000,snapshotId:snapshot.body.result.snapshotId,idempotencyKey:`risk-${session}`});
 assert.equal(risk.response.status,200);
 assert.equal(risk.body.result.status,"fail");
 
-const unsafePrepare=await tool("prepare_transfer",{snapshotId:snapshot.body.result.snapshotId,sourceAccountId:"acc_checking_001",destinationAccountId:"acc_goal_japan_001",amount:400000,currency:"CNY",schedule:{type:"once",firstExecutionDate:"2026-09-24"}});
+const unsafePrepare=await tool("prepare_transfer",{snapshotId:snapshot.body.result.snapshotId,sourceAccountId:"acc_checking_001",destinationAccountId:"acc_goal_japan_001",amount:800000,currency:"CNY",schedule:{type:"once",firstExecutionDate:"2026-09-24"}});
 assert.equal(unsafePrepare.response.status,200);
 assert.equal(unsafePrepare.body.result.status,"prepared");
 assert.ok(unsafePrepare.body.result.balanceAfter<unsafePrepare.body.result.safetyBuffer);
@@ -70,15 +70,17 @@ assert.equal(updateResult.response.status,200);
 assert.equal(updateReplay.response.status,200);
 assert.equal(updateResult.body.result.operationId,updateReplay.body.result.operationId);
 
+const selected=await json("/api/financial-twin",{method:"POST",headers,body:JSON.stringify({type:"select_goal_plan",goalId:"goal_japan_001",plan:"balanced"})});
+assert.equal(selected.response.status,200);
 const twinBeforeActivation=await json("/api/financial-twin",{headers});
 assert.equal(twinBeforeActivation.response.status,200);
-const activationParameters={goalId:"goal_japan_001",selectedPlan:twinBeforeActivation.body.state.selectedPlan??"balanced",twinVersion:twinBeforeActivation.body.state.version};
+const activationParameters={goalId:"goal_japan_001",selectedPlan:twinBeforeActivation.body.state.goals.find(goal=>goal.id==="goal_japan_001").selectedPlan,twinVersion:twinBeforeActivation.body.state.version};
 const activationSnapshot=await tool("create_approval_snapshot",{action:"activate_goal",parameters:activationParameters,expiresInSeconds:300});
 const activationConfirmation=await tool("confirm_approval",{approvalId:activationSnapshot.body.result.approvalId,snapshotHash:activationSnapshot.body.result.snapshotHash,confirmed:true},{"x-nova-user-confirmed":"true"});
 assert.equal(activationConfirmation.response.status,200);
 const tamperedActivation=await tool("activate_goal",{...activationParameters,selectedPlan:activationParameters.selectedPlan==="balanced"?"accelerated":"balanced",approvalToken:activationConfirmation.body.result.approvalToken,idempotencyKey:`activate-tampered-${session}`});
-assert.equal(tamperedActivation.response.status,400);
-assert.equal(tamperedActivation.body.error.code,"APPROVAL_INVALID");
+assert.equal(tamperedActivation.response.status,409);
+assert.equal(tamperedActivation.body.error.code,"GOAL_PLAN_NOT_SELECTED");
 const activationInput={...activationParameters,approvalToken:activationConfirmation.body.result.approvalToken,idempotencyKey:`activate-${session}`};
 const activationResult=await tool("activate_goal",activationInput);
 const activationReplay=await tool("activate_goal",activationInput);

@@ -1,5 +1,8 @@
 import { z } from "zod";
 import fixture from "@backend/demo-fixtures.json";
+import type { FinancialTwinState } from "./financial-twin-contracts";
+import type { CashflowForecast } from "./financial-twin-engine";
+import { getGoalReadiness } from "./goal-readiness";
 
 export const AllowedIntentSchema=z.enum(["select_goal_scenario","request_goal_approval","explain_goal_impact","edit_goal","review_external_request","approve_external_request","view_mandate","verify_operation","retry_safely"]);
 const Amount=z.object({amount:z.number().int(),currency:z.string().length(3)});
@@ -12,7 +15,10 @@ const schemas=[
  Base.extend({type:z.literal("metric_strip"),data:z.object({metrics:z.array(z.object({label:z.string(),value:Amount,note:z.string().optional()})).min(2).max(4)})}),
  Base.extend({type:z.literal("cashflow_timeline"),data:z.object({openingBalance:Amount,events:z.array(z.object({date:z.string(),label:z.string(),amount:Amount,tone:Tone})).min(1),closingBalance:Amount})}),
  Base.extend({type:z.literal("goal_simulator"),data:z.object({target:Amount,saved:Amount,monthlyContribution:Amount,targetDate:z.string(),selectedPlan:z.string()})}),
- Base.extend({type:z.literal("scenario_compare"),data:z.object({selectedId:z.string(),scenarios:z.array(z.object({id:z.string(),name:z.string(),monthlyContribution:Amount,completionDate:z.string(),impact:z.string(),recommended:z.boolean()})).min(1).max(3)})}),
+ Base.extend({type:z.literal("scenario_compare"),data:z.object({selectedId:z.string().nullable(),scenarios:z.array(z.object({id:z.string(),name:z.string(),monthlyContribution:Amount,completionDate:z.string(),impact:z.string(),recommended:z.boolean()})).min(1).max(3)})}),
+ Base.extend({type:z.literal("goal_progress_card"),data:z.object({goalId:z.string(),saved:Amount,target:Amount,targetDate:z.string(),progressPercent:z.number().min(0).max(100),status:z.enum(["insufficient_data","on_track","at_risk","infeasible"])})}),
+ Base.extend({type:z.literal("goal_feasibility_card"),data:z.object({goalId:z.string(),status:z.enum(["insufficient_data","on_track","at_risk","infeasible"]),monthlyRequired:Amount,availableMonthly:Amount,missing:z.array(z.string()),updatedAt:z.string()})}),
+ Base.extend({type:z.literal("goal_impact_signal"),data:z.object({goalId:z.string(),expense:Amount,completionDelayDays:z.number().int().nonnegative(),safeToSpendBefore:Amount,safeToSpendAfter:Amount,qualifies:z.boolean()})}),
  Base.extend({type:z.literal("allocation_chart"),data:z.object({total:Amount,segments:z.array(z.object({label:z.string(),amount:Amount,color:z.string().regex(/^#[0-9a-fA-F]{6}$/)})).min(1)})}),
  Base.extend({type:z.literal("impact_summary"),data:z.object({items:z.array(z.object({label:z.string(),value:z.string(),tone:z.enum(["neutral","positive","warning"])})).min(1)})}),
  Base.extend({type:z.literal("plan_steps"),data:z.object({steps:z.array(z.object({id:z.string(),label:z.string(),status:z.enum(["planned","checking","requires_approval","executing","completed","failed","cancelled"])}))})}),
@@ -24,10 +30,25 @@ const schemas=[
  Base.extend({type:z.literal("error_recovery"),data:z.object({code:z.string(),message:z.string(),safeNextStep:z.string(),operationId:z.string().optional()})}),
 ] as const;
 export const GeneratedComponentSchema=z.discriminatedUnion("type",schemas);
-export const GeneratedCanvasSchema=z.array(GeneratedComponentSchema).min(1).max(16).superRefine((items,ctx)=>{const ids=new Set<string>();items.forEach((item,index)=>{if(ids.has(item.id))ctx.addIssue({code:"custom",path:[index,"id"],message:"component id must be unique"});ids.add(item.id);});});
+export const GeneratedCanvasSchema=z.array(GeneratedComponentSchema).min(1).max(16).superRefine((items,ctx)=>{const ids=new Set<string>();items.forEach((item,index)=>{if(ids.has(item.id))ctx.addIssue({code:"custom",path:[index,"id"],message:"component id must be unique"});ids.add(item.id);item.actions.forEach((action,actionIndex)=>{if(action.riskClass==="money_movement"&&!action.requiresApproval)ctx.addIssue({code:"custom",path:[index,"actions",actionIndex,"requiresApproval"],message:"money movement requires explicit approval"});});});});
 export type GeneratedComponent=z.infer<typeof GeneratedComponentSchema>;
 export type AllowedIntent=z.infer<typeof AllowedIntentSchema>;
 const act=(intent:AllowedIntent,label:string,riskClass:"read"|"planning"|"money_movement"="read",requiresApproval=false,payload?:Record<string,string>)=>({intent,label,riskClass,requiresApproval,payload});
+
+/** Live goal components use the persisted Financial Twin as their sole data source. */
+export function buildLiveGoalCanvas(state:FinancialTwinState,forecast:CashflowForecast,goalId:string,context:"home"|"feasibility"|"impact"="home",impact?:{amount:number;completionDelayDays:number;safeToSpendBefore:number;safeToSpendAfter:number;qualifies:boolean}){
+ const goal=state.goals.find(item=>item.id===goalId);
+ if(!goal)throw new Error("GOAL_NOT_FOUND");
+ const readiness=getGoalReadiness(state,goalId,forecast);
+ const amount=(value:number)=>({amount:Math.round(value),currency:"CNY"});
+ const labels={conservative:"保守",balanced:"平衡",accelerated:"加速"};
+ const progress={id:`${goalId}-progress`,type:"goal_progress_card",title:goal.name,data:{goalId,saved:amount(goal.savedAmount),target:amount(goal.targetAmount),targetDate:goal.targetDate,progressPercent:goal.targetAmount?Math.min(100,Math.round(goal.savedAmount/goal.targetAmount*100)):0,status:readiness.status},actions:[act("edit_goal","调整目标","planning",false,{goalId})]};
+ const feasibility={id:`${goalId}-feasibility`,type:"goal_feasibility_card",title:"这个目标能按时实现吗？",data:{goalId,status:readiness.status,monthlyRequired:amount(readiness.monthlyRequired),availableMonthly:amount(readiness.availableMonthly),missing:readiness.missing,updatedAt:readiness.updatedAt},actions:[]};
+ const scenarios={id:`${goalId}-scenarios`,type:"scenario_compare",title:"选择适合你的节奏",data:{selectedId:readiness.selectedPlan,scenarios:readiness.options.map(option=>({id:option.id,name:labels[option.id],monthlyContribution:amount(option.monthlyContribution),completionDate:option.projectedDate,impact:option.withinSafeBalance?option.onTime?"在安全余额内按时推进":"安全余额内，完成日可能晚于目标日":"当前现金流不足以支持此投入",recommended:option.id==="balanced"}))},actions:[act("select_goal_scenario","选择方案","planning",false,{goalId})]};
+ const signal=impact?{id:`${goalId}-impact`,type:"goal_impact_signal",title:impact.completionDelayDays?"这笔支出可能推迟目标":"本月可支配余量发生变化",data:{goalId,expense:amount(impact.amount),completionDelayDays:impact.completionDelayDays,safeToSpendBefore:amount(impact.safeToSpendBefore),safeToSpendAfter:amount(impact.safeToSpendAfter),qualifies:impact.qualifies},actions:[act("explain_goal_impact","查看调整方案","read",false,{goalId})]}:null;
+ const canvas=context==="home"?[progress,feasibility,...(signal?.data.qualifies?[signal]:[])]:context==="impact"?[...(signal?[signal]:[]),feasibility,scenarios]:[feasibility,scenarios];
+ return GeneratedCanvasSchema.parse(canvas);
+}
 
 export function buildGoalCanvas(selectedPlan:"保守"|"平衡"|"加速",context:"goal"|"trust"|"recovery"="goal"):unknown{
  const names:Record<string,"保守"|"平衡"|"加速">={scenario_conservative:"保守",scenario_balanced:"平衡",scenario_accelerated:"加速"};
