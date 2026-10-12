@@ -151,3 +151,20 @@ test('goal writes share the same twin version and require explicit activation ap
   assert.equal(active.state.goal.selectedPlanId, 'balanced');
   assert.ok(active.state.twinVersion > selected.state.twinVersion);
 });
+
+test('permission checks bind approval action and parameters without consuming the token', () => {
+  const base = createFixture();
+  const parameters = { draftId: 'draft-1', snapshotId: 'twin-1-2026-09-21' };
+  const approval = runBankingTool(base, 'create_approval_snapshot', {
+    action: 'execute_transfer', parameters, expiresInSeconds: 300,
+  });
+  const confirmed = runBankingTool(approval.state, 'confirm_approval', {
+    approvalId: approval.result.approvalId, snapshotHash: approval.result.snapshotHash, confirmed: true,
+  }, { userConfirmed: true });
+  assert.equal(runBankingTool(confirmed.state, 'permission_check', {
+    action: 'execute_transfer', parameters, approvalToken: confirmed.result.approvalToken,
+  }).result.allowed, true);
+  assert.equal(runBankingTool(confirmed.state, 'permission_check', {
+    action: 'execute_fx_order', parameters, approvalToken: confirmed.result.approvalToken,
+  }).result.allowed, false);
+});

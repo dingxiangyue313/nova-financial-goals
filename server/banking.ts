@@ -189,8 +189,14 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       return { state: next, result: { approvalToken: confirmed.token, status: 'approved' } };
     }
     case 'permission_check': {
-      const approval = input.approvalToken ? state.approvals.find(item => item.token === input.approvalToken && item.status === 'confirmed') : null;
-      const mandate = input.mandateId ? state.mandate && state.mandate.id === input.mandateId && state.mandate.active : false;
+      const approval = input.approvalToken ? state.approvals.find(item => item.token === input.approvalToken && item.status === 'confirmed' &&
+        item.action === input.action && item.twinVersion === state.twinVersion && item.expiresAt > todayTime(state) &&
+        stableHash(item.parameters) === stableHash(input.parameters)) : null;
+      const mandate = input.mandateId && state.mandate && state.mandate.id === input.mandateId && state.mandate.active &&
+        state.mandate.expiresAt >= state.clock && (!input.parameters.agentId || input.parameters.agentId === state.mandate.agentId) &&
+        (!input.parameters.category || input.parameters.category === state.mandate.category) &&
+        (!input.parameters.amountCents || (Number(input.parameters.amountCents) <= state.mandate.maxPerOperationCents &&
+          Number(input.parameters.amountCents) + state.mandate.spentCents <= state.mandate.totalLimitCents));
       return { state, result: { allowed: Boolean(approval || mandate), source: approval ? 'approval' : mandate ? 'mandate' : 'none' } };
     }
     case 'risk_check': {

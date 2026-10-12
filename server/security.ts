@@ -11,7 +11,8 @@ export interface ExternalEnvelope {
 }
 
 function signedPayload(envelope: ExternalEnvelope): string {
-  return [envelope.agentId, envelope.subject, String(envelope.timestamp), envelope.nonce, stableHash(envelope.body)].join('\n');
+  return stableHash({ agentId: envelope.agentId, subject: envelope.subject, timestamp: envelope.timestamp,
+    nonce: envelope.nonce, bodyHash: stableHash(envelope.body) });
 }
 
 export function signExternalRequest(secret: string, envelope: ExternalEnvelope): string {

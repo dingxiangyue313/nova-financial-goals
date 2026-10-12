@@ -32,7 +32,8 @@ app.use('/api', (req, res, next) => {
   const origin = req.get('origin');
   try { if (origin && new URL(origin).host !== req.get('host')) return res.status(403).json({ error: 'INVALID_ORIGIN' }); }
   catch { return res.status(403).json({ error: 'INVALID_ORIGIN' }); }
-  const key = `${req.ip || req.socket.remoteAddress || 'local'}:${req.path.startsWith('/agent') ? 'agent' : 'api'}`;
+  const sessionHint = (req.headers.cookie || '').match(/nova_demo_sid=([0-9a-f-]{36})/)?.[1] || 'anonymous';
+  const key = `${req.ip || req.socket.remoteAddress || 'local'}:${sessionHint}:${req.path.startsWith('/agent') ? 'agent' : 'api'}`;
   if (!generalLimiter.take(key)) return res.status(429).json({ error: 'RATE_LIMITED' });
   const startedAt = Date.now();
   res.on('finish', () => console.info(JSON.stringify({ event: 'http_request', method: req.method,
