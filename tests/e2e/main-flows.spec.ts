@@ -46,6 +46,17 @@ test('故事二：小额波动保持安静，显著支出才触发目标调整',
   await expect(page.getByText('已应用方案 B')).toBeVisible();
 });
 
+test('个人设置的突发支出按钮使用默认 ¥900 金额', async ({ page }) => {
+  await openApp(page);
+  await activateBalancedGoal(page);
+
+  await page.getByTitle('个人设置').click();
+  await page.getByRole('button', { name: '模拟突发支出 ¥900' }).click();
+
+  await expect(page.getByText(/两个不动应急金的办法/)).toBeVisible();
+  await expect(page.getByText(/amountCents/)).not.toBeVisible();
+});
+
 test('故事三：限定授权分别产生 Execute、Ask、Manual Review 和 Block', async ({ page }) => {
   await openApp(page);
   await activateBalancedGoal(page);

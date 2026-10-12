@@ -110,7 +110,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <div className="pt-2 flex gap-2">
           <button
-            onClick={onTriggerImpact}
+            onClick={() => onTriggerImpact()}
             className="flex-1 py-2 rounded-lg bg-[#E6F2F2] hover:bg-[#0F6B6D] hover:text-white text-[#0F6B6D] font-semibold text-[12px] transition-colors cursor-pointer"
           >
             模拟突发支出 ¥900
