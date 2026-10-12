@@ -39,13 +39,23 @@ cd nova-financial-goals
 
 也可以在 GitHub 页面点击 **Code → Download ZIP**，解压后在终端进入项目目录。
 
-### 2. 安装依赖
+### 2. 配置 DeepSeek API（启用智能解析时需要）
+
+复制环境变量模板并填写自己的 API Key：
+
+```bash
+cp .env.example .env
+``
+
+编辑项目根目录下的 `.env`，设置 `DEEPSEEK_API_KEY`。请勿把真实 API Key 发给队友或提交到 GitHub；每位队友应使用自己的密钥。没有配置密钥时，应用和模拟数据仍可打开，但 DeepSeek 智能解析不可用。
+
+### 3. 安装依赖
 
 ```bash
 npm install
 ```
 
-### 3. 启动开发服务器
+### 4. 启动开发服务器
 
 ```bash
 npm run dev
@@ -75,7 +85,7 @@ npm run preview
 
 ## API Key 与网络说明
 
-当前页面使用代码内置的模拟数据，源码没有调用 Gemini API；本地运行和体验不需要配置 Gemini API Key，也不需要创建 Google Cloud 账单。
+应用的基础演示使用代码内置模拟数据。创建目标页的「DeepSeek 智能解析」会把你输入的目标描述发送到 DeepSeek API，并由本地 Node.js 服务端代为请求；API Key 不会发送到浏览器。调用 API 需要自行准备 DeepSeek API Key，费用按 DeepSeek 账户的实际用量规则计算。
 
 页面的字体、图标字体和部分图片通过外部 URL 加载。首次加载这些资源需要联网；离线时应用仍可运行，但部分字体、图标或图片可能无法显示。
 
