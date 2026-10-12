@@ -9,7 +9,7 @@ import {
   financialTwin,
   verifyAuditChain,
 } from './governance.ts';
-import { artifactCounts, mutateState, resetState } from './store.ts';
+import { artifactCounts, mutateState, resetState, storedAuditChain } from './store.ts';
 
 test('financial twin exposes one versioned source for balances and goals', () => {
   const twin = financialTwin(createFixture());
@@ -84,7 +84,11 @@ test('approval and nonce artifacts persist in dedicated session tables', () => {
     const created = createApprovalSnapshot(state, 'activate_goal', {
       goalId: state.goal.id, planId: 'balanced', twinVersion: state.twinVersion,
     }, '2026-09-22T00:00:00.000Z');
-    return { ...created.state, consumedNonces: ['nonce-1234567890'] };
+    return appendAuditEvent({ ...created.state, consumedNonces: ['nonce-1234567890'] }, 'persistence_check', 'ok', '证据链持久化');
   });
   assert.deepEqual(artifactCounts(sessionId), { approvals: 1, nonces: 1, operations: 0, receipts: 0 });
+  const events = storedAuditChain(sessionId);
+  assert.equal(events[0].sequence, 1);
+  assert.equal(events[0].previousHash, 'GENESIS');
+  assert.match(events[0].eventHash, /^[0-9a-f]{64}$/);
 });

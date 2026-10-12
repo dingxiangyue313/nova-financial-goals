@@ -202,8 +202,9 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
     }
     case 'prepare_transfer': {
       const source = account(state, input.sourceAccountId);
-      account(state, input.destinationAccountId);
+      const destination = account(state, input.destinationAccountId);
       if (source.protected) throw new Error('PROTECTED_ACCOUNT');
+      if (source.currency !== destination.currency) throw new Error('CURRENCY_MISMATCH_USE_FX');
       if (source.balanceCents < input.amountCents) throw new Error('INSUFFICIENT_BALANCE');
       const item: ToolRecord = { id: randomUUID(), kind: 'transfer_draft', status: 'prepared', expiresAt: null,
         data: { ...input, twinVersion: state.twinVersion, snapshotId: financialTwin(state).snapshotId } };
@@ -249,7 +250,8 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       const quote = state.toolRecords.find(item => item.id === input.quoteId && item.kind === 'fx_quote');
       if (!quote) throw new Error('FX_QUOTE_NOT_FOUND');
       if (!quote.expiresAt || quote.expiresAt <= todayTime(state)) throw new Error('FX_QUOTE_EXPIRED');
-      const source = account(state, input.sourceAccountId); account(state, input.destinationAccountId);
+      const source = account(state, input.sourceAccountId); const destination = account(state, input.destinationAccountId);
+      if (source.currency !== quote.data.fromCurrency || destination.currency !== quote.data.toCurrency) throw new Error('FX_ACCOUNT_CURRENCY_MISMATCH');
       if (source.protected) throw new Error('PROTECTED_ACCOUNT');
       if (source.balanceCents < Number(quote.data.amountCents)) throw new Error('INSUFFICIENT_BALANCE');
       const item: ToolRecord = { id: randomUUID(), kind: 'fx_draft', status: 'prepared', expiresAt: quote.expiresAt,
@@ -279,6 +281,8 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       return { state: next, result: { status: 'succeeded', operationId: operation.operation.operationId, receipt: operation.receipt } };
     }
     case 'create_mandate': {
+      if (state.goal.status !== 'active') throw new Error('GOAL_NOT_ACTIVE');
+      if (input.totalLimitCents < input.maxPerOperationCents || input.expiresAt <= state.clock) throw new Error('INVALID_MANDATE');
       let next = consumeApproval(state, input.approvalToken, 'create_mandate', {
         agentId: input.agentId, category: input.category, maxPerOperationCents: input.maxPerOperationCents,
         totalLimitCents: input.totalLimitCents, expiresAt: input.expiresAt,
@@ -292,6 +296,8 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
     case 'list_mandates': return { state, result: { mandates: state.mandate ? [state.mandate] : [] } };
     case 'update_mandate': {
       if (!state.mandate || state.mandate.id !== input.mandateId) throw new Error('MANDATE_NOT_FOUND');
+      if (input.totalLimitCents < input.maxPerOperationCents || input.totalLimitCents < state.mandate.spentCents || input.expiresAt <= state.clock)
+        throw new Error('INVALID_MANDATE');
       const parameters = { mandateId: input.mandateId, category: input.category,
         maxPerOperationCents: input.maxPerOperationCents, totalLimitCents: input.totalLimitCents, expiresAt: input.expiresAt };
       let next = consumeApproval(state, input.approvalToken, 'update_mandate', parameters);

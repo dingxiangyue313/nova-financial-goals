@@ -62,7 +62,7 @@ function sessionId(req: express.Request, res: express.Response): string {
 function respond(res: express.Response, state: DemoState) { return res.json(snapshot(state)); }
 function failure(res: express.Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
-  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|UNKNOWN_TOOL|SUBJECT_)/.test(message);
+  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_)/.test(message);
   return res.status(bad ? 400 : 500).json({ error: bad ? message : '服务暂时不可用，请稍后重试。' });
 }
 function route(fn: (req: express.Request, res: express.Response) => Promise<unknown> | unknown): express.RequestHandler {

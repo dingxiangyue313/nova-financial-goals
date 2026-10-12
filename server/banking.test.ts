@@ -11,7 +11,7 @@ test('tool discovery and read tools expose the same financial twin', () => {
   const base = createFixture();
   const snapshot = runBankingTool(base, 'get_financial_snapshot', {});
   assert.equal(snapshot.result.version, 1);
-  assert.equal(snapshot.result.accounts.length, 3);
+  assert.equal(snapshot.result.accounts.length, 4);
   const forecast = runBankingTool(base, 'forecast_cashflow', { horizonDays: 30 });
   assert.equal(forecast.result.safeToSpendCents, 200000);
   assert.equal(forecast.result.protectedCents, 2000000);
@@ -64,7 +64,7 @@ test('FX quote expires and an approved quote can execute', () => {
   const base = createFixture();
   const quoted = runBankingTool(base, 'quote_fx', { fromCurrency: 'CNY', toCurrency: 'JPY', amountCents: 10000 });
   const prepared = runBankingTool(quoted.state, 'prepare_fx_order', {
-    quoteId: quoted.result.quoteId, sourceAccountId: 'checking', destinationAccountId: 'goal-wallet',
+    quoteId: quoted.result.quoteId, sourceAccountId: 'checking', destinationAccountId: 'jpy-wallet',
   });
   const approval = runBankingTool(prepared.state, 'create_approval_snapshot', {
     action: 'execute_fx_order', parameters: { draftId: prepared.result.draftId, quoteId: quoted.result.quoteId },
@@ -80,7 +80,7 @@ test('FX quote expires and an approved quote can execute', () => {
   assert.equal(executed.state.finance.checkingCents, 490000);
   const expired = { ...quoted.state, clock: '2026-09-22' };
   assert.throws(() => runBankingTool(expired, 'prepare_fx_order', {
-    quoteId: quoted.result.quoteId, sourceAccountId: 'checking', destinationAccountId: 'goal-wallet',
+    quoteId: quoted.result.quoteId, sourceAccountId: 'checking', destinationAccountId: 'jpy-wallet',
   }), /FX_QUOTE_EXPIRED/);
 });
 

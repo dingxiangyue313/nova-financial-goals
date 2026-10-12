@@ -30,6 +30,15 @@ CREATE TABLE IF NOT EXISTS receipt_artifacts (
   operation_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, payload_json TEXT NOT NULL
 );`);
 
+function ensureColumn(table: string, column: string, definition: string) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!columns.some(item => item.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+for (const [column, definition] of [
+  ['request_id', 'TEXT'], ['approval_id', 'TEXT'], ['twin_version', 'INTEGER'], ['sequence', 'INTEGER'],
+  ['previous_hash', 'TEXT'], ['event_hash', 'TEXT'],
+] as const) ensureColumn('audit_events', column, definition);
+
 function syncArtifacts(sessionId: string, state: DemoState) {
   for (const approval of state.approvals) db.prepare(`INSERT INTO approval_artifacts(id,session_id,status,payload_json)
     VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,payload_json=excluded.payload_json`)
@@ -62,8 +71,12 @@ export function mutateState(sessionId: string, change: (state: DemoState) => Dem
     const result = db.prepare('UPDATE demo_sessions SET state_json = ?, version = version + 1, updated_at = ? WHERE id = ?')
       .run(JSON.stringify(next), new Date().toISOString(), sessionId);
     if (!result.changes) throw new Error('SESSION_NOT_FOUND');
-    for (const event of newEvents) db.prepare('INSERT INTO audit_events (id,session_id,at,action,outcome,detail,operation_id) VALUES (?,?,?,?,?,?,?)')
-      .run(event.id, sessionId, event.at, event.action, event.outcome, event.detail, event.operationId ?? null);
+    for (const event of newEvents) db.prepare(`INSERT INTO audit_events
+      (id,session_id,at,action,outcome,detail,operation_id,request_id,approval_id,twin_version,sequence,previous_hash,event_hash)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(event.id, sessionId, event.at, event.action, event.outcome, event.detail, event.operationId ?? null,
+        event.requestId ?? null, event.approvalId ?? null, event.twinVersion ?? null, event.sequence ?? null,
+        event.previousHash ?? null, event.eventHash ?? null);
     syncArtifacts(sessionId, next);
     db.exec('COMMIT');
     return next;
@@ -93,6 +106,13 @@ export function artifactCounts(sessionId: string) {
     approvals: count('approval_artifacts'), nonces: count('nonce_artifacts'),
     operations: count('operation_artifacts'), receipts: count('receipt_artifacts'),
   };
+}
+
+export function storedAuditChain(sessionId: string) {
+  return db.prepare(`SELECT sequence,previous_hash AS previousHash,event_hash AS eventHash,twin_version AS twinVersion
+    FROM audit_events WHERE session_id=? ORDER BY sequence`).all(sessionId) as Array<{
+      sequence: number; previousHash: string; eventHash: string; twinVersion: number;
+    }>;
 }
 
 export function closeStore() { db.close(); }

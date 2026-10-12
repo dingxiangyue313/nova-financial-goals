@@ -24,6 +24,7 @@ export function createFixture(): DemoState {
       { id: 'checking', label: '日常活期', type: 'checking', balanceCents: 500000, currency: 'CNY', protected: false },
       { id: 'emergency', label: '应急金', type: 'emergency', balanceCents: 2000000, currency: 'CNY', protected: true },
       { id: 'goal-wallet', label: '旅行目标钱包', type: 'goal', balanceCents: 350000, currency: 'CNY', protected: false },
+      { id: 'jpy-wallet', label: '日元旅行钱包', type: 'goal', balanceCents: 0, currency: 'JPY', protected: false },
     ],
     transactions: [
       { id: 'tx-salary', accountId: 'checking', date: '2026-09-01', title: '工资', category: 'income', amountCents: 900000 },
