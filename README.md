@@ -73,14 +73,22 @@ Vite 会在终端显示本地访问地址。此项目配置的端口为 **3000**
 | --- | --- |
 | `npm run dev` | 启动本地开发服务器 |
 | `npm run build` | 生成生产构建文件到 `dist/` |
-| `npm run preview` | 本地预览已生成的生产构建 |
+| `npm run preview` | 由 Vite 本地预览已生成的生产构建 |
+| `npm start` | 以 Express 服务端模式运行生产构建（需先运行 `npm run build`） |
 | `npm run lint` | 执行 TypeScript 类型检查（`tsc --noEmit`） |
 
-运行生产预览前，先执行：
+本地查看 Vite 预览版：
 
 ```bash
 npm run build
 npm run preview
+```
+
+以服务端模式运行生产构建：
+
+```bash
+npm run build
+npm start
 ```
 
 ## API Key 与网络说明
