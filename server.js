@@ -100,7 +100,7 @@ app.post('/api/goal/interpret', async (req, res) => {
   }
 });
 
-if (process.env.NODE_ENV === 'production') {
+if (process.env.NODE_ENV === 'production' || process.argv.includes('--production')) {
   app.use(express.static(path.join(rootDir, 'dist')));
   app.get('*', (_req, res) => res.sendFile(path.join(rootDir, 'dist', 'index.html')));
 } else {
