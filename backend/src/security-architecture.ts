@@ -67,4 +67,3 @@ export function runSecurityDemo(scenario: SecurityDemoScenario): SecurityDemoRes
   if (scenario === "timeout") return { ...base, outcome:"unknown", code:"OPERATION_STATUS_UNKNOWN", title:"状态未知，不自动重试", explanation:"工具超时后保留原 Operation ID，只允许查询最新状态，禁止生成新幂等键重复执行。", layers:base.layers.map(layer=>layer.name==="Idempotency"?{...layer,status:"unknown",evidence:"锁定 op_security_demo_001，等待状态查询"}:layer), audit:[...base.audit,"tool_timeout","status_query_required"] };
   return { ...base, outcome:"allowed", code:"ALL_GUARDS_PASSED", title:"服务端守卫全部通过", explanation:"签名、快照、权限、风险和幂等检查全部通过后，工具才获得执行权限。", audit:[...base.audit,"tool_executed","receipt_sealed"] };
 }
-

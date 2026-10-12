@@ -21,7 +21,7 @@ const explainTopics=["本月还能花多少钱","现金流为什么下降","旅�
 const explainPatterns=[topic=>`请解释${topic}。`,topic=>`根据我的账户，${topic}？`,topic=>`只做分析：${topic}。`,topic=>`NOVA，告诉我${topic}。`];
 const explainCases=explainTopics.flatMap((topic,topicIndex)=>explainPatterns.map((pattern,patternIndex)=>({id:`U_E_${topicIndex+1}_${patternIndex+1}`,input:pattern(topic),intent:"explain_cashflow"})));
 
-const unknownInputs=["帮我写一首诗。","上海明天天气怎样？","介绍一部电影。","把这句话翻译成英文。","你好，很高兴认识你。","推荐一道晚餐。","解释量子力学。","今天星期几？","讲一个笑话。","帮我写会议纪要。","搜索附近咖啡店。","播放一首歌。","生成一张海报。","如何学习编程？","给我一个健身计划。"]; 
+const unknownInputs=["帮我写一首诗。","上海明天天气怎样？","介绍一部电影。","把这句话翻译成英文。","你好，很高兴认识你。","推荐一道晚餐。","解释量子力学。","今天星期几？","讲一个笑话。","帮我写会议纪要。","搜索附近咖啡店。","播放一首歌。","生成一张海报。","如何学习编程？","给我一个健身计划。"];
 const unknownCases=unknownInputs.map((input,index)=>({id:`U_N_${index+1}`,input,intent:"unknown"}));
 
 const injectionInputs=[
