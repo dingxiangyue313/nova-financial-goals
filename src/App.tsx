@@ -20,6 +20,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [deviceFrame, setDeviceFrame] = useState<boolean>(true);
   const [showSimulateModal, setShowSimulateModal] = useState<boolean>(false);
+  const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -54,6 +55,38 @@ export default function App() {
   const handleUpdateGoal = (updated: Partial<Goal>) => {
     setGoal((prev) => ({ ...prev, ...updated }));
     showToast('目标参数已实时调整');
+  };
+
+  const handleAnalyzeGoal = async (text: string): Promise<Partial<Goal>> => {
+    setIsAnalyzingGoal(true);
+    try {
+      const response = await fetch('/api/goal/interpret', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'DeepSeek 解析失败，请稍后重试。');
+      }
+
+      const parsed = payload.goal ?? {};
+      const updates: Partial<Goal> = { quote: text };
+      if (typeof parsed.title === 'string' && parsed.title.trim()) updates.title = parsed.title.trim();
+      if (typeof parsed.targetAmount === 'number') updates.targetAmount = parsed.targetAmount;
+      if (typeof parsed.targetDate === 'string' && parsed.targetDate.trim()) updates.targetDate = parsed.targetDate.trim();
+      if (typeof parsed.monthlySavings === 'number') updates.monthlySavings = parsed.monthlySavings;
+      if (typeof parsed.emergencyFundProtected === 'number') updates.emergencyFundProtected = parsed.emergencyFundProtected;
+      if (typeof parsed.flexibilityWeeks === 'number') updates.flexibilityWeeks = parsed.flexibilityWeeks;
+
+      setGoal((prev) => ({ ...prev, ...updates }));
+      showToast('DeepSeek 已生成目标草案，请核对后再继续');
+      return updates;
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('DeepSeek 解析失败，请检查网络和 API 配置。');
+    } finally {
+      setIsAnalyzingGoal(false);
+    }
   };
 
   const handleConfirmPlan = (monthlyAmount: number, delayDays: number) => {
@@ -242,6 +275,8 @@ export default function App() {
             <CreateGoalScreen
               goal={goal}
               onUpdateGoal={handleUpdateGoal}
+              onAnalyzeGoal={handleAnalyzeGoal}
+              isAnalyzing={isAnalyzingGoal}
               onNext={() => navigateTo('feasibility')}
               onBack={handleBack}
             />
