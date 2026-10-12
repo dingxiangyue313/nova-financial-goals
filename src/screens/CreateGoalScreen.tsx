@@ -4,6 +4,8 @@ import { Goal } from '../types';
 interface CreateGoalScreenProps {
   goal: Goal;
   onUpdateGoal: (updated: Partial<Goal>) => void;
+  onAnalyzeGoal: (text: string) => Promise<Partial<Goal>>;
+  isAnalyzing: boolean;
   onNext: () => void;
   onBack: () => void;
 }
@@ -11,6 +13,8 @@ interface CreateGoalScreenProps {
 export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
   goal,
   onUpdateGoal,
+  onAnalyzeGoal,
+  isAnalyzing,
   onNext,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -21,6 +25,27 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
   const [targetAmount, setTargetAmount] = useState(goal.targetAmount);
   const [targetDate, setTargetDate] = useState(goal.targetDate);
   const [emergencyFund, setEmergencyFund] = useState(goal.emergencyFundProtected);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
+
+  const handleAnalyze = async () => {
+    if (!customQuote.trim()) {
+      setAnalysisError('请先输入目标描述。');
+      return;
+    }
+    setAnalysisError(null);
+    setAnalysisComplete(false);
+    try {
+      const updates = await onAnalyzeGoal(customQuote.trim());
+      if (typeof updates.targetAmount === 'number') setTargetAmount(updates.targetAmount);
+      if (typeof updates.targetDate === 'string') setTargetDate(updates.targetDate);
+      if (typeof updates.emergencyFundProtected === 'number') setEmergencyFund(updates.emergencyFundProtected);
+      setAnalysisComplete(true);
+      setIsEditing(true);
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : '解析失败，请检查 API 配置后重试。');
+    }
+  };
 
   const handleSaveSettings = () => {
     onUpdateGoal({
@@ -77,9 +102,22 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
           </div>
 
           <div className="bg-[#F5F7F8] p-2.5 rounded-lg border border-[#E5E8EB] flex flex-col gap-1.5">
-            <p className="text-[14px] leading-relaxed text-[#1F2329] font-medium">
-              {customQuote}
-            </p>
+            <label className="block">
+              <span className="sr-only">目标描述</span>
+              <textarea
+                value={customQuote}
+                onChange={(event) => {
+                  setCustomQuote(event.target.value);
+                  setAnalysisError(null);
+                  setAnalysisComplete(false);
+                }}
+                maxLength={500}
+                rows={3}
+                aria-label="目标描述"
+                placeholder="例如：我想三个月后去日本旅行，预算 8000 元，不能动应急金。"
+                className="w-full resize-y bg-transparent text-[14px] leading-relaxed text-[#1F2329] font-medium focus:outline-none"
+              />
+            </label>
             {/* Quick preset switches */}
             <div className="flex flex-wrap gap-1.5 pt-1 border-t border-[#E5E8EB]/70">
               <span className="text-[11px] text-[#8F959E] self-center">试听不同原话:</span>
@@ -108,6 +146,32 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
                   示例 {idx + 1}
                 </button>
               ))}
+            </div>
+            <div className="flex flex-col gap-1.5 pt-2 border-t border-[#E5E8EB]/70">
+              <button
+                type="button"
+                onClick={handleAnalyze}
+                disabled={isAnalyzing}
+                className="w-full min-h-[40px] rounded-lg bg-[#0F6B6D] hover:bg-[#084C4E] disabled:opacity-60 text-white text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {isAnalyzing ? 'progress_activity' : 'auto_awesome'}
+                </span>
+                {isAnalyzing ? 'DeepSeek 正在解析…' : 'DeepSeek 智能解析'}
+              </button>
+              {analysisError && (
+                <p role="alert" className="text-[11px] leading-relaxed text-red-600">
+                  {analysisError}
+                </p>
+              )}
+              {analysisComplete && (
+                <p role="status" className="text-[11px] leading-relaxed text-[#2E7D5B]">
+                  已生成草案并展开可修改字段。请核对识别结果，再决定是否继续。
+                </p>
+              )}
+              <p className="text-[10px] leading-relaxed text-[#8F959E]">
+                点击解析会将这段目标描述发送给 DeepSeek；请勿输入真实账号、银行卡或身份证信息。
+              </p>
             </div>
           </div>
         </section>
