@@ -38,8 +38,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
 
         {/* Tab 3: NOVA Center Button */}
         <button
-          onClick={() => onNavigate('create_goal')}
-          className="flex flex-col items-center justify-center h-full transition-transform active:scale-95 cursor-pointer group"
+          onClick={() => onNavigate('workspace')}
+          className={`flex flex-col items-center justify-center h-full transition-transform active:scale-95 cursor-pointer group ${currentScreen === 'workspace' ? 'font-bold' : ''}`}
           title="新建目标 / NOVA 智能对话"
         >
           <div className="w-9 h-9 rounded-full bg-[#0F6B6D] group-hover:bg-[#084C4E] text-white flex items-center justify-center shadow-sm transition-colors">

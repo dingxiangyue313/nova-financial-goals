@@ -147,6 +147,58 @@ export const UiCardSchema = z.object({
 });
 export type UiCard = z.infer<typeof UiCardSchema>;
 
+export const AgentIntentSchema = z.enum([
+  'goal_planning', 'goal_status', 'goal_impact', 'mandate_management',
+  'external_agent_request', 'clarification', 'rejected_prompt_injection',
+]);
+export type AgentIntent = z.infer<typeof AgentIntentSchema>;
+
+const AgentComponentBase = z.object({ id: z.string().min(1) });
+const AgentToneSchema = z.enum(['neutral', 'good', 'warning', 'danger']);
+export const AgentComponentSchema = z.discriminatedUnion('type', [
+  AgentComponentBase.extend({ type: z.literal('explanation'), title: z.string(), body: z.string(), tone: AgentToneSchema }),
+  AgentComponentBase.extend({ type: z.literal('goal_summary'), title: z.string(), goal: GoalSchema.pick({
+    title: true, targetCents: true, savedCents: true, targetDate: true, protectedCents: true, status: true,
+  }) }),
+  AgentComponentBase.extend({ type: z.literal('feasibility'), title: z.string(), assessment: AssessmentSchema }),
+  AgentComponentBase.extend({ type: z.literal('plan_compare'), title: z.string(), plans: z.array(PlanSchema).min(1).max(3) }),
+  AgentComponentBase.extend({ type: z.literal('impact_summary'), title: z.string(), impact: ImpactSchema,
+    protectedCents: MoneySchema }),
+  AgentComponentBase.extend({ type: z.literal('mandate_preview'), title: z.string(), mandate: z.object({
+    agentId: z.string(), category: z.string(), maxPerOperationCents: MoneySchema,
+    totalLimitCents: MoneySchema, expiresAt: IsoDateSchema, active: z.boolean(),
+  }) }),
+  AgentComponentBase.extend({ type: z.literal('confirmation'), title: z.string(), body: z.string(), tone: AgentToneSchema,
+    action: z.object({ actionId: z.string().min(10), label: z.string(), destructive: z.boolean().default(false) }) }),
+  AgentComponentBase.extend({ type: z.literal('receipt'), title: z.string(), body: z.string(),
+    status: z.enum(['succeeded', 'failed', 'unknown']), operationId: z.string().optional() }),
+  AgentComponentBase.extend({ type: z.literal('audit_summary'), title: z.string(), body: z.string(), chainValid: z.boolean() }),
+  AgentComponentBase.extend({ type: z.literal('clarification'), title: z.string(), body: z.string(), suggestions: z.array(z.string()).max(4) }),
+  AgentComponentBase.extend({ type: z.literal('error_recovery'), title: z.string(), body: z.string(), code: z.string() }),
+]);
+export type AgentComponent = z.infer<typeof AgentComponentSchema>;
+
+export const AgentThreadSchema = z.object({
+  id: z.string(), title: z.string().min(1).max(80), kind: z.enum(['task', 'risk']),
+  status: z.enum(['active', 'archived']), unread: z.boolean(), readOnly: z.boolean(),
+  createdAt: z.string(), updatedAt: z.string(),
+});
+export type AgentThread = z.infer<typeof AgentThreadSchema>;
+
+export const AgentMessageSchema = z.object({
+  id: z.string(), threadId: z.string(), role: z.enum(['user', 'assistant', 'system']),
+  content: z.string(), components: z.array(AgentComponentSchema), createdAt: z.string(),
+});
+export type AgentMessage = z.infer<typeof AgentMessageSchema>;
+
+export const AgentTurnSchema = z.object({
+  id: z.string(), thread: AgentThreadSchema, intent: AgentIntentSchema,
+  provider: z.enum(['deepseek', 'deterministic']), fallbackReason: z.string().nullable(),
+  twinVersion: z.number().int().positive(), message: AgentMessageSchema,
+  components: z.array(AgentComponentSchema), suggestedPrompts: z.array(z.string()).max(4),
+});
+export type AgentTurn = z.infer<typeof AgentTurnSchema>;
+
 export const SnapshotSchema = z.object({
   goal: GoalSchema, finance: FinanceSchema, assessment: AssessmentSchema,
   pendingImpact: ImpactSchema.nullable(), mandate: MandateSchema.nullable(),
