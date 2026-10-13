@@ -57,3 +57,16 @@ test('对话故事三：创建限定授权并运行受治理的外部 Agent 请�
   await expect(page.getByText(/EXECUTED/).first()).toBeVisible();
   await expect(page.getByText('治理与审计')).toBeVisible();
 });
+
+test('历史会话继续提问时自动创建可写会话，不暴露归档错误', async ({ page }) => {
+  await openApp(page);
+  await openWorkspace(page);
+  await page.getByRole('button', { name: '＋ 新会话' }).click();
+  await page.getByRole('button', { name: '归档' }).click();
+  const composer = page.getByPlaceholder('历史会话仅供查看；发送会新建会话');
+  await expect(composer).toBeEnabled();
+  await composer.fill('我想年底去日本旅行，预算 ¥8,000');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect(page.getByText('确认目标草案')).toBeVisible();
+  await expect(page.getByText('THREAD_ARCHIVED')).not.toBeVisible();
+});

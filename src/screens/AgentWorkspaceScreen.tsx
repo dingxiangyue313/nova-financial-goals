@@ -3,6 +3,7 @@ import type { AgentMessage, AgentThread, AgentTurn, Snapshot } from '../../share
 import { api } from '../api';
 import type { ScreenId } from '../types';
 import { AgentComponentRenderer } from '../components/AgentComponentRenderer';
+import { NOVA_LOGO_URL } from '../data/mockData';
 
 const suggestions = ['我想年底去日本旅行，预算 ¥8,000', '这笔 ¥900 支出会影响目标吗？', '允许旅行 Agent 在 ¥500 内订票'];
 
@@ -40,9 +41,15 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
     if (!message.trim() || busy) return;
     setBusy(true); setError(null); setDraft('');
     try {
-      const turn = await api<AgentTurn>('/api/agent/turn', 'POST', { threadId: activeThreadId, message: message.trim() });
+      const writableThreadId = activeThread && activeThread.status === 'active' && !activeThread.readOnly ? activeThread.id : null;
+      const turn = await api<AgentTurn>('/api/agent/turn', 'POST', { threadId: writableThreadId, message: message.trim() });
       await refreshThreads(turn.thread.id);
-    } catch (value) { setError(value instanceof Error ? value.message : '发送失败'); }
+    } catch (value) {
+      if (value instanceof Error && value.message === 'THREAD_ARCHIVED') {
+        const turn = await api<AgentTurn>('/api/agent/turn', 'POST', { threadId: null, message: message.trim() });
+        await refreshThreads(turn.thread.id);
+      } else setError(value instanceof Error ? value.message : '发送失败');
+    }
     finally { setBusy(false); }
   }
   async function submit(event: FormEvent) { event.preventDefault(); await send(draft); }
@@ -98,7 +105,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
       {activeThread && <div className="mt-2 flex items-center gap-2 text-[10px] text-[#646A73]"><button onClick={renameThread}>重命名</button><button disabled={activeThread.readOnly} onClick={() => void updateThread({ status: activeThread.status === 'active' ? 'archived' : 'active' })}>{activeThread.status === 'active' ? '归档' : '恢复'}</button><button onClick={removeThread} className="text-rose-600">删除</button>{activeThread.readOnly && <span className="ml-auto rounded-full bg-[#F0F2F5] px-2 py-1">旧演示 · 只读</span>}</div>}
     </header>
     <div className="flex-1 overflow-y-auto px-3 py-4 no-scrollbar">
-      {!messages.length && <div className="mx-auto max-w-md pt-6 text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#0F6B6D] text-xl font-bold text-white">N</div><h2 className="mt-3 text-[16px] font-bold">你想完成什么财务目标？</h2><p className="mt-1 text-[12px] text-[#646A73]">NOVA 会把理解结果变成可以核对和确认的界面。</p></div>}
+      {!messages.length && <div className="mx-auto max-w-md pt-6 text-center"><div className="mx-auto flex h-12 items-center justify-center"><img alt="NOVA" className="h-8 w-auto object-contain" src={NOVA_LOGO_URL} /></div><h2 className="mt-3 text-[16px] font-bold">你想完成什么财务目标？</h2><p className="mt-1 text-[12px] text-[#646A73]">NOVA 会把理解结果变成可以核对和确认的界面。</p></div>}
       <div className="mx-auto max-w-xl space-y-4">{messages.map(message => <div key={message.id} className={message.role === 'user' ? 'ml-10' : 'mr-5'}>
         <div className={`rounded-2xl px-3 py-2 text-[12px] leading-relaxed ${message.role === 'user' ? 'rounded-br-md bg-[#0F6B6D] text-white' : 'rounded-bl-md border border-[#E5E8EB] bg-white text-[#1F2329]'}`}>{message.content}</div>
         {message.components.length > 0 && <div className="mt-2 space-y-2">{message.components.map(component => <AgentComponentRenderer key={component.id} value={component} onAction={action} onCancel={cancelAction} onNavigate={onNavigate} busy={busy} />)}</div>}
@@ -107,7 +114,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
     <footer className="border-t border-[#E5E8EB] bg-white p-3">
       {!messages.length && <div className="mb-2 flex gap-2 overflow-x-auto no-scrollbar">{suggestions.map(item => <button key={item} onClick={() => void send(item)} className="shrink-0 rounded-xl border border-[#D8E7E7] bg-[#F2FAFA] px-3 py-2 text-left text-[11px] text-[#0F6B6D]">{item}</button>)}</div>}
       {error && <div className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-700">{error}</div>}
-      <form onSubmit={submit} className="flex items-end gap-2"><textarea disabled={activeThread?.readOnly || activeThread?.status === 'archived'} value={draft} onChange={event => setDraft(event.target.value)} placeholder={activeThread?.readOnly ? '旧演示会话只读' : '描述目标、风险或授权范围…'} rows={1} className="min-h-11 flex-1 resize-none rounded-xl border border-[#D0D5DD] bg-[#F8FAFB] px-3 py-3 text-[12px] outline-none focus:border-[#0F6B6D] disabled:opacity-60"/><button type="submit" aria-label="发送" disabled={busy || !draft.trim() || activeThread?.readOnly || activeThread?.status === 'archived'} className="grid h-11 w-11 place-items-center rounded-xl bg-[#0F6B6D] text-white disabled:opacity-40"><span className="material-symbols-outlined text-[18px]">arrow_upward</span></button></form>
+      <form onSubmit={submit} className="flex items-end gap-2"><textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder={activeThread?.readOnly || activeThread?.status === 'archived' ? '历史会话仅供查看；发送会新建会话' : '描述目标、风险或授权范围…'} rows={1} className="min-h-11 flex-1 resize-none rounded-xl border border-[#D0D5DD] bg-[#F8FAFB] px-3 py-3 text-[12px] outline-none focus:border-[#0F6B6D]"/><button type="submit" aria-label="发送" disabled={busy || !draft.trim()} className="grid h-11 w-11 place-items-center rounded-xl bg-[#0F6B6D] text-white disabled:opacity-40"><span className="material-symbols-outlined text-[18px]">arrow_upward</span></button></form>
     </footer>
   </section>;
 
