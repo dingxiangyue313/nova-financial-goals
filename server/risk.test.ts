@@ -4,10 +4,12 @@ import { activatePlan } from './domain.ts';
 import { createFixture } from './fixtures.ts';
 import {
   DEFAULT_RISK_PREFERENCES,
+  applySpendingTrendDemo,
   analyzeSpendingPattern,
   decideAgentRequest,
   evaluateOneOffExpenseRisk,
   evaluateSpendingRisk,
+  markActiveRiskSignal,
 } from './risk.ts';
 import type { Transaction } from '../shared/contracts.ts';
 
@@ -112,4 +114,28 @@ test('an in-limit Agent operation that worsens the goal requires manual review',
   });
   assert.equal(decision.outcome, 'manual_review');
   assert.equal(decision.reasonCode, 'GOAL_WOULD_WORSEN');
+});
+
+test('resolving one impact suppresses only its matching signal', () => {
+  const active = activatePlan(createFixture(), 'balanced');
+  const applied = applySpendingTrendDemo(active).state;
+  const first = applied.riskSignals[0];
+  const second = { ...first, id: 'other-signal', impactId: 'other-impact',
+    suppressionKey: 'other-fact' };
+  const resolved = markActiveRiskSignal({ ...applied, riskSignals: [first, second] }, 'dismiss', first.impactId);
+  assert.equal(resolved.riskSignals[0].status, 'dismissed');
+  assert.equal(resolved.riskSignals[1].status, 'active');
+});
+
+test('replaying a non-immediate spending trend never applies the same transactions twice', () => {
+  const state = activatePlan(createFixture(), 'balanced');
+  const weeklyOnly = { ...state, riskPreferences: { ...state.riskPreferences,
+    amountThresholdCents: 500000 } };
+  const first = applySpendingTrendDemo(weeklyOnly);
+  assert.equal(first.decision?.outcome, 'weekly_summary');
+  const second = applySpendingTrendDemo(first.state);
+  assert.equal(second.replayed, true);
+  assert.equal(second.state.finance.checkingCents, first.state.finance.checkingCents);
+  assert.equal(second.state.finance.currentMonthExpenseCents, first.state.finance.currentMonthExpenseCents);
+  assert.equal(second.state.transactions.length, first.state.transactions.length);
 });

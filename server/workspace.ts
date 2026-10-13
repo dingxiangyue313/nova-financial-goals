@@ -203,7 +203,7 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
     detail = '目标计划已激活，不会自动扣款。';
   } else if (action.actionType === 'resolve_impact') {
     const decision = String(action.payload.decision) as 'A' | 'B' | 'later' | 'dismiss';
-    next = markActiveRiskSignal(resolveImpact(state, decision), decision);
+    next = markActiveRiskSignal(resolveImpact(state, decision), decision, state.pendingImpact?.id);
     detail = decision === 'later' ? '已保留风险会话，稍后可继续处理。'
       : decision === 'dismiss' ? '已忽略本次提示；事实不变前不会重复提醒。'
       : `已应用目标影响方案 ${decision}。`;

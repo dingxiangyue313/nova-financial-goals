@@ -280,8 +280,11 @@ app.post('/api/demo/deposit', route((req, res) => {
 }));
 app.post('/api/impact/decision', route((req, res) => {
   const decision = z.enum(['A','B','later','dismiss']).parse(req.body?.decision);
-  const state = mutateState(sessionId(req, res), old => audit(markActiveRiskSignal(resolveImpact(old, decision), decision),
-    'impact_decision', decision, `用户选择 ${decision}`));
+  const state = mutateState(sessionId(req, res), old => {
+    const impactId = old.pendingImpact?.id;
+    return audit(markActiveRiskSignal(resolveImpact(old, decision), decision, impactId),
+      'impact_decision', decision, `用户选择 ${decision}`);
+  });
   return respond(res, state);
 }));
 app.post('/api/mandates', route((req, res) => {

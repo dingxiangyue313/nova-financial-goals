@@ -63,8 +63,12 @@ export function evaluateExternalRequest(state: DemoState, request: ExternalReque
   let next: DemoState = { ...state, operations: [...state.operations, operation] };
   if (status === 'executed') {
     next.twinVersion = state.twinVersion + 1;
-    next.finance = { ...state.finance, checkingCents: state.finance.checkingCents - request.amountCents };
+    next.finance = { ...state.finance, checkingCents: state.finance.checkingCents - request.amountCents,
+      currentMonthExpenseCents: state.finance.currentMonthExpenseCents + request.amountCents,
+      updatedAt: state.clock };
     next.accounts = state.accounts.map(item => item.id === 'checking' ? { ...item, balanceCents: item.balanceCents - request.amountCents } : item);
+    next.transactions = [{ id: `agent-payment:${operationId}`, accountId: 'checking', date: state.clock,
+      title: '外部 Agent 模拟支付', category: request.category, amountCents: -request.amountCents }, ...state.transactions];
     next.mandate = { ...mandate!, spentCents: mandate!.spentCents + request.amountCents };
     next.receipts = [...state.receipts, receipt!];
   }
@@ -90,8 +94,12 @@ export function approveOperation(state: DemoState, operationId: string): DemoSta
   const operations = [...state.operations];
   operations[index] = updated;
   let next: DemoState = { ...state, operations, twinVersion: state.twinVersion + 1,
-    finance: { ...state.finance, checkingCents: state.finance.checkingCents - operation.amountCents },
+    finance: { ...state.finance, checkingCents: state.finance.checkingCents - operation.amountCents,
+      currentMonthExpenseCents: state.finance.currentMonthExpenseCents + operation.amountCents,
+      updatedAt: state.clock },
     accounts: state.accounts.map(item => item.id === 'checking' ? { ...item, balanceCents: item.balanceCents - operation.amountCents } : item),
+    transactions: [{ id: `agent-payment:${operationId}`, accountId: 'checking', date: state.clock,
+      title: '用户确认的外部 Agent 模拟支付', category: operation.category, amountCents: -operation.amountCents }, ...state.transactions],
     mandate: { ...state.mandate, spentCents: state.mandate.spentCents + operation.amountCents },
     receipts: [...state.receipts, receipt] };
   next = appendAuditEvent(next, 'approve_operation', 'executed', updated.reason, { operationId });

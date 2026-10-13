@@ -76,8 +76,8 @@ export const RiskDecisionSchema = z.object({
 export type RiskDecision = z.infer<typeof RiskDecisionSchema>;
 
 export const GoalImpactSignalSchema = z.object({
-  id: z.string(), goalId: z.string(), patternId: z.string(), createdAt: IsoDateSchema,
-  title: z.string(), decision: z.enum(['weekly_summary', 'immediate_signal']),
+  id: z.string(), goalId: z.string(), patternId: z.string(), impactId: z.string(), createdAt: IsoDateSchema,
+  title: z.string(), decision: z.literal('immediate_signal'),
   evidence: z.array(z.object({ transactionId: z.string(), date: IsoDateSchema, amountCents: MoneySchema })),
   confidence: z.enum(['low', 'medium', 'high']), ruleVersion: z.string(),
   twinVersion: z.number().int().positive(), impact: GoalRiskImpactSchema,

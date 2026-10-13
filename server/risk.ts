@@ -238,13 +238,31 @@ export function applySpendingTrendDemo(state: DemoState): {
   if (state.riskSignals.some(signal => signal.suppressionKey === suppressionKey))
     return { state, decision: null, replayed: true };
   const knownIds = new Set(state.transactions.map(item => item.id));
+  if (demoTransactions.every(item => knownIds.has(item.id)))
+    return { state, decision: null, replayed: true };
   const transactions = [...demoTransactions.filter(item => !knownIds.has(item.id)), ...state.transactions];
   const pattern = analyzeSpendingPattern(transactions, 'delivery_and_rides', state.clock);
   if (!pattern) throw new Error('RISK_EVIDENCE_INCOMPLETE');
   const decision = evaluateSpendingRisk(state, pattern, state.riskPreferences);
   const spendingPatterns = [...state.spendingPatterns.filter(item => item.id !== pattern.id), pattern];
-  if (decision.outcome !== 'weekly_summary' && decision.outcome !== 'immediate_signal')
-    return { state: { ...state, transactions, spendingPatterns }, decision, replayed: false };
+  const currentSpend = pattern.currentCents;
+  const finance = {
+    ...state.finance,
+    checkingCents: Math.max(0, state.finance.checkingCents - currentSpend),
+    currentMonthExpenseCents: state.finance.currentMonthExpenseCents + pattern.increaseCents,
+    updatedAt: state.clock,
+  };
+  const common: DemoState = {
+    ...state,
+    finance,
+    accounts: state.accounts.map(item => item.id === 'checking'
+      ? { ...item, balanceCents: finance.checkingCents } : item),
+    transactions,
+    spendingPatterns,
+    twinVersion: state.twinVersion + 1,
+  };
+  if (decision.outcome !== 'immediate_signal')
+    return { state: common, decision, replayed: false };
   const impactData = decision.goalImpact!;
   const months = Math.max(1, Math.ceil(daysBetween(state.clock, state.goal.targetDate) / 30));
   const optionAContributionCents = roundHundredYuan(state.goal.monthlyContributionCents
@@ -262,7 +280,7 @@ export function applySpendingTrendDemo(state: DemoState): {
     dismissed: false,
   };
   const signal: GoalImpactSignal = {
-    id: crypto.randomUUID(), goalId: state.goal.id, patternId: pattern.id, createdAt: state.clock,
+    id: crypto.randomUUID(), goalId: state.goal.id, patternId: pattern.id, impactId: impact.id, createdAt: state.clock,
     title: '外卖与打车支出趋势影响日本旅行', decision: decision.outcome,
     evidence: pattern.evidenceTransactionIds.map(transactionId => {
       const item = transactions.find(transaction => transaction.id === transactionId)!;
@@ -271,33 +289,21 @@ export function applySpendingTrendDemo(state: DemoState): {
     confidence: pattern.confidence, ruleVersion: RISK_RULE_VERSION, twinVersion: state.twinVersion + 1,
     impact: impactData, status: 'active', suppressionKey,
   };
-  const currentSpend = pattern.currentCents;
-  const finance = {
-    ...state.finance,
-    checkingCents: Math.max(0, state.finance.checkingCents - currentSpend),
-    currentMonthExpenseCents: state.finance.currentMonthExpenseCents + pattern.increaseCents,
-    updatedAt: state.clock,
-  };
   const next: DemoState = {
-    ...state,
-    finance,
-    accounts: state.accounts.map(item => item.id === 'checking'
-      ? { ...item, balanceCents: finance.checkingCents } : item),
-    transactions,
-    spendingPatterns,
+    ...common,
     riskSignals: [...state.riskSignals, signal],
-    pendingImpact: decision.outcome === 'immediate_signal' ? impact : state.pendingImpact,
-    twinVersion: state.twinVersion + 1,
+    pendingImpact: impact,
   };
   return { state: next, decision, replayed: false };
 }
 
-export function markActiveRiskSignal(state: DemoState, decision: 'A' | 'B' | 'later' | 'dismiss'): DemoState {
+export function markActiveRiskSignal(state: DemoState, decision: 'A' | 'B' | 'later' | 'dismiss', impactId?: string): DemoState {
   const status: GoalImpactSignal['status'] = decision === 'later' ? 'later'
     : decision === 'dismiss' ? 'dismissed' : 'resolved';
   let changed = false;
   const riskSignals = state.riskSignals.map(signal => {
     if (signal.status !== 'active' && signal.status !== 'later') return signal;
+    if (impactId && signal.impactId !== impactId) return signal;
     changed = true;
     return { ...signal, status };
   });
