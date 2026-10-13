@@ -2,9 +2,9 @@ name: NOVA checks
 
 on:
   push:
-    branches: [main, feature/goal-first-backend]
+    branches: [main, feature/goal-first-backend, feature/generative-goal-workspace]
   pull_request:
-    branches: [main]
+    branches: [main, feature/goal-first-backend]
 
 permissions:
   contents: read

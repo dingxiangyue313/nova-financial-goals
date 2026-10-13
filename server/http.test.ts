@@ -64,6 +64,9 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     const large = await call('/api/demo/expense', 'POST', { amountCents: 90000, title: '汽车保养' });
     assert.ok((large.data as Snapshot).pendingImpact);
     assert.equal((large.data as Snapshot).finance.emergencyCents, 2000000);
+    const riskThreads = await call('/api/agent/threads?includeArchived=true');
+    assert.equal((riskThreads.data as { threads: Array<{ kind: string; unread: boolean }> }).threads
+      .some(thread => thread.kind === 'risk' && thread.unread), true);
     assert.equal((await call('/api/impact/decision', 'POST', { decision: 'B' })).code, 200);
     assert.equal((await call('/api/mandates', 'POST', { confirmed: true })).code, 200);
     const subject = cookie.slice('nova_demo_sid='.length).split('.')[0];
@@ -97,6 +100,25 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     cookie = originalCookie;
     assert.equal((await call('/api/demo/reset', 'POST')).code, 200);
     assert.equal(((await call('/api/session')).data as Snapshot).audit.length, 0);
+
+    const newThread = await call('/api/agent/threads', 'POST', { title: '日本旅行目标' });
+    assert.equal(newThread.code, 200);
+    const threadId = (newThread.data as { thread: { id: string } }).thread.id;
+    const turn = await call('/api/agent/turn', 'POST', { threadId, message: '我想年底去日本旅行，预算 ¥8,000' });
+    assert.equal(turn.code, 200);
+    const turnData = turn.data as { intent: string; components: Array<{ type: string; action?: { actionId: string } }> };
+    assert.equal(turnData.intent, 'goal_planning');
+    const actionId = turnData.components.find(item => item.type === 'confirmation')?.action?.actionId;
+    assert.ok(actionId);
+    const action = await call('/api/agent/action', 'POST', { actionId, decision: 'confirm' });
+    assert.equal(action.code, 200);
+    assert.equal((action.data as { snapshot: Snapshot }).snapshot.goal.targetCents, 800000);
+    const actionReplay = await call('/api/agent/action', 'POST', { actionId, decision: 'confirm' });
+    assert.equal((actionReplay.data as { replayed: boolean }).replayed, true);
+    const messages = await call(`/api/agent/threads/${threadId}/messages`);
+    assert.equal((messages.data as { messages: unknown[] }).messages.length, 3);
+    assert.equal((await call(`/api/agent/threads/${threadId}`, 'PATCH', { title: '冬季日本旅行' })).code, 200);
+    assert.equal((await call(`/api/agent/threads/${threadId}`, 'DELETE')).code, 200);
   } finally {
     child.kill('SIGTERM');
     await new Promise(resolve => child.once('exit', resolve));

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { addDays } from './domain.ts';
-import { UiCardSchema, type UiCard } from '../shared/contracts.ts';
+import { AgentIntentSchema, UiCardSchema, type AgentIntent, type UiCard } from '../shared/contracts.ts';
 import { containsPromptInjection } from './security.ts';
 
 const ParsedGoal = z.object({
@@ -12,6 +12,35 @@ const ParsedGoal = z.object({
   flexibilityWeeks: z.number().int().nonnegative().max(52).nullable().optional(),
 });
 export type ParsedGoalDraft = z.infer<typeof ParsedGoal>;
+
+export async function interpretAgentRequest(text: string, deterministicIntent: AgentIntent, safeContext?: {
+  context: Array<{ role: string; content: string }>; twin: { version: number; goalStatus: string; hasImpact: boolean; hasMandate: boolean };
+}): Promise<{
+  intent: AgentIntent; explanation: string | null; provider: 'deepseek' | 'deterministic'; fallbackReason: string | null;
+}> {
+  if (containsPromptInjection(text)) return { intent: 'rejected_prompt_injection', explanation: null,
+    provider: 'deterministic', fallbackReason: 'PROMPT_INJECTION_DETECTED' };
+  const fallback = (reason: string | null) => ({ intent: deterministicIntent, explanation: null,
+    provider: 'deterministic' as const, fallbackReason: reason });
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) return fallback('DEEPSEEK_NOT_CONFIGURED');
+  try {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: process.env.DEEPSEEK_MODEL || 'deepseek-flash', thinking: { type: 'disabled' },
+        response_format: { type: 'json_object' }, max_tokens: 180, messages: [
+          { role: 'system', content: `你只为模拟财务助手识别任务。输出 JSON {intent,explanation}。intent 只能是：goal_planning,goal_status,goal_impact,mandate_management,external_agent_request,clarification。explanation 最多 80 个中文字符，不计算金额、不提出执行参数、不声称已执行。` },
+          { role: 'user', content: JSON.stringify({ recentConversation: safeContext?.context.slice(-20) ?? [],
+            financialState: safeContext?.twin ?? null, currentMessage: text }) },
+        ] }), signal: AbortSignal.timeout(12_000),
+    });
+    if (!response.ok) return fallback('DEEPSEEK_HTTP_ERROR');
+    const content = (await response.json())?.choices?.[0]?.message?.content;
+    const parsed = z.object({ intent: AgentIntentSchema.exclude(['rejected_prompt_injection']),
+      explanation: z.string().max(160).nullable() }).parse(JSON.parse(content));
+    return { intent: parsed.intent, explanation: parsed.explanation, provider: 'deepseek', fallbackReason: null };
+  } catch { return fallback('DEEPSEEK_INVALID_OR_TIMEOUT'); }
+}
 
 function deterministic(text: string, clock: string): ParsedGoalDraft {
   const target = text.match(/(?:预算|目标|存|需要|准备)[^\d¥]{0,8}¥?\s*([\d,]+(?:\.\d{1,2})?)/);

@@ -13,6 +13,7 @@ import { GoalsListScreen } from './screens/GoalsListScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { BankingDemoScreen } from './screens/BankingDemoScreen';
+import { AgentWorkspaceScreen } from './screens/AgentWorkspaceScreen';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('home');
@@ -24,6 +25,7 @@ export default function App() {
   const [showSimulateModal, setShowSimulateModal] = useState<boolean>(false);
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
+  const [workspaceStarter, setWorkspaceStarter] = useState('');
   useEffect(() => {
     api('/api/session').then(setSnapshot).catch(e => setLoadError(e.message));
   }, []);
@@ -76,7 +78,7 @@ export default function App() {
       setCurrentScreen('home');
     } else if (currentScreen === 'impact') {
       setCurrentScreen('home');
-    } else if (currentScreen === 'goals_list' || currentScreen === 'activity' || currentScreen === 'profile' || currentScreen === 'banking_demo') {
+    } else if (currentScreen === 'workspace' || currentScreen === 'goals_list' || currentScreen === 'activity' || currentScreen === 'profile' || currentScreen === 'banking_demo') {
       setCurrentScreen('home');
     } else {
       setCurrentScreen('home');
@@ -167,6 +169,8 @@ export default function App() {
         return '个人设置';
       case 'banking_demo':
         return '授权与执行记录';
+      case 'workspace':
+        return 'NOVA 工作台';
       default:
         return '';
     }
@@ -175,6 +179,7 @@ export default function App() {
   const isHomeScreen = currentScreen === 'home';
   const showBottomNav =
     currentScreen === 'home' ||
+    currentScreen === 'workspace' ||
     currentScreen === 'goals_list' ||
     currentScreen === 'activity' ||
     currentScreen === 'profile';
@@ -247,7 +252,9 @@ export default function App() {
         className={`bg-[#F5F7F8] relative flex flex-col overflow-hidden transition-all duration-300 ${
           deviceFrame
             ? 'w-[390px] max-w-[390px] h-[844px] max-h-[844px] min-h-[844px] rounded-[38px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border-[8px] border-[#1F2329]'
-            : 'w-full max-w-[420px] min-h-screen md:min-h-[844px] md:max-h-[90vh] md:rounded-2xl md:shadow-xl md:border border-[#E5E8EB]'
+            : currentScreen === 'workspace'
+              ? 'w-full max-w-[1120px] min-h-screen md:min-h-[760px] md:max-h-[90vh] md:rounded-2xl md:shadow-xl md:border border-[#E5E8EB]'
+              : 'w-full max-w-[420px] min-h-screen md:min-h-[844px] md:max-h-[90vh] md:rounded-2xl md:shadow-xl md:border border-[#E5E8EB]'
         }`}
       >
         {/* Top Header */}
@@ -268,7 +275,7 @@ export default function App() {
               hasImpactPending={hasImpactPending}
               onNavigateToFeasibility={() => navigateTo('feasibility')}
               onNavigateToImpact={() => navigateTo('impact')}
-              onNavigateToCreate={() => navigateTo('create_goal')}
+              onNavigateToCreate={() => { setWorkspaceStarter('我想创建一个新的财务目标'); navigateTo('workspace'); }}
             />
           )}
 
@@ -321,6 +328,9 @@ export default function App() {
           )}
 
           {currentScreen === 'banking_demo' && <BankingDemoScreen snapshot={snapshot} mutate={mutate} />}
+
+          {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame}
+            starter={workspaceStarter} onSnapshot={setSnapshot} onNavigate={navigateTo} />}
 
           {currentScreen === 'profile' && (
             <ProfileScreen

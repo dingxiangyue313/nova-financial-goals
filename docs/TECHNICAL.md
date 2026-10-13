@@ -3,11 +3,11 @@
 ## 架构与边界
 
 ```
-React 原版界面 ── same-origin /api ── Express 服务
+React 原版界面 + 对话工作台 ── same-origin /api ── Express 服务
                                    ├─ Zod 共享契约 / 白名单卡片
                                    ├─ 确定性目标与风险规则
                                    ├─ DeepSeek 可选解析 / 编排
-                                   ├─ SQLite 会话、Twin、Approval、Operation、Receipt、审计
+                                   ├─ SQLite Thread、Turn、Component、Action、Twin 与审计
                                    └─ 受保护 /mcp 模拟工具
 ```
 
@@ -17,7 +17,9 @@ React 原版界面 ── same-origin /api ── Express 服务
 - 规则：`server/domain.ts` 计算资金余量、预测日期、三方案和显著影响；`server/banking.ts` 是统一工具运行时，覆盖目标状态、转账、换汇、Mandate、外部请求、幂等、Operation、Receipt 和审计导出。受保护应急金不进入可用余额。
 - 批准：`server/governance.ts` 冻结 action、参数、Twin Version 和过期时间并计算 SHA-256；用户确认后签发短期一次性 Token。参数、版本、期限或消费状态不匹配即拒绝。
 - 外部认证：`server/security.ts` 用 HMAC 绑定 Agent ID、会话主体、时间戳、Nonce 和请求体；5 分钟窗口和持久化 Nonce 防止重放。它同时提供 Prompt Injection 检测与本地限流。
-- 模型：`server/agent.ts` 调用 DeepSeek Chat Completions；只解析目标和排序已有 UI 卡片。模型不能写状态、生成工具参数或改变计算值。超时、无 Key、无效输出回退确定性模式。
+- 工作台：`server/workspace.ts` 生成完整 Agent Turn。最近 20 条消息和精简 Twin 状态仅用于意图理解；服务端按白名单组合组件，并为写操作签发绑定会话、Twin Version、期限和幂等键的 `actionId`。
+- 模型：`server/agent.ts` 调用 DeepSeek Chat Completions；只识别意图、解析目标和生成短解释。模型不能写状态、生成工具参数、创建组件类型或改变计算值。超时、无 Key、无效输出或 Prompt Injection 回退确定性模式。
+- 历史：每个体验者可拥有多个长期会话。显著支出按 Impact ID 去重创建未读风险会话；重置演示会轮换 Run ID，并将旧会话转为只读。
 - MCP：`server/mcp.ts` 使用 TypeScript SDK Streamable HTTP，只暴露读取、预测、模拟请求和状态查询；它不能创建 Mandate、确认自己的 Approval 或直接写审计。
 
 ## 三条链路与状态矩阵
@@ -46,6 +48,11 @@ React 原版界面 ── same-origin /api ── Express 服务
 | --- | --- |
 | `GET /api/session` | 当前会话完整快照与经过服务端校验的卡片 |
 | `POST /api/agent` | 结构化意图、计划、模型来源、回退原因与工具结果 |
+| `GET/POST /api/agent/threads` | 查询或创建长期任务会话 |
+| `PATCH/DELETE /api/agent/threads/:id` | 重命名、归档、恢复或删除会话 |
+| `GET /api/agent/threads/:id/messages` | 读取已校验的消息与生成组件 |
+| `POST /api/agent/turn` | 自然语言输入 → 意图 → 服务端受控组件 |
+| `POST /api/agent/action` | 确认或取消服务端绑定的写操作 |
 | `GET/POST /api/financial-twin` | 读取版本化 Twin 或调用统一模拟工具 |
 | `GET/POST /api/goal-flow` | 读取目标状态机或执行目标迁移 |
 | `GET/POST /api/banking-tools` | 工具发现与第一方调用 |

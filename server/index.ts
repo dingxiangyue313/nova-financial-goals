@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer as createViteServer } from 'vite';
 import { z } from 'zod';
-import { artifactCounts, getState, mutateState, resetState } from './store.ts';
+import { artifactCounts, createAgentThread, deleteAgentThread, getAgentMessages, getState, listAgentThreads,
+  markAgentThreadRead, mutateState, renameAgentThread, resetState, setAgentThreadStatus } from './store.ts';
 import { snapshot } from './presentation.ts';
 import { assessGoal, injectExpense, resolveImpact } from './domain.ts';
 import { composeUiCards, interpretGoal } from './agent.ts';
@@ -15,6 +16,7 @@ import { IsoDateSchema, type DemoState } from '../shared/contracts.ts';
 import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './banking.ts';
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
 import { containsPromptInjection, LocalRateLimiter, signExternalRequest, verifyExternalRequest } from './security.ts';
+import { createAgentTurn, ensureImpactThread, executeWorkspaceAction } from './workspace.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -63,7 +65,7 @@ function sessionId(req: express.Request, res: express.Response): string {
 function respond(res: express.Response, state: DemoState) { return res.json(snapshot(state)); }
 function failure(res: express.Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
-  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_)/.test(message);
+  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_)/.test(message);
   return res.status(bad ? 400 : 500).json({ error: bad ? message : '服务暂时不可用，请稍后重试。' });
 }
 function route(fn: (req: express.Request, res: express.Response) => Promise<unknown> | unknown): express.RequestHandler {
@@ -129,6 +131,40 @@ app.post('/api/agent', route(async (req, res) => {
     provider: parsed.provider, fallbackReason: parsed.notice || null,
     toolResults: [{ tool: 'interpret_goal', result: parsed.goal }] });
 }));
+app.get('/api/agent/threads', route((req, res) => {
+  const includeArchived = req.query.includeArchived === 'true';
+  res.json({ threads: listAgentThreads(sessionId(req, res), includeArchived) });
+}));
+app.post('/api/agent/threads', route((req, res) => {
+  const title = z.string().min(1).max(80).default('新的目标任务').parse(req.body?.title);
+  res.json({ thread: createAgentThread(sessionId(req, res), { title }) });
+}));
+app.patch('/api/agent/threads/:id', route((req, res) => {
+  const body = z.object({ title: z.string().min(1).max(80).optional(),
+    status: z.enum(['active', 'archived']).optional() }).refine(value => value.title || value.status).parse(req.body);
+  const id = sessionId(req, res);
+  let thread = body.title ? renameAgentThread(id, req.params.id, body.title) : undefined;
+  if (body.status) thread = setAgentThreadStatus(id, req.params.id, body.status);
+  res.json({ thread });
+}));
+app.delete('/api/agent/threads/:id', route((req, res) => {
+  deleteAgentThread(sessionId(req, res), req.params.id); res.json({ deleted: true });
+}));
+app.get('/api/agent/threads/:id/messages', route((req, res) => {
+  const id = sessionId(req, res); const messages = getAgentMessages(id, req.params.id);
+  markAgentThreadRead(id, req.params.id); res.json({ messages });
+}));
+app.post('/api/agent/turn', route(async (req, res) => {
+  const body = z.object({ threadId: z.string().nullable().default(null), message: z.string().min(1).max(500) }).parse(req.body);
+  const id = sessionId(req, res);
+  res.json(await createAgentTurn(id, body.threadId, body.message, getState(id)));
+}));
+app.post('/api/agent/action', route((req, res) => {
+  const body = z.object({ actionId: z.string(), decision: z.enum(['confirm', 'cancel']) }).parse(req.body);
+  const id = sessionId(req, res); let outcome: ReturnType<typeof executeWorkspaceAction> | undefined;
+  const state = mutateState(id, old => { outcome = executeWorkspaceAction(id, body.actionId, body.decision, old); return outcome.state; });
+  res.json({ snapshot: snapshot(state), message: outcome!.message, replayed: outcome!.replayed });
+}));
 app.get('/api/ui/cards', route(async (req, res) => {
   const cards = snapshot(getState(sessionId(req, res))).cards;
   res.json(await composeUiCards(cards));
@@ -188,12 +224,14 @@ app.post('/api/goals/activate', route((req, res) => {
 }));
 app.post('/api/demo/expense', route((req, res) => {
   const body = z.object({ amountCents: z.number().int().positive(), title: z.string().min(1).max(60) }).parse(req.body);
-  const state = mutateState(sessionId(req, res), old => {
+  const id = sessionId(req, res);
+  const state = mutateState(id, old => {
     const result = injectExpense(old, body.amountCents, body.title);
     const withTransaction = { ...result.state, transactions: [{ id: randomUUID(), accountId: 'checking',
       date: old.clock, title: body.title, category: 'expense', amountCents: -body.amountCents }, ...result.state.transactions] };
     return audit(withTransaction, 'simulate_expense', result.impact ? 'impact' : 'no_signal', body.title);
   });
+  ensureImpactThread(id, state);
   return respond(res, state);
 }));
 app.post('/api/demo/deposit', route((req, res) => {
