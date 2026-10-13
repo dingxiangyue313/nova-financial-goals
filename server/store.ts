@@ -31,6 +31,18 @@ CREATE TABLE IF NOT EXISTS operation_artifacts (
 CREATE TABLE IF NOT EXISTS receipt_artifacts (
   operation_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, payload_json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS risk_preferences (
+  session_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS spending_patterns (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, payload_json TEXT NOT NULL,
+  PRIMARY KEY(session_id, id)
+);
+CREATE TABLE IF NOT EXISTS risk_signals (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, suppression_key TEXT NOT NULL,
+  status TEXT NOT NULL, payload_json TEXT NOT NULL,
+  PRIMARY KEY(session_id, id), UNIQUE(session_id, suppression_key)
+);
 CREATE TABLE IF NOT EXISTS agent_runs (
   session_id TEXT PRIMARY KEY, current_run_id TEXT NOT NULL
 );
@@ -69,6 +81,15 @@ for (const [column, definition] of [
 ] as const) ensureColumn('audit_events', column, definition);
 
 function syncArtifacts(sessionId: string, state: DemoState) {
+  db.prepare(`INSERT INTO risk_preferences(session_id,payload_json,updated_at) VALUES(?,?,?)
+    ON CONFLICT(session_id) DO UPDATE SET payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
+    .run(sessionId, JSON.stringify(state.riskPreferences), new Date().toISOString());
+  for (const pattern of state.spendingPatterns) db.prepare(`INSERT INTO spending_patterns(session_id,id,payload_json)
+    VALUES(?,?,?) ON CONFLICT(session_id,id) DO UPDATE SET payload_json=excluded.payload_json`)
+    .run(sessionId, pattern.id, JSON.stringify(pattern));
+  for (const signal of state.riskSignals) db.prepare(`INSERT INTO risk_signals(session_id,id,suppression_key,status,payload_json)
+    VALUES(?,?,?,?,?) ON CONFLICT(session_id,suppression_key) DO UPDATE SET status=excluded.status,payload_json=excluded.payload_json`)
+    .run(sessionId, signal.id, signal.suppressionKey, signal.status, JSON.stringify(signal));
   for (const approval of state.approvals) db.prepare(`INSERT INTO approval_artifacts(id,session_id,status,payload_json)
     VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,payload_json=excluded.payload_json`)
     .run(approval.id, sessionId, approval.status, JSON.stringify(approval));
@@ -123,6 +144,9 @@ export function resetState(sessionId: string): DemoState {
     db.prepare('DELETE FROM nonce_artifacts WHERE session_id=?').run(sessionId);
     db.prepare('DELETE FROM operation_artifacts WHERE session_id=?').run(sessionId);
     db.prepare('DELETE FROM receipt_artifacts WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM risk_preferences WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM spending_patterns WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM risk_signals WHERE session_id=?').run(sessionId);
     const runId = randomUUID();
     db.prepare('UPDATE agent_threads SET read_only=1, status=\'archived\', updated_at=? WHERE session_id=?')
       .run(new Date().toISOString(), sessionId);

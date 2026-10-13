@@ -33,6 +33,15 @@ export function createFixture(): DemoState {
     bills: [{ id: 'bill-mobile', title: '通信账单', dueDate: '2026-09-25', amountCents: 12000, paid: false }],
     subscriptions: [{ id: 'sub-stream', title: 'StreamPlus', monthlyCents: 5500, nextChargeDate: '2026-09-23', status: 'active' }],
     approvals: [], receipts: [], consumedNonces: [], toolRecords: [],
+    riskPreferences: {
+      amountThresholdCents: 50000,
+      goalImpactRatioThresholdBps: 500,
+      weeklySummaryEnabled: true,
+      quietHours: null,
+      pausedUntil: null,
+      goalOverrides: {},
+    },
+    spendingPatterns: [], riskSignals: [],
     pendingImpact: null, mandate: null, audit: [], operations: [],
   };
 }

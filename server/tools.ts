@@ -1,5 +1,6 @@
 import type { DemoState, Mandate, Operation, Receipt } from '../shared/contracts.ts';
 import { appendAuditEvent, stableHash } from './governance.ts';
+import { decideAgentRequest } from './risk.ts';
 
 export interface ExternalRequest {
   agentId: string; category: string; amountCents: number; idempotencyKey: string;
@@ -44,18 +45,14 @@ export function evaluateExternalRequest(state: DemoState, request: ExternalReque
     return { state, operation: previous };
   }
   const mandate = state.mandate;
-  let status: Operation['status'] = 'blocked';
-  let reason = '';
-  if (request.agentId !== 'travel-agent-demo') reason = '外部 Agent 身份未通过验证，模拟请求被阻断。';
-  else if (state.goal.status !== 'active') reason = '目标计划尚未激活。';
-  else if (request.amountCents > state.finance.checkingCents) reason = '模拟活期余额不足；应急金保持隔离。';
-  else if (!mandate || !mandate.active || mandate.expiresAt < state.clock) reason = '授权缺失或已过期。';
-  else if (request.amountCents > mandate.maxPerOperationCents || mandate.spentCents + request.amountCents > mandate.totalLimitCents)
-    reason = '请求超出授权额度，已阻断。';
-  else if (request.category !== mandate.category) { status = 'ask'; reason = '用途与授权类别不同，需要你逐次确认。'; }
-  else if (request.amountCents >= Math.min(40000, mandate.maxPerOperationCents)) { status = 'manual_review'; reason = '金额接近单笔授权上限，需要人工复核后再决定。'; }
-  else if (request.simulateTimeout) { status = 'unknown'; reason = '模拟工具超时，状态未知；只能先查询原操作，不能重复扣款。'; }
-  else { status = 'executed'; reason = '模拟操作已完成；金额、授权和安全线已由服务端核对。'; }
+  const decision = decideAgentRequest(state, request);
+  let status: Operation['status'] = decision.outcome === 'block' ? 'blocked'
+    : decision.outcome === 'execute' ? 'executed' : decision.outcome as Operation['status'];
+  let reason = decision.explanation;
+  if (status === 'executed' && request.simulateTimeout) {
+    status = 'unknown';
+    reason = '模拟工具超时，状态未知；只能先查询原操作，不能重复扣款。';
+  }
   const operationId = crypto.randomUUID();
   const receipt: Receipt | null = status === 'executed' ? { operationId, tool: 'external_payment', status: 'succeeded',
     amountCents: request.amountCents, currency: 'CNY', executedAt: `${state.clock}T12:00:00.000Z`, twinVersion: state.twinVersion + 1 } : null;
@@ -66,8 +63,12 @@ export function evaluateExternalRequest(state: DemoState, request: ExternalReque
   let next: DemoState = { ...state, operations: [...state.operations, operation] };
   if (status === 'executed') {
     next.twinVersion = state.twinVersion + 1;
-    next.finance = { ...state.finance, checkingCents: state.finance.checkingCents - request.amountCents };
+    next.finance = { ...state.finance, checkingCents: state.finance.checkingCents - request.amountCents,
+      currentMonthExpenseCents: state.finance.currentMonthExpenseCents + request.amountCents,
+      updatedAt: state.clock };
     next.accounts = state.accounts.map(item => item.id === 'checking' ? { ...item, balanceCents: item.balanceCents - request.amountCents } : item);
+    next.transactions = [{ id: `agent-payment:${operationId}`, accountId: 'checking', date: state.clock,
+      title: '外部 Agent 模拟支付', category: request.category, amountCents: -request.amountCents }, ...state.transactions];
     next.mandate = { ...mandate!, spentCents: mandate!.spentCents + request.amountCents };
     next.receipts = [...state.receipts, receipt!];
   }
@@ -93,8 +94,12 @@ export function approveOperation(state: DemoState, operationId: string): DemoSta
   const operations = [...state.operations];
   operations[index] = updated;
   let next: DemoState = { ...state, operations, twinVersion: state.twinVersion + 1,
-    finance: { ...state.finance, checkingCents: state.finance.checkingCents - operation.amountCents },
+    finance: { ...state.finance, checkingCents: state.finance.checkingCents - operation.amountCents,
+      currentMonthExpenseCents: state.finance.currentMonthExpenseCents + operation.amountCents,
+      updatedAt: state.clock },
     accounts: state.accounts.map(item => item.id === 'checking' ? { ...item, balanceCents: item.balanceCents - operation.amountCents } : item),
+    transactions: [{ id: `agent-payment:${operationId}`, accountId: 'checking', date: state.clock,
+      title: '用户确认的外部 Agent 模拟支付', category: operation.category, amountCents: -operation.amountCents }, ...state.transactions],
     mandate: { ...state.mandate, spentCents: state.mandate.spentCents + operation.amountCents },
     receipts: [...state.receipts, receipt] };
   next = appendAuditEvent(next, 'approve_operation', 'executed', updated.reason, { operationId });

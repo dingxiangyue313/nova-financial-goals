@@ -41,7 +41,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
           </div>
 
           <p className="text-[14px] text-[#646A73] leading-relaxed">
-            本月新增 ¥{scenario.expenseAmount} {scenario.expenseTitle}
+            本月新增 ¥{scenario.expenseAmount.toLocaleString()} {scenario.expenseTitle}
             ，影响了原有储蓄节奏。你可以增加月存金额，或调整出发日期。
           </p>
 
@@ -88,7 +88,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
                 <p className="text-[14px] text-[#1F2329] mt-0.5">
                   记录到「{scenario.expenseTitle}{' '}
                   <span className="text-[15px] font-bold text-[#C74242]">
-                    ¥{scenario.expenseAmount}
+                    ¥{scenario.expenseAmount.toLocaleString()}
                   </span>
                   」
                 </p>

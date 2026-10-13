@@ -11,6 +11,8 @@ test('mandate requires confirmation and keeps the emergency fund isolated', () =
   const result = evaluateExternalRequest(withMandate, { agentId: 'travel-agent-demo', category: 'transport', amountCents: 30000, idempotencyKey: 'trip-1' });
   assert.equal(result.operation.status, 'executed');
   assert.equal(result.state.finance.checkingCents, withMandate.finance.checkingCents - 30000);
+  assert.equal(result.state.finance.currentMonthExpenseCents, withMandate.finance.currentMonthExpenseCents + 30000);
+  assert.equal(result.state.transactions[0].id, `agent-payment:${result.operation.operationId}`);
   assert.equal(result.state.finance.emergencyCents, withMandate.finance.emergencyCents);
   const replay = evaluateExternalRequest(result.state, { agentId: 'travel-agent-demo', category: 'transport', amountCents: 30000, idempotencyKey: 'trip-1' });
   assert.equal(replay.state.finance.checkingCents, result.state.finance.checkingCents);
@@ -24,6 +26,8 @@ test('shopping asks for approval and over-limit requests are blocked', () => {
   assert.equal(ask.state.finance.checkingCents, state.finance.checkingCents);
   const approved = approveOperation(ask.state, ask.operation.operationId);
   assert.equal(approved.finance.checkingCents, state.finance.checkingCents - 20000);
+  assert.equal(approved.finance.currentMonthExpenseCents, state.finance.currentMonthExpenseCents + 20000);
+  assert.equal(approved.transactions[0].id, `agent-payment:${ask.operation.operationId}`);
   const blocked = evaluateExternalRequest(state, { agentId: 'travel-agent-demo', category: 'transport', amountCents: 200000, idempotencyKey: 'trip-over-limit' });
   assert.equal(blocked.operation.status, 'blocked');
 });

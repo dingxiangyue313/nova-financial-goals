@@ -59,6 +59,31 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     assert.equal(created.code, 200);
     assert.equal((created.data as Snapshot).goal.selectedPlanId, null);
     assert.equal((await call('/api/goals/activate', 'POST', { planId: 'balanced' })).code, 200);
+    const defaultPreferences = await call('/api/risk/preferences');
+    assert.equal((defaultPreferences.data as { preferences: { amountThresholdCents: number } }).preferences.amountThresholdCents, 50000);
+    const changedPreferences = await call('/api/risk/preferences', 'PATCH', { amountThresholdCents: 60000 });
+    assert.equal((changedPreferences.data as { preferences: { amountThresholdCents: number } }).preferences.amountThresholdCents, 60000);
+    await call('/api/risk/preferences', 'PATCH', { amountThresholdCents: 50000 });
+
+    const trend = await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'delivery-rides-september' });
+    const trendSnapshot = trend.data as Snapshot;
+    assert.equal(trend.code, 200);
+    assert.equal(trendSnapshot.spendingPatterns.at(-1)?.currentCents, 190000);
+    assert.equal(trendSnapshot.riskSignals.length, 1);
+    assert.equal(trendSnapshot.riskSignals[0].decision, 'immediate_signal');
+    assert.equal(trendSnapshot.riskSignals[0].impact.delayDays, 16);
+    assert.equal(trendSnapshot.pendingImpact?.delayDays, 16);
+    const firstTrendVersion = trendSnapshot.twinVersion;
+    const trendReplay = await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'delivery-rides-september' });
+    assert.equal((trendReplay.data as Snapshot).riskSignals.length, 1);
+    assert.equal((trendReplay.data as Snapshot).twinVersion, firstTrendVersion);
+    const signals = await call('/api/risk/signals');
+    assert.equal((signals.data as { signals: unknown[] }).signals.length, 1);
+    await call('/api/impact/decision', 'POST', { decision: 'dismiss' });
+    const dismissedReplay = await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'delivery-rides-september' });
+    assert.equal((dismissedReplay.data as Snapshot).pendingImpact, null);
+    assert.equal((dismissedReplay.data as Snapshot).riskSignals[0].status, 'dismissed');
+
     const small = await call('/api/demo/expense', 'POST', { amountCents: 1000, title: '咖啡' });
     assert.equal((small.data as Snapshot).pendingImpact, null);
     const large = await call('/api/demo/expense', 'POST', { amountCents: 90000, title: '汽车保养' });
@@ -97,6 +122,7 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     const other = await call('/api/session');
     assert.equal((other.data as Snapshot).goal.status, 'draft');
     assert.equal((other.data as Snapshot).audit.length, 0);
+    assert.equal((other.data as Snapshot).riskSignals.length, 0);
     cookie = originalCookie;
     assert.equal((await call('/api/demo/reset', 'POST')).code, 200);
     assert.equal(((await call('/api/session')).data as Snapshot).audit.length, 0);

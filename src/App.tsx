@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScreenId, Goal } from './types';
 import { api, cents, displayGoal, displayImpact } from './api';
-import type { Snapshot, UiCard } from '../shared/contracts';
+import type { RiskPreferences, Snapshot, UiCard } from '../shared/contracts';
 import { normalizeUiCard } from '../shared/generative';
 import { TopBar } from './components/TopBar';
 import { BottomNav } from './components/BottomNav';
@@ -122,6 +122,14 @@ export default function App() {
     showToast('计划已激活；不会自动扣款');
     navigateTo('home');
   };
+  const handleRiskPreferences = async (changes: Partial<RiskPreferences>) => {
+    try {
+      await api('/api/risk/preferences', 'PATCH', changes);
+      const next = await api<Snapshot>('/api/session');
+      setSnapshot(next);
+      showToast('智能守护设置已更新');
+    } catch (error) { showToast(error instanceof Error ? error.message : '设置更新失败'); throw error; }
+  };
   const handleApplyOption = async (option: 'A' | 'B') => {
     await mutate('/api/impact/decision', 'POST', { decision: option });
     showToast(`已应用方案 ${option}`);
@@ -143,6 +151,13 @@ export default function App() {
     const result = await mutate('/api/demo/expense', 'POST', { amountCents: cents(amount), title: '汽车保养' });
     if (result.pendingImpact) { navigateTo('impact'); showToast(`已模拟 ¥${amount} 支出，目标影响已更新`); }
     else showToast(`已模拟 ¥${amount} 支出，未触发显著影响提醒`);
+  };
+  const handleSpendingTrend = async () => {
+    const result = await mutate('/api/demo/spending-trend', 'POST', { idempotencyKey: 'delivery-rides-september' });
+    if (result.pendingImpact) {
+      navigateTo('impact');
+      showToast('累计趋势已影响目标，NOVA 已生成风险解释');
+    } else showToast('趋势已记录，本次无需即时提醒');
   };
   const handleDeposit = async () => {
     await mutate('/api/demo/deposit', 'POST', { amountCents: 150000 });
@@ -295,6 +310,8 @@ export default function App() {
               goal={goal}
               assessment={snapshot.assessment}
               selectedPlanId={snapshot.goal.selectedPlanId}
+              riskPreferences={snapshot.riskPreferences}
+              onUpdateRiskPreferences={handleRiskPreferences}
               onConfirmPlan={handleConfirmPlan}
               onBack={handleBack}
             />
@@ -392,6 +409,13 @@ export default function App() {
               </p>
 
               <div className="space-y-2">
+                <button
+                  onClick={() => { void handleSpendingTrend(); setShowSimulateModal(false); }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-[#FFF7E6] hover:bg-[#F5A623] hover:text-white text-[#8A5A00] font-semibold text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">insights</span><span>模拟外卖与打车趋势（¥600 → ¥1,900）</span></div>
+                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                </button>
                 <button
                   onClick={() => {
                     void handleTriggerImpact();
