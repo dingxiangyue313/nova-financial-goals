@@ -14,7 +14,7 @@ React 原版界面 + 对话工作台 ── same-origin /api ── Express 服�
 - 入口：`server/index.ts`。演示默认时钟为 `2026-09-21`；重置恢复固定夹具。
 - 状态：`server/store.ts` 为每个签名 Cookie 建立独立 SQLite 会话。版本化 Financial Twin 包含账户、交易、账单、订阅、目标和 Mandate；写入在 SQLite 事务内同步状态与证据表。
 - 契约：`shared/contracts.ts` 使用 Zod；金额均为整数分，日期是 `YYYY-MM-DD`。页面只把分转换为显示用元。
-- 规则：`server/domain.ts` 计算资金余量、预测日期、三方案和显著影响；`server/banking.ts` 是统一工具运行时，覆盖目标状态、转账、换汇、Mandate、外部请求、幂等、Operation、Receipt 和审计导出。受保护应急金不进入可用余额。
+- 规则：`server/domain.ts` 计算资金余量、预测日期和三方案；`server/risk.ts` 统一分析流水趋势、目标影响、用户提醒和外部 Agent 决策；`server/banking.ts` 是统一工具运行时，覆盖目标状态、转账、换汇、Mandate、外部请求、幂等、Operation、Receipt 和审计导出。受保护应急金不进入可用余额。
 - 批准：`server/governance.ts` 冻结 action、参数、Twin Version 和过期时间并计算 SHA-256；用户确认后签发短期一次性 Token。参数、版本、期限或消费状态不匹配即拒绝。
 - 外部认证：`server/security.ts` 用 HMAC 绑定 Agent ID、会话主体、时间戳、Nonce 和请求体；5 分钟窗口和持久化 Nonce 防止重放。它同时提供 Prompt Injection 检测与本地限流。
 - 工作台：`server/workspace.ts` 生成完整 Agent Turn。最近 20 条消息和精简 Twin 状态仅用于意图理解；服务端按白名单组合组件，并为写操作签发绑定会话、Twin Version、期限和幂等键的 `actionId`。
@@ -31,8 +31,10 @@ React 原版界面 + 对话工作台 ── same-origin /api ── Express 服�
 | 正常 | 可用月结余足够、历史数据 ≥2 月 | `on_track` | 首页按时预测 |
 | 数据不足 | 历史数据 <2 月 | `insufficient_data` | 表明依据不足 |
 | 不可行 | 目标所需月存高于可用额 | `infeasible` | 禁止不可行方案激活 |
-| 小额波动 | 未改变计划投入或低于显著阈值 | 无影响信号 | 首页无紧急提醒 |
-| 显著支出 | 投入出现缺口且达到阈值 | 影响与 A/B 方案 | 影响页，保护额不变 |
+| 小额波动 | 低于趋势证据或目标参考线 | `silent` | 首页无紧急提醒 |
+| 趋势但目标未越界 | ≥3 笔、增长 ≥25%、增加 ≥¥200 | `weekly_summary` | 进入周摘要 |
+| 累计趋势影响目标 | ¥600 基线升至 ¥1,900，延期 16 天 | `immediate_signal` | 风险会话与影响页 |
+| 显著单笔支出 | 超过参考线且目标状态变差 | `immediate_signal` | 影响页，保护额不变 |
 | 模型不可用 | 无 Key、超时或无效 JSON | 确定性回退 | 演示不中断 |
 | 已授权同类请求 | 身份、额度、余额、期限均合格 | Execute | 模拟余额变动及凭证 |
 | 异类但在额度内 | 已授权且需逐次同意 | Ask | 用户核对后确认 |
@@ -40,7 +42,13 @@ React 原版界面 + 对话工作台 ── same-origin /api ── Express 服�
 | 重复请求 | 相同幂等键与参数 | 返回原凭证 | 不重复扣款 |
 | 工具超时 | 模拟状态未知 | Unknown | 查询原操作，不重试扣款 |
 
-显著阈值为单笔不少于 ¥500 或不少于目标剩余金额的 5%，且必须实际造成当月目标投入缺口。此阈值是演示假设，可在比赛答辩中解释，不代表真实理财建议。
+## 目标感知风险引擎
+
+`Pattern Analyzer` 使用当前 30 天与前两个完整 30 天窗口的平均值比较同类支出。至少 3 笔、增长至少 25%、绝对增加至少 ¥200 才形成趋势证据。用户参考线默认为 ¥500 或目标剩余金额的 5%；参考线只触发进一步评估，最终是否即时提醒仍由目标日期、安全缓冲、数据新鲜度和分类置信度决定。
+
+用户流水只产生 `silent / weekly_summary / immediate_signal`，不会返回拦截结果。历史不足两个月、数据过期或分类置信度不足时，最多进入周摘要。相同 `suppressionKey` 只保存一个信号；稍后或忽略后，底层事实不变不会再次提醒。
+
+Agent 请求按固定顺序判断：身份、有效期、余额、保护资金或硬额度失败先 `Block`；可安全逐次确认的参数不匹配为 `Ask`；达到单笔额度 80% 或额度内操作会使目标变差为 `Manual Review`；全部匹配且不影响目标或安全资金才 `Execute`。DeepSeek 不参与这些金额与执行决策。
 
 ## 核心 API
 
@@ -57,6 +65,9 @@ React 原版界面 + 对话工作台 ── same-origin /api ── Express 服�
 | `GET/POST /api/goal-flow` | 读取目标状态机或执行目标迁移 |
 | `GET/POST /api/banking-tools` | 工具发现与第一方调用 |
 | `GET /api/activity`, `/api/audit/export` | Hash 链活动与 JSON/CSV 证据 |
+| `GET/PATCH /api/risk/preferences` | 读取或更新会话内智能守护偏好 |
+| `GET /api/risk/signals` | 读取趋势证据和目标影响信号 |
+| `POST /api/demo/spending-trend` | 幂等注入固定的累计消费趋势故事 |
 | `POST /api/external-agent/request` | HMAC、时间戳、Nonce 认证的外部请求 |
 | `POST /api/goal/interpret` | DeepSeek 或确定性自然语言解析 |
 | `POST /api/goals`, `PATCH /api/goals/current` | 新建、修改目标草案 |
