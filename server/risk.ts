@@ -142,6 +142,39 @@ export function evaluateSpendingRisk(
   };
 }
 
+export function evaluateOneOffExpenseRisk(state: DemoState, amountCents: number): RiskDecision {
+  const before = assessGoal(state);
+  const after = assessGoal({ ...state, finance: { ...state.finance,
+    currentMonthExpenseCents: state.finance.currentMonthExpenseCents + amountCents } });
+  const remaining = Math.max(0, state.goal.targetCents - state.goal.savedCents);
+  const preferences = preferenceForGoal(state.riskPreferences, state.goal.id);
+  const referenceCents = Math.max(preferences.amountThresholdCents,
+    Math.round(remaining * preferences.goalImpactRatioThresholdBps / 10000));
+  const goalImpact = {
+    beforeStatus: before.status, afterStatus: after.status,
+    beforeProjectedDate: before.projectedDate, afterProjectedDate: after.projectedDate,
+    delayDays: after.delayDays,
+    shortfallCents: Math.max(0, state.goal.monthlyContributionCents
+      - Math.max(0, before.availableMonthlyCents - state.finance.currentMonthExpenseCents - amountCents)),
+    safetyBufferAffected: state.finance.emergencyCents < state.goal.protectedCents,
+  };
+  const reliable = state.finance.historyMonths >= 2 && daysBetween(state.finance.updatedAt, state.clock) <= 7;
+  const immediate = state.goal.status === 'active' && reliable && amountCents >= referenceCents
+    && ((before.status !== after.status && (after.status === 'at_risk' || after.status === 'infeasible'))
+      || after.delayDays > state.goal.flexibilityWeeks * 7 || after.status === 'infeasible'
+      || goalImpact.safetyBufferAffected);
+  if (immediate) return { scope: 'consumer', outcome: 'immediate_signal', reasonCode: 'ONE_OFF_GOAL_IMPACT',
+    explanation: `这笔支出使目标预计延期约 ${after.delayDays} 天。`, twinVersion: state.twinVersion,
+    ruleVersion: RISK_RULE_VERSION, patternId: null, goalImpact, suppressed: false };
+  if (amountCents >= referenceCents && preferences.weeklySummaryEnabled)
+    return { scope: 'consumer', outcome: 'weekly_summary', reasonCode: 'ONE_OFF_WITHIN_TOLERANCE',
+      explanation: '这笔支出在当前目标的可接受浮动范围内。', twinVersion: state.twinVersion,
+      ruleVersion: RISK_RULE_VERSION, patternId: null, goalImpact, suppressed: false };
+  return { scope: 'consumer', outcome: 'silent', reasonCode: 'ONE_OFF_BELOW_REFERENCE',
+    explanation: '这笔支出不需要打扰用户。', twinVersion: state.twinVersion,
+    ruleVersion: RISK_RULE_VERSION, patternId: null, goalImpact, suppressed: false };
+}
+
 export interface AgentRiskRequest {
   agentId: string;
   category: string;

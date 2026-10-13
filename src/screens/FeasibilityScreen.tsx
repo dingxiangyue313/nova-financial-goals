@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Goal } from '../types';
-import type { Assessment } from '../../shared/contracts';
+import type { Assessment, RiskPreferences } from '../../shared/contracts';
 
 interface FeasibilityScreenProps {
   goal: Goal;
   assessment: Assessment;
   selectedPlanId: string | null;
+  riskPreferences: RiskPreferences;
+  onUpdateRiskPreferences: (changes: Partial<RiskPreferences>) => Promise<void>;
   onConfirmPlan: (planId: string) => void;
   onBack: () => void;
 }
@@ -14,9 +16,13 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
   goal,
   assessment,
   selectedPlanId,
+  riskPreferences,
+  onUpdateRiskPreferences,
   onConfirmPlan,
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
   const options = assessment.plans.map(p => ({
     id: p.id, type: p.label, amountText: `¥${(p.monthlyCents / 100).toLocaleString()}`,
     periodText: '/ 月', forecastText: p.explanation,
@@ -197,6 +203,22 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
             );
           })}
         </div>
+
+        <section className="w-full rounded-xl border border-[#D8E7E7] bg-white p-3.5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex gap-2.5">
+              <span className="material-symbols-outlined mt-0.5 text-[20px] text-[#0F6B6D]">verified_user</span>
+              <div><h3 className="text-[14px] font-bold text-[#1F2329]">智能守护设置</h3><p className="mt-1 text-[11px] leading-relaxed text-[#646A73]">NOVA 整理账户流水；只有变化真正影响目标或安全资金时才即时提醒。</p></div>
+            </div>
+            <span className="shrink-0 rounded-full bg-[#EBF7F2] px-2 py-1 text-[10px] font-semibold text-[#2E7D5B]">系统推荐</span>
+          </div>
+          <div className="mt-3 rounded-xl bg-[#F5F7F8] p-2.5 text-[11px]">
+            <div className="flex items-center justify-between"><span className="text-[#646A73]">目标参考线</span><b>¥{(riskPreferences.amountThresholdCents / 100).toLocaleString()} 或目标剩余金额的 {riskPreferences.goalImpactRatioThresholdBps / 100}%</b></div>
+            <label className="mt-2 flex min-h-8 items-center justify-between border-t border-[#E5E8EB] pt-2"><span className="text-[#646A73]">每周趋势摘要</span><input aria-label="每周趋势摘要" type="checkbox" checked={riskPreferences.weeklySummaryEnabled} disabled={savingPreferences} onChange={async event => { setSavingPreferences(true); try { await onUpdateRiskPreferences({ weeklySummaryEnabled: event.target.checked }); } finally { setSavingPreferences(false); } }} className="h-4 w-4 accent-[#0F6B6D]" /></label>
+          </div>
+          <button type="button" onClick={() => setShowAdvanced(value => !value)} className="mt-2 text-[11px] font-semibold text-[#0F6B6D]">{showAdvanced ? '收起高级规则' : '展开高级规则'}</button>
+          {showAdvanced && <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-[#E5E8EB] p-2.5 text-[10px] text-[#646A73]"><div><span className="block">金额参考线</span><b className="text-[12px] text-[#1F2329]">¥{(riskPreferences.amountThresholdCents / 100).toLocaleString()}</b></div><div><span className="block">目标占比参考线</span><b className="text-[12px] text-[#1F2329]">{riskPreferences.goalImpactRatioThresholdBps / 100}%</b></div><p className="col-span-2 leading-relaxed">这两项只决定何时进一步评估；目标仍在允许浮动范围内时，不会弹出即时风险。</p></div>}
+        </section>
 
         {/* Action Area: Primary CTA & Safety Reassurance */}
         <div className="w-full flex flex-col space-y-2.5 pt-1">

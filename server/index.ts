@@ -17,7 +17,7 @@ import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
 import { containsPromptInjection, LocalRateLimiter, signExternalRequest, verifyExternalRequest } from './security.ts';
 import { createAgentTurn, ensureImpactThread, executeWorkspaceAction } from './workspace.ts';
-import { applySpendingTrendDemo, markActiveRiskSignal } from './risk.ts';
+import { applySpendingTrendDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -257,9 +257,12 @@ app.post('/api/demo/expense', route((req, res) => {
   const id = sessionId(req, res);
   const state = mutateState(id, old => {
     const result = injectExpense(old, body.amountCents, body.title);
-    const withTransaction = { ...result.state, transactions: [{ id: randomUUID(), accountId: 'checking',
+    const decision = evaluateOneOffExpenseRisk(old, body.amountCents);
+    const acceptedImpact = decision.outcome === 'immediate_signal' ? result.impact : null;
+    const withTransaction = { ...result.state, pendingImpact: acceptedImpact,
+      transactions: [{ id: randomUUID(), accountId: 'checking',
       date: old.clock, title: body.title, category: 'expense', amountCents: -body.amountCents }, ...result.state.transactions] };
-    return audit(withTransaction, 'simulate_expense', result.impact ? 'impact' : 'no_signal', body.title);
+    return audit(withTransaction, 'simulate_expense', decision.outcome, body.title);
   });
   ensureImpactThread(id, state);
   return respond(res, state);

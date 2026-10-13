@@ -223,6 +223,8 @@ export const AgentComponentSchema = z.discriminatedUnion('type', [
   AgentComponentBase.extend({ type: z.literal('plan_compare'), title: z.string(), plans: z.array(PlanSchema).min(1).max(3) }),
   AgentComponentBase.extend({ type: z.literal('impact_summary'), title: z.string(), impact: ImpactSchema,
     protectedCents: MoneySchema }),
+  AgentComponentBase.extend({ type: z.literal('risk_signal'), title: z.string(),
+    signal: GoalImpactSignalSchema, pattern: SpendingPatternSchema, protectedCents: MoneySchema }),
   AgentComponentBase.extend({ type: z.literal('mandate_preview'), title: z.string(), mandate: z.object({
     agentId: z.string(), category: z.string(), maxPerOperationCents: MoneySchema,
     totalLimitCents: MoneySchema, expiresAt: IsoDateSchema, active: z.boolean(),

@@ -6,6 +6,7 @@ import {
   DEFAULT_RISK_PREFERENCES,
   analyzeSpendingPattern,
   decideAgentRequest,
+  evaluateOneOffExpenseRisk,
   evaluateSpendingRisk,
 } from './risk.ts';
 import type { Transaction } from '../shared/contracts.ts';
@@ -68,6 +69,15 @@ test('stale or uncertain data never produces an immediate consumer risk conclusi
   const reliable = analyzeSpendingPattern(trendTransactions, 'delivery_and_rides', active.clock);
   assert.ok(reliable);
   assert.equal(evaluateSpendingRisk(stale, reliable, DEFAULT_RISK_PREFERENCES).outcome, 'weekly_summary');
+});
+
+test('user card spending is observed rather than blocked, and only material goal impact is immediate', () => {
+  const active = activatePlan(createFixture(), 'balanced');
+  assert.equal(evaluateOneOffExpenseRisk(active, 1000).outcome, 'silent');
+  const material = evaluateOneOffExpenseRisk(active, 90000);
+  assert.equal(material.outcome, 'immediate_signal');
+  assert.equal(material.goalImpact?.afterStatus, 'at_risk');
+  assert.notEqual(material.outcome, 'block');
 });
 
 test('agent policy applies hard blocks, safe confirmation, manual review, and execution in order', () => {

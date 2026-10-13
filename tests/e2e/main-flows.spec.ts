@@ -15,6 +15,8 @@ async function activateBalancedGoal(page: Page) {
   await expect(page.getByText('选择适合你的节奏', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '请选择一个方案' })).toBeDisabled();
   await page.getByRole('button', { name: /平衡方案/ }).click();
+  await expect(page.getByText('智能守护设置')).toBeVisible();
+  await expect(page.getByText('¥500 或目标剩余金额的 5%')).toBeVisible();
   const confirm = page.getByRole('button', { name: /确认以此节奏推进/ });
   await expect(confirm).toBeEnabled();
   await confirm.click();
@@ -27,6 +29,18 @@ test('故事一：目标可行性必须先选择方案，再激活计划', async
   await page.reload();
   await expect(page.getByText('进度正常')).toBeVisible();
   await expect(page.getByText('已选择并启用计划')).toBeVisible();
+});
+
+test('故事二扩展：累计小额流水形成趋势后才解释目标风险', async ({ page }) => {
+  await openApp(page);
+  await activateBalancedGoal(page);
+
+  await page.getByTitle('点击切换模拟数据或事件').click();
+  await page.getByRole('button', { name: /模拟外卖与打车趋势/ }).click();
+  await expect(page.getByText('外卖与打车持续上升').first()).toBeVisible();
+  await expect(page.getByText(/¥1,300/).first()).toBeVisible();
+  await expect(page.getByText(/延期 16 天/).first()).toBeVisible();
+  await expect(page.getByText(/应急金未受影响/)).toBeVisible();
 });
 
 test('故事二：小额波动保持安静，显著支出才触发目标调整', async ({ page }) => {
