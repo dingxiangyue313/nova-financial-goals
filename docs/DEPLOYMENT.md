@@ -4,18 +4,38 @@
 
 ```bash
 cp .env.example .env
-npm ci
+npm install
 npm run dev
 ```
 
 在 `.env` 中可不填 DeepSeek Key；默认演示地址是 `http://localhost:3000`。服务与前端同源，`data/` 下 SQLite 会话持久化。执行 `npm run lint && npm test && npm run build` 检查可交付版本。
+
+## 发布前准备
+
+### 阿里云账号与服务器权限
+
+不要使用阿里云主账号部署，也不要向部署者发送主账号密码、付款信息、AccessKey 或验证码。账号拥有者应创建一个专用 RAM 子账号（例如 `nova-deploy`），启用控制台登录和 MFA，并只授予：
+
+- 目标 ECS 的管理权限；
+- 目标域名的 DNS 修改权限；
+- 需要的日志查看权限。
+
+RAM 子账号本身不收费，ECS、域名和网络资源费用仍记在主账号。部署时只使用 RAM 子账号或独立 SSH 密钥；DeepSeek Key 只写在服务器本机 `.env`。
+
+### 域名、网络与备案
+
+为 `nova.<现有域名>` 创建 A 记录，指向 ECS 公网 IP。ECS 安全组只开放 80 和 443；22 只允许维护者的可信 IP。应用的 3000 端口仅绑定在 `127.0.0.1`，不对公网开放。
+
+如果 ECS 位于中国内地，域名正式对外提供服务前需完成 ICP 备案。若 DNS 不在阿里云，请在当前权威 DNS 服务商处创建同样的 A 记录。
+
+部署前由账号拥有者提供以下**非敏感连接信息**：最终子域名、ECS 公网 IP、SSH 用户名、系统版本，以及是否已有 Nginx 或其他反向代理。不要通过聊天发送密码、私钥、API Key 或 MFA 验证码。
 
 ## 单容器部署
 
 前提：阿里云 ECS Linux、Docker Compose、指向实例的域名、开放 80/443 入站规则。应用只监听宿主机 `127.0.0.1:3000`，由 Nginx 提供 HTTPS。用独立非 root 账号部署。
 
 ```bash
-git clone https://github.com/dingxiangyue313/nova-financial-goals.git
+git clone --branch feature/generative-goal-workspace https://github.com/dingxiangyue313/nova-financial-goals.git
 cd nova-financial-goals
 cp .env.example .env
 ```

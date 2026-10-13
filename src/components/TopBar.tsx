@@ -1,5 +1,5 @@
 import React from 'react';
-import { NOVA_LOGO_URL } from '../data/mockData';
+import { NovaMark } from './NovaMark';
 
 interface TopBarProps {
   title?: string;
@@ -20,24 +20,9 @@ export const TopBar: React.FC<TopBarProps> = ({
     <header className="sticky top-0 w-full z-50 pt-safe bg-white/95 backdrop-blur-md border-b border-[#E5E8EB]">
       <div className="h-14 px-3 flex items-center justify-between">
         {isHome ? (
-          <div className="flex items-center">
-            <img
-              alt="NOVA"
-              className="h-8 w-auto object-contain"
-              src={NOVA_LOGO_URL}
-              onError={(e) => {
-                // High-quality SVG fallback if network blocks
-                const target = e.currentTarget;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent && !parent.querySelector('.nova-fallback-badge')) {
-                  const div = document.createElement('div');
-                  div.className = 'nova-fallback-badge flex items-center gap-1.5 font-bold text-[#0F6B6D] text-[18px] tracking-tight';
-                  div.innerHTML = `<span class="w-6 h-6 rounded bg-[#0F6B6D] text-white flex items-center justify-center text-xs font-black">N</span><span>NOVA</span>`;
-                  parent.appendChild(div);
-                }
-              }}
-            />
+          <div className="flex items-center gap-1.5" aria-label="NOVA">
+            <NovaMark size={32} className="shrink-0" />
+            <span className="text-[17px] font-bold tracking-tight text-[#0F6B6D]">NOVA</span>
           </div>
         ) : (
           <button

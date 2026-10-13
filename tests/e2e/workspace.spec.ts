@@ -70,3 +70,17 @@ test('历史会话继续提问时自动创建可写会话，不暴露归档错�
   await expect(page.getByText('确认目标草案')).toBeVisible();
   await expect(page.getByText('THREAD_ARCHIVED')).not.toBeVisible();
 });
+
+test('首页与空工作台使用同一透明 NOVA 标志', async ({ page }) => {
+  await openApp(page);
+  const homeMark = page.getByTestId('nova-mark');
+  await expect(homeMark).toBeVisible();
+  await expect(homeMark).toHaveAttribute('data-size', '32');
+  await expect(homeMark).toHaveAttribute('data-transparent', 'true');
+
+  await openWorkspace(page);
+  const workspaceMark = page.getByTestId('nova-mark');
+  await expect(workspaceMark).toBeVisible();
+  await expect(workspaceMark).toHaveAttribute('data-size', '64');
+  await expect(workspaceMark).toHaveAttribute('data-transparent', 'true');
+});
