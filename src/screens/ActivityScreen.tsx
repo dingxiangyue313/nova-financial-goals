@@ -1,45 +1,19 @@
 import React from 'react';
 
+import type { Audit } from '../../shared/contracts';
+
 interface ActivityScreenProps {
+  audit: Audit[];
+  hasImpactPending: boolean;
   onNavigateToImpact: () => void;
 }
 
-export const ActivityScreen: React.FC<ActivityScreenProps> = ({ onNavigateToImpact }) => {
-  const events = [
-    {
-      date: '9月20日 15:32',
-      title: '汽车保养支出 ¥900',
-      tag: '突发支出',
-      tagColor: 'bg-red-50 text-red-600 border-red-200',
-      description: '触发 NOVA 节奏研判：原储蓄计划可能受到 18 天波及。已生成 2 套平滑方案。',
-      actionable: true,
-    },
-    {
-      date: '9月15日 10:00',
-      title: '月度存入 ¥500',
-      tag: '常规积累',
-      tagColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      description: '计入「日本旅行」专项资金，当前累计 ¥3,500，完成度 43.8%。',
-      actionable: false,
-    },
-    {
-      date: '9月01日 09:00',
-      title: '月度资产底线体检',
-      tag: '底线守护',
-      tagColor: 'bg-teal-50 text-teal-700 border-teal-200',
-      description: '¥20,000 应急金严密隔离保护中，无被意外挪用风险。',
-      actionable: false,
-    },
-    {
-      date: '8月28日 21:15',
-      title: '创建新目标「日本旅行」',
-      tag: '目标立项',
-      tagColor: 'bg-blue-50 text-blue-700 border-blue-200',
-      description: '通过语音录入快速解析，锁定 12月15日 出行窗口，总预算 ¥8,000。',
-      actionable: false,
-    },
-  ];
-
+export const ActivityScreen: React.FC<ActivityScreenProps> = ({ audit, hasImpactPending, onNavigateToImpact }) => {
+  const events = [...audit].reverse().map(evt => ({
+    date: evt.at.slice(0, 16).replace('T', ' '), title: evt.action,
+    tag: evt.outcome, tagColor: evt.outcome === 'blocked' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-teal-50 text-teal-700 border-teal-200',
+    description: evt.detail, actionable: hasImpactPending && evt.action === 'simulate_expense',
+  }));
   return (
     <div className="flex-1 flex flex-col pt-2 pb-safe px-4 overflow-y-auto no-scrollbar space-y-3">
       <div className="flex items-center justify-between">
@@ -50,6 +24,7 @@ export const ActivityScreen: React.FC<ActivityScreenProps> = ({ onNavigateToImpa
       </div>
 
       <div className="space-y-3">
+        {events.length === 0 && <div className="bg-white border border-[#E5E8EB] rounded-xl p-4 text-sm text-[#646A73]">当前还没有操作记录。创建目标或模拟支出后，这里会显示审计轨迹。</div>}
         {events.map((evt, idx) => (
           <div
             key={idx}

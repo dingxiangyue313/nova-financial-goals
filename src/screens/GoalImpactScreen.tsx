@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Goal, ImpactScenario } from '../types';
+import { readableDate, shortDate } from '../api';
 
 interface GoalImpactScreenProps {
   goal: Goal;
@@ -67,7 +68,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
               为什么会受影响
             </span>
             <span className="text-[11px] text-[#646A73] bg-[#F5F7F8] border border-[#E5E8EB] px-2 py-0.5 rounded-full">
-              估算把握：中等 · 基于近 3 个月模拟数据
+              基于当前模拟数据估算
             </span>
           </div>
 
@@ -129,9 +130,9 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
                   </span>
                 </div>
                 <p className="text-[13px] text-[#646A73] mt-0.5">
-                  原 2026年12月15日{' '}
+                  原 {readableDate(goal.originalDate || goal.targetDate)}{' '}
                   <span className="text-[#1F2329] font-medium">
-                    → 预计 2027年1月2日
+                    → 预计 {readableDate(scenario.optionB.completionDate)}
                   </span>
                 </p>
               </div>
@@ -152,12 +153,14 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
 
           <div className="flex flex-col space-y-2">
             {/* Option A */}
-            <div
-              onClick={() => setSelectedOption('A')}
-              className={`relative flex items-start gap-3 p-3.5 rounded-xl transition-all cursor-pointer select-none shadow-sm ${
+            <button type="button"
+              disabled={!scenario.optionA.available}
+              aria-pressed={selectedOption === 'A'}
+              onClick={() => scenario.optionA.available && setSelectedOption('A')}
+              className={`relative flex items-start gap-3 p-3.5 rounded-xl text-left transition-all cursor-pointer select-none shadow-sm ${
                 selectedOption === 'A'
                   ? 'bg-[#F4FAF9] border-2 border-[#0F6B6D]'
-                  : 'bg-white border border-[#E5E8EB] hover:border-[#0F6B6D]/40'
+                  : `bg-white border border-[#E5E8EB] hover:border-[#0F6B6D]/40 ${scenario.optionA.available ? '' : 'opacity-50 cursor-not-allowed'}`
               }`}
             >
               <div className="pt-0.5">
@@ -182,20 +185,21 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
                   </span>
                 </div>
                 <p className="text-[13px] text-[#646A73] mt-1 leading-relaxed">
-                  未来 3 个月微调每月存入{' '}
+                  后续微调每月存入{' '}
                   <span className="text-[#1F2329] font-semibold">
                     ¥{scenario.optionA.newMonthly.toLocaleString()}
                   </span>
-                  ，确保按时在{' '}
-                  <span className="text-[#1F2329] font-semibold">12月15日</span> 出发。
+                  ，{scenario.optionA.available ? '预计可在' : '超出可用月结余，暂不可选；原目标日'}{' '}
+                  <span className="text-[#1F2329] font-semibold">{shortDate(scenario.optionA.completionDate)}</span> 出发。
                 </p>
               </div>
-            </div>
+            </button>
 
             {/* Option B */}
-            <div
+            <button type="button"
+              aria-pressed={selectedOption === 'B'}
               onClick={() => setSelectedOption('B')}
-              className={`relative flex items-start gap-3 p-3.5 rounded-xl transition-all cursor-pointer select-none shadow-sm ${
+              className={`relative flex items-start gap-3 p-3.5 rounded-xl text-left transition-all cursor-pointer select-none shadow-sm ${
                 selectedOption === 'B'
                   ? 'bg-[#F4FAF9] border-2 border-[#0F6B6D]'
                   : 'bg-white border border-[#E5E8EB] hover:border-[#0F6B6D]/40'
@@ -228,10 +232,10 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
                     ¥{scenario.optionB.newMonthly.toLocaleString()}
                   </span>
                   ，平移出行窗口至{' '}
-                  <span className="text-[#1F2329] font-semibold">2027年1月2日</span>。
+                  <span className="text-[#1F2329] font-semibold">{readableDate(scenario.optionB.completionDate)}</span>。
                 </p>
               </div>
-            </div>
+            </button>
           </div>
         </section>
 
@@ -250,7 +254,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
               {selectedOption === 'A'
                 ? '确认应用：方案 A（保持原日期）'
                 : selectedOption === 'B'
-                ? '确认应用：方案 B（延后 18 天）'
+                ? `确认应用：方案 B（延后 ${scenario.optionB.delayDays} 天）`
                 : '请选择一个方案'}
             </span>
             {selectedOption && (
