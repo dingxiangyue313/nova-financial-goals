@@ -48,5 +48,8 @@ export function snapshot(state: DemoState): Snapshot {
     operations: state.operations, receipts: state.receipts,
     approvalSummaries: state.approvals.map(({ token: _token, ...approval }) => approval),
     auditChainValid: verifyAuditChain(state.audit),
-    twinVersion: state.twinVersion, cards: generatedCards(state, assessment), clock: state.clock });
+    twinVersion: state.twinVersion, cards: generatedCards(state, assessment), clock: state.clock,
+    riskPreferences: state.riskPreferences, spendingPatterns: state.spendingPatterns,
+    riskSignals: state.riskSignals,
+  });
 }

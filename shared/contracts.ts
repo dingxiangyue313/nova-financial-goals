@@ -33,6 +33,59 @@ export const TransactionSchema = z.object({
 });
 export type Transaction = z.infer<typeof TransactionSchema>;
 
+export const RiskPreferencesSchema = z.object({
+  amountThresholdCents: MoneySchema.default(50000),
+  goalImpactRatioThresholdBps: z.number().int().min(0).max(10000).default(500),
+  weeklySummaryEnabled: z.boolean().default(true),
+  quietHours: z.object({ start: z.string().regex(/^\d{2}:\d{2}$/), end: z.string().regex(/^\d{2}:\d{2}$/) }).nullable().default(null),
+  pausedUntil: IsoDateSchema.nullable().default(null),
+  goalOverrides: z.record(z.string(), z.object({
+    amountThresholdCents: MoneySchema.optional(),
+    goalImpactRatioThresholdBps: z.number().int().min(0).max(10000).optional(),
+  })).default({}),
+});
+export type RiskPreferences = z.infer<typeof RiskPreferencesSchema>;
+
+export const SpendingPatternSchema = z.object({
+  id: z.string(), category: z.string(), label: z.string(),
+  periodStart: IsoDateSchema, periodEnd: IsoDateSchema,
+  baselineCents: MoneySchema, currentCents: MoneySchema, increaseCents: MoneySchema,
+  increaseRatioBps: z.number().int().nonnegative(), transactionCount: z.number().int().nonnegative(),
+  evidenceTransactionIds: z.array(z.string()), categoryConfidence: z.number().min(0).max(1),
+  confidence: z.enum(['low', 'medium', 'high']), meetsTrendEvidence: z.boolean(),
+});
+export type SpendingPattern = z.infer<typeof SpendingPatternSchema>;
+
+export const GoalRiskImpactSchema = z.object({
+  beforeStatus: z.enum(['insufficient_data', 'on_track', 'at_risk', 'infeasible']),
+  afterStatus: z.enum(['insufficient_data', 'on_track', 'at_risk', 'infeasible']),
+  beforeProjectedDate: IsoDateSchema.nullable(), afterProjectedDate: IsoDateSchema.nullable(),
+  delayDays: z.number().int().nonnegative(), shortfallCents: MoneySchema,
+  safetyBufferAffected: z.boolean(),
+});
+export type GoalRiskImpact = z.infer<typeof GoalRiskImpactSchema>;
+
+export const RiskDecisionSchema = z.object({
+  scope: z.enum(['consumer', 'agent']),
+  outcome: z.enum(['silent', 'weekly_summary', 'immediate_signal', 'execute', 'ask', 'manual_review', 'block']),
+  reasonCode: z.string(), explanation: z.string(),
+  twinVersion: z.number().int().positive(), ruleVersion: z.string(),
+  patternId: z.string().nullable().default(null), goalImpact: GoalRiskImpactSchema.nullable().default(null),
+  suppressed: z.boolean().default(false),
+});
+export type RiskDecision = z.infer<typeof RiskDecisionSchema>;
+
+export const GoalImpactSignalSchema = z.object({
+  id: z.string(), goalId: z.string(), patternId: z.string(), createdAt: IsoDateSchema,
+  title: z.string(), decision: z.enum(['weekly_summary', 'immediate_signal']),
+  evidence: z.array(z.object({ transactionId: z.string(), date: IsoDateSchema, amountCents: MoneySchema })),
+  confidence: z.enum(['low', 'medium', 'high']), ruleVersion: z.string(),
+  twinVersion: z.number().int().positive(), impact: GoalRiskImpactSchema,
+  status: z.enum(['active', 'later', 'dismissed', 'resolved']),
+  suppressionKey: z.string(),
+});
+export type GoalImpactSignal = z.infer<typeof GoalImpactSignalSchema>;
+
 export const BillSchema = z.object({
   id: z.string(), title: z.string(), dueDate: IsoDateSchema, amountCents: MoneySchema, paid: z.boolean(),
 });
@@ -118,6 +171,12 @@ export const DemoStateSchema = z.object({
   bills: z.array(BillSchema).default([]), subscriptions: z.array(SubscriptionSchema).default([]),
   approvals: z.array(ApprovalSchema).default([]), receipts: z.array(ReceiptSchema).default([]),
   consumedNonces: z.array(z.string()).default([]), toolRecords: z.array(ToolRecordSchema).default([]),
+  riskPreferences: RiskPreferencesSchema.default({
+    amountThresholdCents: 50000, goalImpactRatioThresholdBps: 500,
+    weeklySummaryEnabled: true, quietHours: null, pausedUntil: null, goalOverrides: {},
+  }),
+  spendingPatterns: z.array(SpendingPatternSchema).default([]),
+  riskSignals: z.array(GoalImpactSignalSchema).default([]),
 });
 export type DemoState = z.infer<typeof DemoStateSchema>;
 
@@ -206,5 +265,8 @@ export const SnapshotSchema = z.object({
   receipts: z.array(ReceiptSchema), approvalSummaries: z.array(ApprovalSchema.omit({ token: true })),
   auditChainValid: z.boolean(), twinVersion: z.number().int().positive(),
   cards: z.array(UiCardSchema), clock: IsoDateSchema,
+  riskPreferences: RiskPreferencesSchema,
+  spendingPatterns: z.array(SpendingPatternSchema),
+  riskSignals: z.array(GoalImpactSignalSchema),
 });
 export type Snapshot = z.infer<typeof SnapshotSchema>;
