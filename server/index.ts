@@ -12,11 +12,12 @@ import { assessGoal, injectExpense, resolveImpact } from './domain.ts';
 import { composeUiCards, interpretGoal } from './agent.ts';
 import { verifyOperation } from './tools.ts';
 import { registerMcp } from './mcp.ts';
-import { IsoDateSchema, type DemoState } from '../shared/contracts.ts';
+import { IsoDateSchema, RiskPreferencesSchema, type DemoState } from '../shared/contracts.ts';
 import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './banking.ts';
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
 import { containsPromptInjection, LocalRateLimiter, signExternalRequest, verifyExternalRequest } from './security.ts';
 import { createAgentTurn, ensureImpactThread, executeWorkspaceAction } from './workspace.ts';
+import { applySpendingTrendDemo, markActiveRiskSignal } from './risk.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -116,6 +117,23 @@ app.get('/api/activity', route((req, res) => {
   const state = getState(sessionId(req, res));
   res.json({ events: state.audit.slice().reverse(), chainValid: verifyAuditChain(state.audit) });
 }));
+app.get('/api/risk/preferences', route((req, res) => {
+  const state = getState(sessionId(req, res));
+  res.json({ preferences: state.riskPreferences, twinVersion: state.twinVersion });
+}));
+app.patch('/api/risk/preferences', route((req, res) => {
+  const changes = RiskPreferencesSchema.partial().parse(req.body);
+  const state = mutateState(sessionId(req, res), old => appendAuditEvent({
+    ...old,
+    riskPreferences: RiskPreferencesSchema.parse({ ...old.riskPreferences, ...changes }),
+    twinVersion: old.twinVersion + 1,
+  }, 'risk_preferences', 'updated', '用户更新智能守护设置'));
+  res.json({ preferences: state.riskPreferences, twinVersion: state.twinVersion });
+}));
+app.get('/api/risk/signals', route((req, res) => {
+  const state = getState(sessionId(req, res));
+  res.json({ signals: state.riskSignals, patterns: state.spendingPatterns, twinVersion: state.twinVersion });
+}));
 app.get('/api/audit/export', route((req, res) => {
   const format = z.enum(['json', 'csv']).catch('json').parse(req.query.format);
   const outcome = runBankingTool(getState(sessionId(req, res)), 'export_audit_report', { format });
@@ -179,6 +197,18 @@ app.post('/api/demo/scenario', route((req, res) => {
       monthlyIncomeCents: scenario === 'infeasible' ? 600000 : 900000 };
     return audit({ ...old, finance }, 'demo_scenario', scenario, `切换为 ${scenario} 演示状态`);
   });
+  return respond(res, state);
+}));
+app.post('/api/demo/spending-trend', route((req, res) => {
+  z.object({ idempotencyKey: z.string().min(1).max(100).default('delivery-rides-september') }).parse(req.body || {});
+  const id = sessionId(req, res);
+  const state = mutateState(id, old => {
+    const outcome = applySpendingTrendDemo(old);
+    if (outcome.replayed) return old;
+    return appendAuditEvent(outcome.state, 'spending_trend', outcome.decision?.outcome || 'silent',
+      '外卖与打车累计趋势已由目标感知风险引擎评估');
+  });
+  ensureImpactThread(id, state);
   return respond(res, state);
 }));
 app.post('/api/demo/clock', route((req, res) => {
@@ -247,7 +277,8 @@ app.post('/api/demo/deposit', route((req, res) => {
 }));
 app.post('/api/impact/decision', route((req, res) => {
   const decision = z.enum(['A','B','later','dismiss']).parse(req.body?.decision);
-  const state = mutateState(sessionId(req, res), old => audit(resolveImpact(old, decision), 'impact_decision', decision, `用户选择 ${decision}`));
+  const state = mutateState(sessionId(req, res), old => audit(markActiveRiskSignal(resolveImpact(old, decision), decision),
+    'impact_decision', decision, `用户选择 ${decision}`));
   return respond(res, state);
 }));
 app.post('/api/mandates', route((req, res) => {

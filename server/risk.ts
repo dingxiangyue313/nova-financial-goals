@@ -1,5 +1,7 @@
 import type {
   DemoState,
+  GoalImpactSignal,
+  Impact,
   RiskDecision,
   RiskPreferences,
   SpendingPattern,
@@ -178,4 +180,93 @@ export function decideAgentRequest(state: DemoState, request: AgentRiskRequest):
   if (after.delayDays > before.delayDays || after.status === 'infeasible')
     return result('manual_review', 'GOAL_WOULD_WORSEN', '额度内操作会使目标进度变差，需要人工复核。');
   return result('execute', 'MANDATE_MATCHED_AND_SAFE', '请求匹配授权，且不影响目标或安全资金。');
+}
+
+const demoTransactions: Transaction[] = [
+  { id: 'trend-old-1', accountId: 'checking', date: '2026-06-28', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -30000 },
+  { id: 'trend-old-2', accountId: 'checking', date: '2026-07-12', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -30000 },
+  { id: 'trend-previous-1', accountId: 'checking', date: '2026-07-28', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -30000 },
+  { id: 'trend-previous-2', accountId: 'checking', date: '2026-08-12', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -30000 },
+  { id: 'trend-current-1', accountId: 'checking', date: '2026-08-25', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -40000 },
+  { id: 'trend-current-2', accountId: 'checking', date: '2026-09-02', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -40000 },
+  { id: 'trend-current-3', accountId: 'checking', date: '2026-09-09', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -40000 },
+  { id: 'trend-current-4', accountId: 'checking', date: '2026-09-15', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -35000 },
+  { id: 'trend-current-5', accountId: 'checking', date: '2026-09-21', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -35000 },
+];
+
+function roundHundredYuan(cents: number): number { return Math.ceil(cents / 10000) * 10000; }
+
+export function applySpendingTrendDemo(state: DemoState): {
+  state: DemoState;
+  decision: RiskDecision | null;
+  replayed: boolean;
+} {
+  const suppressionKey = `spending-trend:${state.goal.id}:delivery_and_rides:2026-09`;
+  if (state.riskSignals.some(signal => signal.suppressionKey === suppressionKey))
+    return { state, decision: null, replayed: true };
+  const knownIds = new Set(state.transactions.map(item => item.id));
+  const transactions = [...demoTransactions.filter(item => !knownIds.has(item.id)), ...state.transactions];
+  const pattern = analyzeSpendingPattern(transactions, 'delivery_and_rides', state.clock);
+  if (!pattern) throw new Error('RISK_EVIDENCE_INCOMPLETE');
+  const decision = evaluateSpendingRisk(state, pattern, state.riskPreferences);
+  const spendingPatterns = [...state.spendingPatterns.filter(item => item.id !== pattern.id), pattern];
+  if (decision.outcome !== 'weekly_summary' && decision.outcome !== 'immediate_signal')
+    return { state: { ...state, transactions, spendingPatterns }, decision, replayed: false };
+  const impactData = decision.goalImpact!;
+  const months = Math.max(1, Math.ceil(daysBetween(state.clock, state.goal.targetDate) / 30));
+  const optionAContributionCents = roundHundredYuan(state.goal.monthlyContributionCents
+    + impactData.shortfallCents / Math.max(1, months - 1));
+  const impact: Impact = {
+    id: crypto.randomUUID(),
+    title: '外卖与打车持续上升',
+    expenseCents: pattern.increaseCents,
+    detectedAt: state.clock,
+    shortfallCents: impactData.shortfallCents,
+    delayDays: impactData.delayDays,
+    optionAContributionCents,
+    optionAAvailable: optionAContributionCents <= assessGoal(state).availableMonthlyCents,
+    optionBDate: addDays(state.goal.targetDate, impactData.delayDays),
+    dismissed: false,
+  };
+  const signal: GoalImpactSignal = {
+    id: crypto.randomUUID(), goalId: state.goal.id, patternId: pattern.id, createdAt: state.clock,
+    title: '外卖与打车支出趋势影响日本旅行', decision: decision.outcome,
+    evidence: pattern.evidenceTransactionIds.map(transactionId => {
+      const item = transactions.find(transaction => transaction.id === transactionId)!;
+      return { transactionId, date: item.date, amountCents: Math.max(0, -item.amountCents) };
+    }),
+    confidence: pattern.confidence, ruleVersion: RISK_RULE_VERSION, twinVersion: state.twinVersion + 1,
+    impact: impactData, status: 'active', suppressionKey,
+  };
+  const currentSpend = pattern.currentCents;
+  const finance = {
+    ...state.finance,
+    checkingCents: Math.max(0, state.finance.checkingCents - currentSpend),
+    currentMonthExpenseCents: state.finance.currentMonthExpenseCents + pattern.increaseCents,
+    updatedAt: state.clock,
+  };
+  const next: DemoState = {
+    ...state,
+    finance,
+    accounts: state.accounts.map(item => item.id === 'checking'
+      ? { ...item, balanceCents: finance.checkingCents } : item),
+    transactions,
+    spendingPatterns,
+    riskSignals: [...state.riskSignals, signal],
+    pendingImpact: decision.outcome === 'immediate_signal' ? impact : state.pendingImpact,
+    twinVersion: state.twinVersion + 1,
+  };
+  return { state: next, decision, replayed: false };
+}
+
+export function markActiveRiskSignal(state: DemoState, decision: 'A' | 'B' | 'later' | 'dismiss'): DemoState {
+  const status: GoalImpactSignal['status'] = decision === 'later' ? 'later'
+    : decision === 'dismiss' ? 'dismissed' : 'resolved';
+  let changed = false;
+  const riskSignals = state.riskSignals.map(signal => {
+    if (signal.status !== 'active' && signal.status !== 'later') return signal;
+    changed = true;
+    return { ...signal, status };
+  });
+  return changed ? { ...state, riskSignals } : state;
 }
