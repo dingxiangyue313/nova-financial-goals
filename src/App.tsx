@@ -206,7 +206,7 @@ export default function App() {
       {/* Top Floating Switcher Pill (Quick Screen Access) */}
       <aside aria-label="屏幕快速切换与调试" className="w-full max-w-[500px] px-3 mb-2 flex items-center justify-between text-xs">
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-          <span className="font-semibold text-[#646A73] shrink-0 text-[11px]">快速直达:</span>
+          <span className="font-semibold text-[#5A616B] shrink-0 text-[11px]">快速直达:</span>
           <button
             onClick={() => navigateTo('home')}
             className={`px-2.5 py-1 rounded-full shrink-0 transition-all cursor-pointer font-medium text-[11px] ${
@@ -252,7 +252,7 @@ export default function App() {
         <div className="flex items-center gap-2 shrink-0 ml-2">
           <button
             onClick={() => setDeviceFrame(!deviceFrame)}
-            className="p-1 rounded-md bg-white border border-[#D0D5DD] text-[#646A73] hover:text-[#1F2329] cursor-pointer"
+            className="p-1 rounded-md bg-white border border-[#D0D5DD] text-[#5A616B] hover:text-[#1F2329] cursor-pointer"
             title={deviceFrame ? '切换为自适应全屏' : '切换为手机尺寸 390x844'}
           >
             <span className="material-symbols-outlined text-[16px]">
@@ -328,7 +328,7 @@ export default function App() {
             />
           )}
 
-          {currentScreen === 'impact' && !scenario && <div className="m-4 bg-white rounded-xl p-5 text-sm text-[#646A73]">目前没有显著支出影响。请先激活计划，再在模拟数据面板注入支出。</div>}
+          {currentScreen === 'impact' && !scenario && <div className="m-4 bg-white rounded-xl p-5 text-sm text-[#5A616B]">目前没有显著支出影响。请先激活计划，再在模拟数据面板注入支出。</div>}
 
           {currentScreen === 'goals_list' && (
             <GoalsListScreen
@@ -398,13 +398,13 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => setShowSimulateModal(false)}
-                  className="text-[#646A73] hover:text-[#1F2329]"
+                  className="text-[#5A616B] hover:text-[#1F2329]"
                 >
                   <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
 
-              <p className="text-[12px] text-[#646A73]">
+              <p className="text-[12px] text-[#5A616B]">
                 你可以在此随时模拟生活变动，测试 NOVA 如何动态护航你的目标与应急金。
               </p>
 
@@ -438,7 +438,7 @@ export default function App() {
                   className="w-full py-2.5 px-3 rounded-xl bg-[#F5F7F8] hover:bg-[#E5E8EB] text-[#1F2329] font-medium text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[18px] text-[#2E7D5B]">
+                    <span className="material-symbols-outlined text-[18px] text-[#276B4E]">
                       savings
                     </span>
                     <span>模拟额外存入 ¥1,500 (超额提速)</span>
@@ -447,9 +447,9 @@ export default function App() {
                 </button>
 
                 <div className="grid grid-cols-3 gap-1.5">
-                  <button onClick={() => { void handleTriggerImpact(10); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#646A73]">小额波动 ¥10</button>
-                  <button onClick={() => { void handleScenario('insufficient_data'); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#646A73]">数据不足</button>
-                  <button onClick={() => { void handleScenario('infeasible'); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#646A73]">目标不可行</button>
+                  <button onClick={() => { void handleTriggerImpact(10); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#5A616B]">小额波动 ¥10</button>
+                  <button onClick={() => { void handleScenario('insufficient_data'); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#5A616B]">数据不足</button>
+                  <button onClick={() => { void handleScenario('infeasible'); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#5A616B]">目标不可行</button>
                 </div>
 
                 <button
@@ -457,7 +457,7 @@ export default function App() {
                     void handleResetData();
                     setShowSimulateModal(false);
                   }}
-                  className="w-full py-2 px-3 rounded-xl border border-[#E5E8EB] hover:bg-[#F5F7F8] text-[#646A73] text-[12px] font-medium text-center transition-colors cursor-pointer"
+                  className="w-full py-2 px-3 rounded-xl border border-[#E5E8EB] hover:bg-[#F5F7F8] text-[#5A616B] text-[12px] font-medium text-center transition-colors cursor-pointer"
                 >
                   恢复初始 9月21日 基准状态
                 </button>

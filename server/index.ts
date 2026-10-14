@@ -15,9 +15,10 @@ import { registerMcp } from './mcp.ts';
 import { IsoDateSchema, RiskPreferencesSchema, type DemoState } from '../shared/contracts.ts';
 import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './banking.ts';
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
-import { containsPromptInjection, LocalRateLimiter, signExternalRequest, verifyExternalRequest } from './security.ts';
+import { containsPromptInjection, signExternalRequest, verifyExternalRequest } from './security.ts';
 import { createAgentTurn, ensureImpactThread, executeWorkspaceAction } from './workspace.ts';
 import { applySpendingTrendDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
+import { installApiRateLimits, installRequestHardening } from './http-hardening.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -28,19 +29,13 @@ const externalAgentSecret = process.env.NOVA_EXTERNAL_AGENT_SECRET || sessionSec
 if (production && (!process.env.NOVA_SESSION_SECRET || process.env.NOVA_SESSION_SECRET.length < 32))
   throw new Error('NOVA_SESSION_SECRET must contain at least 32 characters in production');
 
-app.disable('x-powered-by');
+installRequestHardening(app);
 app.use(express.json({ limit: '16kb' }));
-const generalLimiter = new LocalRateLimiter(180, 60_000);
+installApiRateLimits(app);
 app.use('/api', (req, res, next) => {
   const origin = req.get('origin');
   try { if (origin && new URL(origin).host !== req.get('host')) return res.status(403).json({ error: 'INVALID_ORIGIN' }); }
   catch { return res.status(403).json({ error: 'INVALID_ORIGIN' }); }
-  const sessionHint = (req.headers.cookie || '').match(/nova_demo_sid=([0-9a-f-]{36})/)?.[1] || 'anonymous';
-  const key = `${req.ip || req.socket.remoteAddress || 'local'}:${sessionHint}:${req.path.startsWith('/agent') ? 'agent' : 'api'}`;
-  if (!generalLimiter.take(key)) return res.status(429).json({ error: 'RATE_LIMITED' });
-  const startedAt = Date.now();
-  res.on('finish', () => console.info(JSON.stringify({ event: 'http_request', method: req.method,
-    path: req.path, status: res.statusCode, durationMs: Date.now() - startedAt })));
   next();
 });
 
@@ -146,7 +141,7 @@ app.post('/api/agent', route(async (req, res) => {
     provider: 'deterministic', fallbackReason: 'PROMPT_INJECTION_DETECTED', toolResults: [] });
   const parsed = await interpretGoal(message, state.clock);
   res.json({ intent: 'create_or_update_goal', plan: ['解析目标', '用户核对', '比较方案', '明确确认'],
-    provider: parsed.provider, fallbackReason: parsed.notice || null,
+    provider: parsed.provider, fallbackReason: parsed.fallbackReason || null,
     toolResults: [{ tool: 'interpret_goal', result: parsed.goal }] });
 }));
 app.get('/api/agent/threads', route((req, res) => {

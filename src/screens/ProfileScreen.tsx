@@ -26,11 +26,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h2 className="text-[17px] font-bold text-[#1F2329]">Alex</h2>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#EBF7F2] text-[#2E7D5B] font-semibold">
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#EBF7F2] text-[#276B4E] font-semibold">
               守护正常
             </span>
           </div>
-          <p className="text-[12px] text-[#646A73] mt-0.5">alex.planner@nova.fin</p>
+          <p className="text-[12px] text-[#5A616B] mt-0.5">alex.planner@nova.fin</p>
         </div>
       </div>
 
@@ -42,20 +42,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </h3>
 
         <div className="flex items-center justify-between py-2 border-b border-[#F0F2F5] text-[13px]">
-          <span className="text-[#646A73]">核心应急金底线</span>
+          <span className="text-[#5A616B]">核心应急金底线</span>
           <span className="font-bold text-[#1F2329]">
             ¥{goal.emergencyFundProtected.toLocaleString()} (严格隔离)
           </span>
         </div>
 
         <div className="flex items-center justify-between py-2 border-b border-[#F0F2F5] text-[13px]">
-          <span className="text-[#646A73]">可承受时间浮动</span>
+          <span className="text-[#5A616B]">可承受时间浮动</span>
           <span className="font-semibold text-[#1F2329]">{goal.flexibilityWeeks} 周浮动</span>
         </div>
 
         <div className="flex items-center justify-between py-2 text-[13px]">
-          <span className="text-[#646A73]">自动划扣授权</span>
-          <span className="font-semibold text-[#2E7D5B] flex items-center gap-1">
+          <span className="text-[#5A616B]">自动划扣授权</span>
+          <span className="font-semibold text-[#276B4E] flex items-center gap-1">
             <span className="material-symbols-outlined text-[15px]">lock</span>
             从不自动划扣
           </span>
@@ -71,7 +71,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <span className="material-symbols-outlined text-[15px] text-[#0F6B6D]">tune</span>
             演示与屏幕快速直达
           </span>
-          <span className="text-[10px] text-[#646A73]">原型无缝切换</span>
+          <span className="text-[10px] text-[#5A616B]">原型无缝切换</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-[12px]">
@@ -117,7 +117,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </button>
           <button
             onClick={onResetData}
-            className="py-2 px-3 rounded-lg bg-white border border-[#E5E8EB] text-[#646A73] hover:text-[#1F2329] text-[12px] font-medium transition-colors cursor-pointer"
+            className="py-2 px-3 rounded-lg bg-white border border-[#E5E8EB] text-[#5A616B] hover:text-[#1F2329] text-[12px] font-medium transition-colors cursor-pointer"
           >
             重置数据
           </button>

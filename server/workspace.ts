@@ -125,7 +125,7 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
   let reply = '';
   if (intent === 'goal_planning') {
     const parsed = await interpretGoal(trimmed, state.clock);
-    provider = parsed.provider; fallbackReason = parsed.notice ?? fallbackReason;
+    provider = parsed.provider; fallbackReason = parsed.fallbackReason ?? fallbackReason;
     const draft = {
       title: parsed.goal.title && parsed.goal.title !== '我的新目标' ? parsed.goal.title : state.goal.title,
       targetCents: parsed.goal.targetAmount ? Math.round(parsed.goal.targetAmount * 100) : state.goal.targetCents,

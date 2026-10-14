@@ -89,7 +89,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
                   }, 2000);
                 }
               }}
-              className="flex items-center gap-1 text-[#646A73] hover:text-[#0F6B6D] transition-colors cursor-pointer text-left"
+              className="flex items-center gap-1 text-[#5A616B] hover:text-[#0F6B6D] transition-colors cursor-pointer text-left"
               title="点击模拟语音重录"
             >
               <span className={`material-symbols-outlined text-[14px] ${isRecording ? 'text-red-500 animate-pulse' : ''}`}>
@@ -140,7 +140,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
                   className={`text-[11px] px-2 py-0.5 rounded-full transition-colors ${
                     customQuote === preset
                       ? 'bg-[#0F6B6D] text-white font-medium'
-                      : 'bg-white border border-[#E5E8EB] text-[#646A73] hover:border-[#0F6B6D]'
+                      : 'bg-white border border-[#E5E8EB] text-[#5A616B] hover:border-[#0F6B6D]'
                   }`}
                 >
                   示例 {idx + 1}
@@ -165,7 +165,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
                 </p>
               )}
               {analysisComplete && (
-                <p role="status" className="text-[11px] leading-relaxed text-[#2E7D5B]">
+                <p role="status" className="text-[11px] leading-relaxed text-[#276B4E]">
                   已生成草案并展开可修改字段。请核对识别结果，再决定是否继续。
                 </p>
               )}
@@ -185,7 +185,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
               </span>
               <span>NOVA 的理解：</span>
             </h2>
-            <span className="text-[12px] px-2.5 py-0.5 rounded-full bg-[#EBF7F2] text-[#2E7D5B] font-medium flex items-center gap-1">
+            <span className="text-[12px] px-2.5 py-0.5 rounded-full bg-[#EBF7F2] text-[#276B4E] font-medium flex items-center gap-1">
               <span
                 className="material-symbols-outlined text-[13px]"
                 style={{ fontVariationSettings: "'FILL' 1" }}
@@ -205,7 +205,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
               <div className="w-2.5 h-2.5 rounded-full bg-[#0F6B6D] mt-1 ring-2 ring-white shrink-0 -ml-[18px]"></div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-[13px] text-[#646A73]">目标金额</span>
+                  <span className="text-[13px] text-[#5A616B]">目标金额</span>
                   <span className="text-[20px] font-bold leading-tight text-[#1F2329] font-editorial">
                     ¥{targetAmount.toLocaleString()}
                   </span>
@@ -219,7 +219,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
               <div className="w-2.5 h-2.5 rounded-full bg-[#0F6B6D] mt-1 ring-2 ring-white shrink-0 -ml-[18px]"></div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-[13px] text-[#646A73]">目标日期</span>
+                  <span className="text-[13px] text-[#5A616B]">目标日期</span>
                   <span className="text-[14px] text-[#1F2329] font-semibold">
                     {targetDate}
                   </span>
@@ -230,13 +230,13 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
 
             {/* Node 3: 受保护资金 */}
             <div className="relative flex items-start gap-2.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#D48806] mt-1 ring-2 ring-white shrink-0 -ml-[18px]"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-[#A45F00] mt-1 ring-2 ring-white shrink-0 -ml-[18px]"></div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-[13px] text-[#646A73]">受保护资金</span>
+                  <span className="text-[13px] text-[#5A616B]">受保护资金</span>
                   <span className="text-[14px] text-[#1F2329] font-semibold">
                     ¥{emergencyFund.toLocaleString()}{' '}
-                    <span className="text-[#D48806] text-[13px] font-normal">
+                    <span className="text-[#A45F00] text-[13px] font-normal">
                       (应急金)
                     </span>
                   </span>
@@ -247,10 +247,10 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
 
             {/* Node 4: 可调整范围 */}
             <div className="relative flex items-start gap-2.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#646A73] mt-1 ring-2 ring-white shrink-0 -ml-[18px]"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-[#5A616B] mt-1 ring-2 ring-white shrink-0 -ml-[18px]"></div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-[13px] text-[#646A73]">可调整范围</span>
+                  <span className="text-[13px] text-[#5A616B]">可调整范围</span>
                   <span className="text-[13px] text-[#1F2329] font-medium">
                     允许 {goal.flexibilityWeeks} 周浮动
                   </span>
@@ -262,9 +262,9 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
           {/* Edit confirmation hint */}
           <button
             onClick={() => setIsEditing(!isEditing)}
-            className="w-full mt-3 pt-2 flex items-center justify-between text-[#646A73] hover:text-[#0F6B6D] bg-[#F5F7F8] rounded-lg px-3 py-2 border border-[#E5E8EB] transition-colors cursor-pointer text-left"
+            className="w-full mt-3 pt-2 flex items-center justify-between text-[#5A616B] hover:text-[#0F6B6D] bg-[#F5F7F8] rounded-lg px-3 py-2 border border-[#E5E8EB] transition-colors cursor-pointer text-left"
           >
-            <span className="text-[12px] text-[#646A73]">
+            <span className="text-[12px] text-[#5A616B]">
               这些理解对吗？若有偏差可直接修正。
             </span>
             <span className="material-symbols-outlined text-[16px] text-[#0F6B6D]">
@@ -280,7 +280,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
                 <span className="text-[11px] text-[#0F6B6D]">实时生效</span>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#646A73] block">目标金额 (元):</label>
+                <label className="text-[11px] text-[#5A616B] block">目标金额 (元):</label>
                 <input
                   type="number"
                   value={targetAmount}
@@ -289,7 +289,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#646A73] block">应急金保护线 (元):</label>
+                <label className="text-[11px] text-[#5A616B] block">应急金保护线 (元):</label>
                 <input
                   type="number"
                   value={emergencyFund}
@@ -327,7 +327,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
             id="cta-edit"
             className="h-11 min-h-[44px] rounded-xl bg-white border border-[#E5E8EB] text-[#1F2329] text-[13px] font-medium flex items-center justify-center gap-1 hover:bg-[#F5F7F8] active:scale-[0.99] transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px] text-[#646A73]">
+            <span className="material-symbols-outlined text-[16px] text-[#5A616B]">
               edit_note
             </span>
             <span>修改设定</span>
@@ -341,7 +341,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
             id="cta-more"
             className="h-11 min-h-[44px] rounded-xl bg-white border border-[#E5E8EB] text-[#1F2329] text-[13px] font-medium flex items-center justify-center gap-1 hover:bg-[#F5F7F8] active:scale-[0.99] transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px] text-[#646A73]">
+            <span className="material-symbols-outlined text-[16px] text-[#5A616B]">
               add_circle
             </span>
             <span>补充更多信息</span>

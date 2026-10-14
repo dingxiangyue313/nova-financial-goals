@@ -16,7 +16,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
           className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'home'
               ? 'text-[#0F6B6D] font-bold'
-              : 'text-[#646A73] hover:text-[#1F2329]'
+              : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
           <span className="material-symbols-outlined text-[20px]">dashboard</span>
@@ -29,7 +29,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
           className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'goals_list'
               ? 'text-[#0F6B6D] font-bold'
-              : 'text-[#646A73] hover:text-[#1F2329]'
+              : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
           <span className="material-symbols-outlined text-[20px]">track_changes</span>
@@ -64,7 +64,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
           className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'activity'
               ? 'text-[#0F6B6D] font-bold'
-              : 'text-[#646A73] hover:text-[#1F2329]'
+              : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
           <span className="material-symbols-outlined text-[20px]">timeline</span>
@@ -77,7 +77,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
           className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'profile'
               ? 'text-[#0F6B6D] font-bold'
-              : 'text-[#646A73] hover:text-[#1F2329]'
+              : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
           <span className="material-symbols-outlined text-[20px]">account_circle</span>

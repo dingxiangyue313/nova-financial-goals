@@ -50,17 +50,3 @@ const injectionPatterns = [
 export function containsPromptInjection(text: string): boolean {
   return injectionPatterns.some(pattern => pattern.test(text));
 }
-
-export class LocalRateLimiter {
-  private readonly buckets = new Map<string, number[]>();
-  constructor(private readonly limit: number, private readonly windowMs: number) {}
-
-  take(key: string, now = Date.now()): boolean {
-    const after = now - this.windowMs;
-    const recent = (this.buckets.get(key) ?? []).filter(value => value > after);
-    if (recent.length >= this.limit) { this.buckets.set(key, recent); return false; }
-    recent.push(now);
-    this.buckets.set(key, recent);
-    return true;
-  }
-}

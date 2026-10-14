@@ -40,20 +40,20 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
             </span>
           </div>
 
-          <p className="text-[14px] text-[#646A73] leading-relaxed">
+          <p className="text-[14px] text-[#5A616B] leading-relaxed">
             本月新增 ¥{scenario.expenseAmount.toLocaleString()} {scenario.expenseTitle}
             ，影响了原有储蓄节奏。你可以增加月存金额，或调整出发日期。
           </p>
 
-          <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#EBF7F2] border border-[#2E7D5B]/20 text-[#1F2329]">
-            <span className="material-symbols-outlined text-[#2E7D5B] text-[18px] shrink-0">
+          <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#EBF7F2] border border-[#276B4E]/20 text-[#1F2329]">
+            <span className="material-symbols-outlined text-[#276B4E] text-[18px] shrink-0">
               verified_user
             </span>
             <div className="flex-1 flex items-center justify-between text-[13px]">
               <span className="text-[#1F2329] font-semibold">
                 ¥{scenario.emergencyFundAmount.toLocaleString()} 应急金未受影响
               </span>
-              <span className="text-[#2E7D5B] font-medium flex items-center gap-1 text-[12px]">
+              <span className="text-[#276B4E] font-medium flex items-center gap-1 text-[12px]">
                 <span className="material-symbols-outlined text-[14px]">check_circle</span>
                 安全隔离
               </span>
@@ -67,7 +67,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
             <span className="text-[12px] font-bold text-[#1F2329] tracking-wide uppercase">
               为什么会受影响
             </span>
-            <span className="text-[11px] text-[#646A73] bg-[#F5F7F8] border border-[#E5E8EB] px-2 py-0.5 rounded-full">
+            <span className="text-[11px] text-[#5A616B] bg-[#F5F7F8] border border-[#E5E8EB] px-2 py-0.5 rounded-full">
               基于当前模拟数据估算
             </span>
           </div>
@@ -101,7 +101,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
                 <span className="w-2 h-2 rounded-full bg-[#8F959E]"></span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[13px] text-[#646A73] font-medium">
+                <span className="text-[13px] text-[#5A616B] font-medium">
                   传导影响 · 结余调整
                 </span>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -129,7 +129,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
                     目标影响 · {goal.title}
                   </span>
                 </div>
-                <p className="text-[13px] text-[#646A73] mt-0.5">
+                <p className="text-[13px] text-[#5A616B] mt-0.5">
                   原 {readableDate(goal.originalDate || goal.targetDate)}{' '}
                   <span className="text-[#1F2329] font-medium">
                     → 预计 {readableDate(scenario.optionB.completionDate)}
@@ -184,7 +184,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
                     {scenario.optionA.title}
                   </span>
                 </div>
-                <p className="text-[13px] text-[#646A73] mt-1 leading-relaxed">
+                <p className="text-[13px] text-[#5A616B] mt-1 leading-relaxed">
                   后续微调每月存入{' '}
                   <span className="text-[#1F2329] font-semibold">
                     ¥{scenario.optionA.newMonthly.toLocaleString()}
@@ -226,7 +226,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
                     {scenario.optionB.title}
                   </span>
                 </div>
-                <p className="text-[13px] text-[#646A73] mt-1 leading-relaxed">
+                <p className="text-[13px] text-[#5A616B] mt-1 leading-relaxed">
                   维持每月存入{' '}
                   <span className="text-[#1F2329] font-semibold">
                     ¥{scenario.optionB.newMonthly.toLocaleString()}
@@ -271,7 +271,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
           <div className="flex items-center justify-center gap-6 pt-0.5">
             <button
               onClick={onLater}
-              className="text-[13px] font-medium text-[#646A73] hover:text-[#0F6B6D] transition-colors py-1 flex items-center gap-1 cursor-pointer"
+              className="text-[13px] font-medium text-[#5A616B] hover:text-[#0F6B6D] transition-colors py-1 flex items-center gap-1 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[15px]">schedule</span>
               稍后处理
@@ -279,7 +279,7 @@ export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
             <span className="w-1 h-1 rounded-full bg-[#CBD5E1]"></span>
             <button
               onClick={onDismiss}
-              className="text-[13px] font-medium text-[#646A73] hover:text-[#C74242] transition-colors py-1 flex items-center gap-1 cursor-pointer"
+              className="text-[13px] font-medium text-[#5A616B] hover:text-[#C74242] transition-colors py-1 flex items-center gap-1 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[15px]">close</span>
               忽略本次提示
