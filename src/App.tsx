@@ -359,6 +359,8 @@ export default function App() {
               goal={goal}
               onNavigate={navigateTo}
               onTriggerImpact={handleTriggerImpact}
+              onWeeklySummary={handleWeeklySummary}
+              onSpendingTrend={handleSpendingTrend}
               onResetData={handleResetData}
               onBankingDemo={() => navigateTo('banking_demo')}
             />

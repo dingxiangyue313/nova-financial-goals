@@ -5,6 +5,8 @@ interface ProfileScreenProps {
   goal: Goal;
   onNavigate: (s: ScreenId) => void;
   onTriggerImpact: () => void;
+  onWeeklySummary: () => void;
+  onSpendingTrend: () => void;
   onResetData: () => void;
   onBankingDemo: () => void;
 }
@@ -13,6 +15,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   goal,
   onNavigate,
   onTriggerImpact,
+  onWeeklySummary,
+  onSpendingTrend,
   onResetData,
   onBankingDemo,
 }) => {
@@ -108,10 +112,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </button>
         </div>
 
-        <div className="pt-2 flex gap-2">
+        <div className="pt-2 grid grid-cols-2 gap-2">
+          <button
+            onClick={onWeeklySummary}
+            className="py-2 px-2.5 rounded-lg bg-white border border-[#D8E4E4] hover:border-[#0F6B6D] text-[#0F6B6D] font-semibold text-[12px] transition-colors cursor-pointer flex items-center justify-center gap-1"
+          >
+            <span className="material-symbols-outlined text-[16px]">event_note</span>
+            生成每周摘要
+          </button>
+          <button
+            onClick={onSpendingTrend}
+            className="py-2 px-2.5 rounded-lg bg-[#FFF7E6] border border-[#F1D7A5] hover:bg-[#F5A623] hover:text-white text-[#8A5A00] font-semibold text-[12px] transition-colors cursor-pointer flex items-center justify-center gap-1"
+          >
+            <span className="material-symbols-outlined text-[16px]">insights</span>
+            模拟消费趋势
+          </button>
           <button
             onClick={() => onTriggerImpact()}
-            className="flex-1 py-2 rounded-lg bg-[#E6F2F2] hover:bg-[#0F6B6D] hover:text-white text-[#0F6B6D] font-semibold text-[12px] transition-colors cursor-pointer"
+            className="py-2 rounded-lg bg-[#E6F2F2] hover:bg-[#0F6B6D] hover:text-white text-[#0F6B6D] font-semibold text-[12px] transition-colors cursor-pointer"
           >
             模拟突发支出 ¥900
           </button>
