@@ -19,12 +19,12 @@ export const ActivityScreen: React.FC<ActivityScreenProps> = ({ audit, hasImpact
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-[18px] font-bold text-[#1F2329]">收支动态与脉络</h2>
-          <p className="text-[12px] text-[#646A73]">每一笔生活涟漪，NOVA 都帮你稳妥接住</p>
+          <p className="text-[12px] text-[#5A616B]">每一笔生活涟漪，NOVA 都帮你稳妥接住</p>
         </div>
       </div>
 
       <div className="space-y-3">
-        {events.length === 0 && <div className="bg-white border border-[#E5E8EB] rounded-xl p-4 text-sm text-[#646A73]">当前还没有操作记录。创建目标或模拟支出后，这里会显示审计轨迹。</div>}
+        {events.length === 0 && <div className="bg-white border border-[#E5E8EB] rounded-xl p-4 text-sm text-[#5A616B]">当前还没有操作记录。创建目标或模拟支出后，这里会显示审计轨迹。</div>}
         {events.map((evt, idx) => (
           <div
             key={idx}
@@ -37,7 +37,7 @@ export const ActivityScreen: React.FC<ActivityScreenProps> = ({ audit, hasImpact
               <span className="text-[11px] text-[#8F959E]">{evt.date}</span>
             </div>
             <h3 className="text-[14px] font-bold text-[#1F2329]">{evt.title}</h3>
-            <p className="text-[12px] text-[#646A73] leading-relaxed">{evt.description}</p>
+            <p className="text-[12px] text-[#5A616B] leading-relaxed">{evt.description}</p>
             {evt.actionable && (
               <div className="pt-1.5">
                 <button

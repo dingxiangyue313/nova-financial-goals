@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { addDays } from './domain.ts';
 import { AgentIntentSchema, UiCardSchema, type AgentIntent, type UiCard } from '../shared/contracts.ts';
 import { containsPromptInjection } from './security.ts';
+import { requestDeepSeekJson } from './deepseek-client.ts';
 
 const ParsedGoal = z.object({
   title: z.string().max(60).nullable().optional(),
@@ -22,24 +23,16 @@ export async function interpretAgentRequest(text: string, deterministicIntent: A
     provider: 'deterministic', fallbackReason: 'PROMPT_INJECTION_DETECTED' };
   const fallback = (reason: string | null) => ({ intent: deterministicIntent, explanation: null,
     provider: 'deterministic' as const, fallbackReason: reason });
-  const key = process.env.DEEPSEEK_API_KEY;
-  if (!key) return fallback('DEEPSEEK_NOT_CONFIGURED');
-  try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: process.env.DEEPSEEK_MODEL || 'deepseek-flash', thinking: { type: 'disabled' },
-        response_format: { type: 'json_object' }, max_tokens: 180, messages: [
-          { role: 'system', content: `你只为模拟财务助手识别任务。输出 JSON {intent,explanation}。intent 只能是：goal_planning,goal_status,goal_impact,mandate_management,external_agent_request,clarification。explanation 最多 80 个中文字符，不计算金额、不提出执行参数、不声称已执行。` },
-          { role: 'user', content: JSON.stringify({ recentConversation: safeContext?.context.slice(-20) ?? [],
-            financialState: safeContext?.twin ?? null, currentMessage: text }) },
-        ] }), signal: AbortSignal.timeout(12_000),
-    });
-    if (!response.ok) return fallback('DEEPSEEK_HTTP_ERROR');
-    const content = (await response.json())?.choices?.[0]?.message?.content;
-    const parsed = z.object({ intent: AgentIntentSchema.exclude(['rejected_prompt_injection']),
-      explanation: z.string().max(160).nullable() }).parse(JSON.parse(content));
-    return { intent: parsed.intent, explanation: parsed.explanation, provider: 'deepseek', fallbackReason: null };
-  } catch { return fallback('DEEPSEEK_INVALID_OR_TIMEOUT'); }
+  const result = await requestDeepSeekJson(z.object({
+    intent: AgentIntentSchema.exclude(['rejected_prompt_injection']),
+    explanation: z.string().max(160).nullable(),
+  }), { maxTokens: 180, messages: [
+    { role: 'system', content: `你只为模拟财务助手识别任务。输出 JSON {intent,explanation}。intent 只能是：goal_planning,goal_status,goal_impact,mandate_management,external_agent_request,clarification。explanation 最多 80 个中文字符，不计算金额、不提出执行参数、不声称已执行。` },
+    { role: 'user', content: JSON.stringify({ recentConversation: safeContext?.context.slice(-20) ?? [],
+      financialState: safeContext?.twin ?? null, currentMessage: text }) },
+  ] });
+  if (!result.ok) return fallback(result.reason);
+  return { intent: result.data.intent, explanation: result.data.explanation, provider: 'deepseek', fallbackReason: null };
 }
 
 function deterministic(text: string, clock: string): ParsedGoalDraft {
@@ -65,56 +58,36 @@ function deterministic(text: string, clock: string): ParsedGoalDraft {
     monthlySavings: null, flexibilityWeeks: null });
 }
 
-export async function interpretGoal(text: string, clock: string): Promise<{ goal: ParsedGoalDraft; provider: 'deepseek' | 'deterministic'; notice?: string }> {
+export async function interpretGoal(text: string, clock: string): Promise<{
+  goal: ParsedGoalDraft; provider: 'deepseek' | 'deterministic'; notice?: string; fallbackReason?: string;
+}> {
   if (!text.trim() || text.length > 500) throw new Error('目标描述不能为空，且最多 500 字。');
-  if (containsPromptInjection(text)) return { goal: deterministic('', clock), provider: 'deterministic',
+  if (containsPromptInjection(text)) return { goal: deterministic('', clock), provider: 'deterministic', fallbackReason: 'PROMPT_INJECTION_DETECTED',
     notice: '检测到与目标规划无关的指令，未发送给模型。请只描述目标、金额和日期。' };
-  const fallback = () => ({ goal: deterministic(text, clock), provider: 'deterministic' as const,
+  const fallback = (reason: string) => ({ goal: deterministic(text, clock), provider: 'deterministic' as const, fallbackReason: reason,
     notice: '当前使用确定性演示解析，请核对金额和日期。' });
-  const key = process.env.DEEPSEEK_API_KEY;
-  if (!key) return fallback();
-  try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
-        thinking: { type: 'disabled' }, response_format: { type: 'json_object' }, max_tokens: 500,
-        messages: [
-          { role: 'system', content: `你只解析模拟财务目标，不做财务决策。当前演示日期 ${clock}。输出 JSON object：title,targetAmount,targetDate,monthlySavings,emergencyFundProtected,flexibilityWeeks。日期用 YYYY-MM-DD；所有金额字段必须是 JSON number；emergencyFundProtected 表示受保护应急金的金额（例如 20000），不能输出 boolean；未知字段为 null。不要编造金额。` },
-          { role: 'user', content: text },
-        ] }), signal: AbortSignal.timeout(12_000),
-    });
-    if (!response.ok) return fallback();
-    const raw = await response.json();
-    const content = raw?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string') return fallback();
-    const goal = ParsedGoal.parse(JSON.parse(content));
-    if (!goal.title && !goal.targetAmount && !goal.targetDate) return fallback();
-    return { goal, provider: 'deepseek' };
-  } catch { return fallback(); }
+  const result = await requestDeepSeekJson(ParsedGoal, { maxTokens: 500, messages: [
+    { role: 'system', content: `你只解析模拟财务目标，不做财务决策。当前演示日期 ${clock}。输出 JSON object：title,targetAmount,targetDate,monthlySavings,emergencyFundProtected,flexibilityWeeks。日期用 YYYY-MM-DD；所有金额字段必须是 JSON number；emergencyFundProtected 表示受保护应急金的金额（例如 20000），不能输出 boolean；未知字段为 null。不要编造金额。` },
+    { role: 'user', content: text },
+  ] });
+  if (!result.ok) return fallback(result.reason);
+  if (!result.data.title && !result.data.targetAmount && !result.data.targetDate) return fallback('DEEPSEEK_EMPTY_RESULT');
+  return { goal: result.data, provider: 'deepseek' };
 }
 
 // DeepSeek may compose approved cards, but it cannot invent card content, actions, or financial numbers.
 export async function composeUiCards(cards: UiCard[]): Promise<{ cards: UiCard[]; provider: 'deepseek' | 'deterministic' }> {
   const safeCards = cards.map(card => UiCardSchema.parse(card));
   const fallback = { cards: safeCards, provider: 'deterministic' as const };
-  const key = process.env.DEEPSEEK_API_KEY;
-  if (!key) return fallback;
-  try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
-        thinking: { type: 'disabled' }, response_format: { type: 'json_object' }, max_tokens: 150,
-        messages: [
-          { role: 'system', content: '只输出 JSON 对象 {"order":[卡片 ID]}。用给定 ID 排序，优先显示目标进度与显著影响。必须保留所有 ID，不得新建组件、文案、金额、操作或动作。' },
-          { role: 'user', content: JSON.stringify(safeCards.map(({ id, type, tone }) => ({ id, type, tone }))) },
-        ] }), signal: AbortSignal.timeout(5_000),
-    });
-    if (!response.ok) return fallback;
-    const content = (await response.json())?.choices?.[0]?.message?.content;
-    const parsed = z.object({ order: z.array(z.string()) }).parse(JSON.parse(content));
-    const known = new Map(safeCards.map(card => [card.id, card]));
-    if (parsed.order.length !== safeCards.length || new Set(parsed.order).size !== safeCards.length ||
-      parsed.order.some(id => !known.has(id))) return fallback;
-    return { cards: parsed.order.map(id => UiCardSchema.parse(known.get(id))), provider: 'deepseek' };
-  } catch { return fallback; }
+  const result = await requestDeepSeekJson(z.object({ order: z.array(z.string()) }), {
+    maxTokens: 150, timeoutMs: 5_000, messages: [
+      { role: 'system', content: '只输出 JSON 对象 {"order":[卡片 ID]}。用给定 ID 排序，优先显示目标进度与显著影响。必须保留所有 ID，不得新建组件、文案、金额、操作或动作。' },
+      { role: 'user', content: JSON.stringify(safeCards.map(({ id, type, tone }) => ({ id, type, tone }))) },
+    ],
+  });
+  if (!result.ok) return fallback;
+  const known = new Map(safeCards.map(card => [card.id, card]));
+  if (result.data.order.length !== safeCards.length || new Set(result.data.order).size !== safeCards.length ||
+    result.data.order.some(id => !known.has(id))) return fallback;
+  return { cards: result.data.order.map(id => UiCardSchema.parse(known.get(id))), provider: 'deepseek' };
 }

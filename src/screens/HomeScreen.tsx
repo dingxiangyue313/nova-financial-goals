@@ -31,7 +31,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Greeting & Subhead */}
       <section className="flex flex-col gap-0.5">
         <div className="flex items-center justify-between">
-          <span className="text-[12px] font-medium text-[#646A73]">
+          <span className="text-[12px] font-medium text-[#5A616B]">
             {readableDate(snapshot.clock)} · 演示日期
           </span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] text-[11px] font-semibold">
@@ -43,7 +43,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           早上好，Alex
         </h1>
         <div className="flex items-center justify-between">
-          <span className="text-[13px] font-medium text-[#646A73]">我的目标</span>
+          <span className="text-[13px] font-medium text-[#5A616B]">我的目标</span>
           <button
             onClick={onNavigateToCreate}
             className="text-[12px] text-[#0F6B6D] hover:underline flex items-center gap-0.5 font-medium cursor-pointer"
@@ -93,7 +93,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
 
-          <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#2E7D5B] text-[11px] font-semibold shadow-sm backdrop-blur-xs">
+          <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#276B4E] text-[11px] font-semibold shadow-sm backdrop-blur-xs">
             <span className="material-symbols-outlined text-[14px]">
               {goal.status === 'delayed' ? 'schedule' : 'check_circle'}
             </span>
@@ -113,11 +113,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Financial Metrics */}
         <div className="flex items-baseline justify-between pt-0.5">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-[12px] text-[#646A73]">已存</span>
+            <span className="text-[12px] text-[#5A616B]">已存</span>
             <span className="text-[22px] font-bold text-[#1F2329] tracking-tight font-editorial">
               ¥{goal.currentAmount.toLocaleString()}
             </span>
-            <span className="text-[13px] text-[#646A73]">
+            <span className="text-[13px] text-[#5A616B]">
               / ¥{goal.targetAmount.toLocaleString()}
             </span>
           </div>
@@ -159,13 +159,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
             <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col items-center">
               <div className="w-3 h-3 rounded-full bg-[#E5E8EB] border border-white"></div>
-              <span className="text-[10px] text-[#646A73] mt-0.5">推进中</span>
+              <span className="text-[10px] text-[#5A616B] mt-0.5">推进中</span>
             </div>
             <div className="absolute right-1 bottom-0 flex flex-col items-center">
-              <div className="w-3.5 h-3.5 rounded-full bg-[#2E7D5B] border-2 border-white shadow-sm flex items-center justify-center">
+              <div className="w-3.5 h-3.5 rounded-full bg-[#276B4E] border-2 border-white shadow-sm flex items-center justify-center">
                 <span className="material-symbols-outlined text-white text-[8px]">flag</span>
               </div>
-              <span className="text-[10px] text-[#2E7D5B] font-bold mt-0.5">
+              <span className="text-[10px] text-[#276B4E] font-bold mt-0.5">
                 ¥{goal.targetAmount.toLocaleString()}
               </span>
             </div>
@@ -182,8 +182,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {insight?.body || '正在评估目标进度'} {snapshot.assessment.projectedDate ? `预计 ${shortDate(snapshot.assessment.projectedDate)}` : ''}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-[#646A73]">
-            <span className="material-symbols-outlined text-[#D48806] text-[15px]">
+          <div className="flex items-center gap-1.5 text-[#5A616B]">
+            <span className="material-symbols-outlined text-[#A45F00] text-[15px]">
               lightbulb
             </span>
             <span>
@@ -213,7 +213,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <span className="material-symbols-outlined text-[#0F6B6D] text-[16px]">flowsheet</span>
             计划阶段与进展
           </span>
-          <span className="text-[11px] text-[#646A73]">3 步清晰推进</span>
+          <span className="text-[11px] text-[#5A616B]">3 步清晰推进</span>
         </div>
         <div className="flex flex-col gap-2">
           {/* Stage 1 */}
@@ -226,7 +226,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
             <div className="flex flex-col">
               <span className="text-[13px] font-bold text-[#1F2329]">当前进度</span>
-              <span className="text-[12px] text-[#646A73]">
+              <span className="text-[12px] text-[#5A616B]">
                 已存 ¥{goal.currentAmount.toLocaleString()}，完成 {percentage}%
               </span>
             </div>
@@ -242,7 +242,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
             <div className="flex flex-col">
               <span className="text-[13px] font-bold text-[#1F2329]">可行方案</span>
-              <span className="text-[12px] text-[#646A73]">
+              <span className="text-[12px] text-[#5A616B]">
                 {insight?.body} 建议月存 ¥{goal.monthlySavings.toLocaleString()}
               </span>
             </div>
@@ -258,7 +258,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
             <div className="flex flex-col">
               <span className="text-[13px] font-bold text-[#1F2329]">确认计划</span>
-              <span className="text-[12px] text-[#646A73]">
+              <span className="text-[12px] text-[#5A616B]">
                 {snapshot.goal.selectedPlanId ? '已选择并启用计划' : '选择适合你的节奏，再决定是否启用'}
               </span>
             </div>

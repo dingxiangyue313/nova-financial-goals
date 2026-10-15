@@ -21,7 +21,7 @@ export const GoalsListScreen: React.FC<GoalsListScreenProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-[18px] font-bold text-[#1F2329]">所有目标 & 资金池</h2>
-          <p className="text-[12px] text-[#646A73]">动态追踪进度与隔离保护底线</p>
+          <p className="text-[12px] text-[#5A616B]">动态追踪进度与隔离保护底线</p>
         </div>
         <button
           onClick={onNavigateToCreate}
@@ -33,26 +33,26 @@ export const GoalsListScreen: React.FC<GoalsListScreenProps> = ({
       </div>
 
       {/* Emergency Fund Protected Card */}
-      <div className="bg-[#EBF7F2] border border-[#2E7D5B]/30 rounded-xl p-3.5 flex items-center justify-between">
+      <div className="bg-[#EBF7F2] border border-[#276B4E]/30 rounded-xl p-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#2E7D5B]/15 text-[#2E7D5B] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-[#276B4E]/15 text-[#276B4E] flex items-center justify-center">
             <span className="material-symbols-outlined text-[20px]">shield</span>
           </div>
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-[14px] font-bold text-[#1F2329]">核心应急金</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#2E7D5B] text-white font-semibold">
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#276B4E] text-white font-semibold">
                 绝对隔离
               </span>
             </div>
-            <p className="text-[12px] text-[#646A73]">不纳入任何消费目标规划</p>
+            <p className="text-[12px] text-[#5A616B]">不纳入任何消费目标规划</p>
           </div>
         </div>
         <div className="text-right">
-          <span className="text-[16px] font-bold text-[#2E7D5B] font-editorial">
+          <span className="text-[16px] font-bold text-[#276B4E] font-editorial">
             ¥{goal.emergencyFundProtected.toLocaleString()}
           </span>
-          <p className="text-[11px] text-[#2E7D5B] font-medium">100% 安全</p>
+          <p className="text-[11px] text-[#276B4E] font-medium">100% 安全</p>
         </div>
       </div>
 
@@ -69,16 +69,16 @@ export const GoalsListScreen: React.FC<GoalsListScreenProps> = ({
               专项预算
             </span>
           </div>
-          <span className="text-[12px] text-[#646A73]">
+          <span className="text-[12px] text-[#5A616B]">
             {goal.targetDate}
           </span>
         </div>
 
         <div className="flex items-baseline justify-between text-[13px]">
-          <span className="text-[#646A73]">
+          <span className="text-[#5A616B]">
             已存 <strong className="text-[#1F2329]">¥{goal.currentAmount.toLocaleString()}</strong>
           </span>
-          <span className="text-[#646A73]">
+          <span className="text-[#5A616B]">
             目标 ¥{goal.targetAmount.toLocaleString()}
           </span>
         </div>
@@ -91,7 +91,7 @@ export const GoalsListScreen: React.FC<GoalsListScreenProps> = ({
         </div>
 
         <div className="flex items-center justify-between pt-1 text-[12px]">
-          <span className="text-[#646A73]">
+          <span className="text-[#5A616B]">
             月供计划: ¥{goal.monthlySavings.toLocaleString()}
           </span>
           <button

@@ -46,7 +46,10 @@ npm run dev
 | `npm run build` | 构建前端到 `dist/` |
 | `npm start` | 运行生产构建，需先设置 `NOVA_SESSION_SECRET` |
 | `npm run lint` | TypeScript 类型检查 |
-| `npm test` | 确定性规则检查 |
+| `npm test` | 服务端、治理、安全和确定性规则检查 |
+| `npm run test:properties` | 金额、保护资金、幂等、风险优先级和审计链属性测试 |
+| `npm run eval:promptfoo` | 不调用真实模型的意图、注入攻击与回退评测 |
+| `npm run test:a11y` | 三种屏幕尺寸的严重无障碍问题检查 |
 | `npm run test:e2e` | 用 Chrome 在 360、768、1440 px 跑固定页面与对话工作台主流程 |
 
 Playwright 按产品叙事分别验收：
@@ -57,7 +60,7 @@ Playwright 按产品叙事分别验收：
 - 受控自主执行：同一限定授权分别产生 Execute、Ask、Manual Review 与 Block，并留下凭证和 Hash 链审计。
 - 对话工作台：长期会话可恢复；显著支出自动建立未读风险会话；所有写操作先展示确认卡。
 
-`.github/workflows/ci.yml` 会在提交到集成分支或更新 `main` 的 Pull Request 时自动运行类型检查、单元测试、生产构建和以上故事验收。CI 固定使用确定性模式，不读取 DeepSeek Key。
+`.github/workflows/ci.yml` 会在更新 `main` 的 Pull Request 和提交到 `main` 后自动运行密钥扫描、依赖安全检查、类型检查、服务端与属性测试、Promptfoo 评测、生产构建、无障碍检查和以上故事验收。CI 固定使用确定性模式，不读取 DeepSeek Key。采用工具、固定版本、许可证与运行边界见 [通用能力复用说明](docs/COMMON_CAPABILITIES.md)。
 
 生产模式本地验证：
 
@@ -82,6 +85,7 @@ NOVA_SESSION_SECRET="$(openssl rand -hex 32)" npm start
 - `/api/demo/spending-trend` 注入固定的外卖与打车累计趋势故事；相同事实幂等且忽略后不重复提醒。
 - `/api/external-agent/request` 要求 HMAC 签名、5 分钟时间窗口和一次性 Nonce。
 - `/mcp` 是需要会话令牌的 MCP Streamable HTTP 入口，只暴露白名单模拟工具。令牌由 `/api/mcp/token` 在当前浏览器会话内获取，不是 DeepSeek Key；不要公开分享。
+- Helmet 为浏览器响应设置安全头；普通 API 每分钟最多 180 次请求，Agent 与模型相关入口每分钟最多 30 次。Pino 日志隐藏 Cookie、Authorization、签名、请求正文、API Key 和完整账户标识。
 
 安全边界与已知限制见 [安全自评](docs/SECURITY_SELF_ASSESSMENT.md)。本项目只用于演示，不应存放真实金融账户或真实支付凭据。
 

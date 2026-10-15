@@ -39,7 +39,7 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
           <div className="flex items-start gap-2.5">
             <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-[#EBF7F2]">
               <span
-                className="material-symbols-outlined text-[20px] text-[#2E7D5B]"
+                className="material-symbols-outlined text-[20px] text-[#276B4E]"
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
                 check_circle
@@ -50,8 +50,8 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
                 {assessment.status === 'insufficient_data' ? '数据不足，先核对目标假设' : assessment.status === 'infeasible' ? '当前条件下目标难以按时实现' : assessment.status === 'at_risk' ? '当前节奏可能延期' : '按当前数据和假设，这个目标可以实现'}
               </h2>
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#2E7D5B]"></span>
-                <p className="text-[11px] text-[#646A73]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#276B4E]"></span>
+                <p className="text-[11px] text-[#5A616B]">
                   {assessment.dataSufficiency}
                 </p>
               </div>
@@ -65,7 +65,7 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
             <span className="text-[12px] text-[#1F2329] font-bold tracking-wide">
               推演与推进阶段
             </span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#646A73]">
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#F0F2F5] text-[#5A616B]">
               阶段详情
             </span>
           </div>
@@ -81,7 +81,7 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
               </div>
               <div className="flex-1 rounded-lg p-2.5 shadow-sm bg-[#F8FAFB] border border-[#E5E8EB]">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#646A73]">阶段 01</span>
+                  <span className="text-[11px] text-[#5A616B]">阶段 01</span>
                   <span className="text-[11px] font-semibold text-[#1F2329]">当前进度</span>
                 </div>
                 <p className="text-[12px] mt-0.5 leading-relaxed text-[#1F2329]">
@@ -96,15 +96,15 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
 
             {/* Node 2 */}
             <div className="relative flex items-start gap-2.5 z-10">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm bg-[#EBF7F2] text-[#2E7D5B]">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm bg-[#EBF7F2] text-[#276B4E]">
                 <span className="material-symbols-outlined text-[17px]">
                   event_available
                 </span>
               </div>
               <div className="flex-1 rounded-lg p-2.5 shadow-sm bg-[#F8FAFB] border border-[#E5E8EB]">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#2E7D5B]">阶段 02</span>
-                  <span className="text-[11px] font-semibold text-[#2E7D5B]">可行方案</span>
+                  <span className="text-[11px] text-[#276B4E]">阶段 02</span>
+                  <span className="text-[11px] font-semibold text-[#276B4E]">可行方案</span>
                 </div>
                 <p className="text-[12px] mt-0.5 leading-relaxed text-[#1F2329]">
                   建议月存{' '}
@@ -118,13 +118,13 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
 
             {/* Node 3 */}
             <div className="relative flex items-start gap-2.5 z-10">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm bg-[#F0F2F5] text-[#646A73]">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm bg-[#F0F2F5] text-[#5A616B]">
                 <span className="material-symbols-outlined text-[17px]">checklist</span>
               </div>
               <div className="flex-1 rounded-lg p-2.5 shadow-sm bg-[#F8FAFB] border border-[#E5E8EB]">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#646A73]">阶段 03</span>
-                  <span className="text-[11px] font-semibold text-[#646A73]">确认计划</span>
+                  <span className="text-[11px] text-[#5A616B]">阶段 03</span>
+                  <span className="text-[11px] font-semibold text-[#5A616B]">确认计划</span>
                 </div>
                 <p className="text-[12px] mt-0.5 leading-relaxed text-[#1F2329]">
                   选择适合你的节奏，再决定是否启用
@@ -140,7 +140,7 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
             <span className="text-[12px] text-[#1F2329] font-bold">
               选择适合你的节奏
             </span>
-            <span className="text-[11px] text-[#646A73]">请选择一种方案</span>
+            <span className="text-[11px] text-[#5A616B]">请选择一种方案</span>
           </div>
 
           {options.map((option) => {
@@ -181,7 +181,7 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
                       <span className="text-[16px] font-bold text-[#1F2329] font-editorial">
                         {option.amountText}
                       </span>
-                      <span className="text-[12px] text-[#646A73]">
+                      <span className="text-[12px] text-[#5A616B]">
                         {option.periodText}
                       </span>
                       {option.isRecommended && (
@@ -190,13 +190,13 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
                         </span>
                       )}
                     </div>
-                    <p className="text-[12px] text-[#646A73] truncate">
+                    <p className="text-[12px] text-[#5A616B] truncate">
                       {option.forecastText}
                     </p>
                   </div>
                 </div>
 
-                <span className="material-symbols-outlined text-[18px] text-[#9AA0A6]">
+                <span className="material-symbols-outlined text-[18px] text-[#727982]">
                   chevron_right
                 </span>
               </button>
@@ -208,16 +208,16 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div className="flex gap-2.5">
               <span className="material-symbols-outlined mt-0.5 text-[20px] text-[#0F6B6D]">verified_user</span>
-              <div><h3 className="text-[14px] font-bold text-[#1F2329]">智能守护设置</h3><p className="mt-1 text-[11px] leading-relaxed text-[#646A73]">NOVA 整理账户流水；只有变化真正影响目标或安全资金时才即时提醒。</p></div>
+              <div><h3 className="text-[14px] font-bold text-[#1F2329]">智能守护设置</h3><p className="mt-1 text-[11px] leading-relaxed text-[#5A616B]">NOVA 整理账户流水；只有变化真正影响目标或安全资金时才即时提醒。</p></div>
             </div>
-            <span className="shrink-0 rounded-full bg-[#EBF7F2] px-2 py-1 text-[10px] font-semibold text-[#2E7D5B]">系统推荐</span>
+            <span className="shrink-0 rounded-full bg-[#EBF7F2] px-2 py-1 text-[10px] font-semibold text-[#276B4E]">系统推荐</span>
           </div>
           <div className="mt-3 rounded-xl bg-[#F5F7F8] p-2.5 text-[11px]">
-            <div className="flex items-center justify-between"><span className="text-[#646A73]">目标参考线</span><b>¥{(riskPreferences.amountThresholdCents / 100).toLocaleString()} 或目标剩余金额的 {riskPreferences.goalImpactRatioThresholdBps / 100}%</b></div>
-            <label className="mt-2 flex min-h-8 items-center justify-between border-t border-[#E5E8EB] pt-2"><span className="text-[#646A73]">每周趋势摘要</span><input aria-label="每周趋势摘要" type="checkbox" checked={riskPreferences.weeklySummaryEnabled} disabled={savingPreferences} onChange={async event => { setSavingPreferences(true); try { await onUpdateRiskPreferences({ weeklySummaryEnabled: event.target.checked }); } finally { setSavingPreferences(false); } }} className="h-4 w-4 accent-[#0F6B6D]" /></label>
+            <div className="flex items-center justify-between"><span className="text-[#5A616B]">目标参考线</span><b>¥{(riskPreferences.amountThresholdCents / 100).toLocaleString()} 或目标剩余金额的 {riskPreferences.goalImpactRatioThresholdBps / 100}%</b></div>
+            <label className="mt-2 flex min-h-8 items-center justify-between border-t border-[#E5E8EB] pt-2"><span className="text-[#5A616B]">每周趋势摘要</span><input aria-label="每周趋势摘要" type="checkbox" checked={riskPreferences.weeklySummaryEnabled} disabled={savingPreferences} onChange={async event => { setSavingPreferences(true); try { await onUpdateRiskPreferences({ weeklySummaryEnabled: event.target.checked }); } finally { setSavingPreferences(false); } }} className="h-4 w-4 accent-[#0F6B6D]" /></label>
           </div>
           <button type="button" onClick={() => setShowAdvanced(value => !value)} className="mt-2 text-[11px] font-semibold text-[#0F6B6D]">{showAdvanced ? '收起高级规则' : '展开高级规则'}</button>
-          {showAdvanced && <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-[#E5E8EB] p-2.5 text-[10px] text-[#646A73]"><div><span className="block">金额参考线</span><b className="text-[12px] text-[#1F2329]">¥{(riskPreferences.amountThresholdCents / 100).toLocaleString()}</b></div><div><span className="block">目标占比参考线</span><b className="text-[12px] text-[#1F2329]">{riskPreferences.goalImpactRatioThresholdBps / 100}%</b></div><p className="col-span-2 leading-relaxed">这两项只决定何时进一步评估；目标仍在允许浮动范围内时，不会弹出即时风险。</p></div>}
+          {showAdvanced && <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-[#E5E8EB] p-2.5 text-[10px] text-[#5A616B]"><div><span className="block">金额参考线</span><b className="text-[12px] text-[#1F2329]">¥{(riskPreferences.amountThresholdCents / 100).toLocaleString()}</b></div><div><span className="block">目标占比参考线</span><b className="text-[12px] text-[#1F2329]">{riskPreferences.goalImpactRatioThresholdBps / 100}%</b></div><p className="col-span-2 leading-relaxed">这两项只决定何时进一步评估；目标仍在允许浮动范围内时，不会弹出即时风险。</p></div>}
         </section>
 
         {/* Action Area: Primary CTA & Safety Reassurance */}
@@ -242,10 +242,10 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
           </button>
 
           <div className="flex items-center justify-center gap-1.5 px-2">
-            <span className="material-symbols-outlined text-[15px] text-[#646A73]">
+            <span className="material-symbols-outlined text-[15px] text-[#5A616B]">
               lock
             </span>
-            <span className="text-[11px] text-[#646A73] text-center">
+            <span className="text-[11px] text-[#5A616B] text-center">
               {selectedPlanId ? '当前方案已激活。' : '选择方案只会设置提醒与推进节奏，不会自动扣款。'}
             </span>
           </div>

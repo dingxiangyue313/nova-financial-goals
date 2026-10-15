@@ -8,7 +8,7 @@ export default defineConfig({
   reporter: 'line',
   use: { baseURL: 'http://127.0.0.1:3177', trace: 'retain-on-failure', channel: 'chrome' },
   webServer: {
-    command: 'PORT=3177 NOVA_DB_PATH=./data/e2e.sqlite DEEPSEEK_API_KEY= npm run dev',
+    command: 'npm run build && PORT=3177 NOVA_DB_PATH=./data/e2e.sqlite DEEPSEEK_API_KEY= NOVA_SESSION_SECRET=playwright-session-secret-at-least-32-characters npm start',
     url: 'http://127.0.0.1:3177/api/health',
     timeout: 30_000,
     reuseExistingServer: false,
