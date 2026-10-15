@@ -12,6 +12,7 @@ const ParsedGoal = z.object({
   emergencyFundProtected: z.number().nonnegative().max(10_000_000).nullable().optional(),
   flexibilityWeeks: z.number().int().nonnegative().max(52).nullable().optional(),
 });
+const GoalExplanation = z.object({ explanation: z.string().max(160).nullable() });
 export type ParsedGoalDraft = z.infer<typeof ParsedGoal>;
 
 export async function interpretAgentRequest(text: string, deterministicIntent: AgentIntent, safeContext?: {
@@ -39,7 +40,8 @@ function deterministic(text: string, clock: string): ParsedGoalDraft {
   const target = text.match(/(?:预算|目标|存|需要|准备)[^\d¥]{0,8}¥?\s*([\d,]+(?:\.\d{1,2})?)/);
   const allAmounts = [...text.matchAll(/¥\s*([\d,]+(?:\.\d{1,2})?)/g)];
   const amount = target?.[1] || allAmounts[0]?.[1];
-  const emergency = text.match(/应急金[^\d¥]{0,8}¥?\s*([\d,]+)/);
+  const emergency = text.match(/应急金[^\d¥]{0,8}¥?\s*([\d,]+)/)
+    || text.match(/(?:保留|保护|留下)[^\d¥]{0,8}¥?\s*([\d,]+)(?:\.\d{1,2})?\s*元?[^。；，,]{0,8}应急金/);
   const exactDate = text.match(/(20\d{2})年(\d{1,2})月(\d{1,2})日/);
   const monthDay = text.match(/(\d{1,2})月(\d{1,2})日/);
   const relativeMonths = text.match(/([一二三四五六七八九十\d]+)个?月后/);
@@ -66,13 +68,13 @@ export async function interpretGoal(text: string, clock: string): Promise<{
     notice: '检测到与目标规划无关的指令，未发送给模型。请只描述目标、金额和日期。' };
   const fallback = (reason: string) => ({ goal: deterministic(text, clock), provider: 'deterministic' as const, fallbackReason: reason,
     notice: '当前使用确定性演示解析，请核对金额和日期。' });
-  const result = await requestDeepSeekJson(ParsedGoal, { maxTokens: 500, messages: [
-    { role: 'system', content: `你只解析模拟财务目标，不做财务决策。当前演示日期 ${clock}。输出 JSON object：title,targetAmount,targetDate,monthlySavings,emergencyFundProtected,flexibilityWeeks。日期用 YYYY-MM-DD；所有金额字段必须是 JSON number；emergencyFundProtected 表示受保护应急金的金额（例如 20000），不能输出 boolean；未知字段为 null。不要编造金额。` },
+  const goal = deterministic(text, clock);
+  const result = await requestDeepSeekJson(GoalExplanation, { maxTokens: 180, messages: [
+    { role: 'system', content: '你只解释用户的模拟财务目标。输出 JSON {"explanation": string|null}。不得输出、改写或推断金额、日期、阈值或动作参数。' },
     { role: 'user', content: text },
   ] });
   if (!result.ok) return fallback(result.reason);
-  if (!result.data.title && !result.data.targetAmount && !result.data.targetDate) return fallback('DEEPSEEK_EMPTY_RESULT');
-  return { goal: result.data, provider: 'deepseek' };
+  return { goal, provider: 'deepseek', notice: result.data.explanation ?? undefined };
 }
 
 // DeepSeek may compose approved cards, but it cannot invent card content, actions, or financial numbers.

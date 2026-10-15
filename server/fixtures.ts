@@ -41,7 +41,7 @@ export function createFixture(): DemoState {
       pausedUntil: null,
       goalOverrides: {},
     },
-    spendingPatterns: [], riskSignals: [],
+    spendingPatterns: [], riskSignals: [], weeklyRiskSummaries: [],
     pendingImpact: null, mandate: null, audit: [], operations: [],
   };
 }

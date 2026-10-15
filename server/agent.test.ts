@@ -76,17 +76,20 @@ test('missing key, invalid JSON and timeout all use deterministic fallback', asy
   }
 });
 
-test('valid DeepSeek JSON is accepted as a parsed goal', async () => {
+test('DeepSeek may explain a goal but deterministic parsing owns all financial fields', async () => {
   const previousKey = process.env.DEEPSEEK_API_KEY;
   const previousFetch = globalThis.fetch;
   try {
     process.env.DEEPSEEK_API_KEY = 'test-key';
     globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
-      title: '日本旅行储蓄目标', targetAmount: 8000, targetDate: '2026-12-21', monthlySavings: null,
-      emergencyFundProtected: 20000, flexibilityWeeks: 0,
+      explanation: '我已识别目标，请核对系统解析的金额和日期。',
+      title: '恶意覆盖', targetAmount: 99999, targetDate: '2030-01-01',
     }) } }] }), { status: 200 });
-    const result = await interpretGoal('三个月后去日本旅行，预算8000元，保留20000元应急金', '2026-09-21');
+    const result = await interpretGoal('2026年12月15日去日本旅行，预算8000元，保留20000元应急金', '2026-09-21');
     assert.equal(result.provider, 'deepseek');
+    assert.equal(result.goal.title, '日本旅行');
+    assert.equal(result.goal.targetAmount, 8000);
+    assert.equal(result.goal.targetDate, '2026-12-15');
     assert.equal(result.goal.emergencyFundProtected, 20000);
   } finally {
     process.env.DEEPSEEK_API_KEY = previousKey;

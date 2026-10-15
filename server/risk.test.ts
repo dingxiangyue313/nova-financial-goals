@@ -5,11 +5,14 @@ import { createFixture } from './fixtures.ts';
 import {
   DEFAULT_RISK_PREFERENCES,
   applySpendingTrendDemo,
+  applyWeeklySummaryDemo,
   analyzeSpendingPattern,
   decideAgentRequest,
   evaluateOneOffExpenseRisk,
   evaluateSpendingRisk,
   markActiveRiskSignal,
+  buildWeeklyRiskSummary,
+  notificationDelivery,
 } from './risk.ts';
 import type { Transaction } from '../shared/contracts.ts';
 
@@ -138,4 +141,60 @@ test('replaying a non-immediate spending trend never applies the same transactio
   assert.equal(second.state.finance.checkingCents, first.state.finance.checkingCents);
   assert.equal(second.state.finance.currentMonthExpenseCents, first.state.finance.currentMonthExpenseCents);
   assert.equal(second.state.transactions.length, first.state.transactions.length);
+});
+
+test('weekly summaries use Shanghai Monday-Sunday periods and separate quiet delivery', () => {
+  const state = activatePlan(createFixture(), 'balanced');
+  const pattern = analyzeSpendingPattern(trendTransactions.slice(0, -1), 'delivery_and_rides', state.clock);
+  assert.ok(pattern);
+  const summary = buildWeeklyRiskSummary({ ...state, spendingPatterns: [pattern] });
+  assert.ok(summary);
+  assert.equal(summary.weekStart, '2026-09-21');
+  assert.equal(summary.weekEnd, '2026-09-27');
+  assert.equal(summary.outcome, 'watch');
+  assert.equal(summary.delivery.urgent, false);
+  assert.equal(summary.dedupeKey, `weekly:${state.goal.id}:2026-09-21`);
+
+  const preferences = { ...state.riskPreferences, quietHours: { start: '22:00', end: '07:00' } };
+  assert.equal(notificationDelivery(preferences, 'immediate', new Date('2026-09-21T15:00:00.000Z')).mode, 'deferred');
+  assert.equal(notificationDelivery(preferences, 'immediate', new Date('2026-09-21T04:00:00.000Z')).mode, 'immediate');
+  assert.equal(notificationDelivery(preferences, 'summary', new Date('2026-09-21T04:00:00.000Z')).mode, 'summary');
+});
+
+test('weekly summaries are stable without a trend and suppressed by preferences', () => {
+  const state = activatePlan(createFixture(), 'balanced');
+  assert.equal(buildWeeklyRiskSummary(state)?.outcome, 'stable');
+  assert.equal(buildWeeklyRiskSummary({ ...state, riskPreferences: {
+    ...state.riskPreferences, weeklySummaryEnabled: false,
+  } }), null);
+  assert.equal(buildWeeklyRiskSummary({ ...state, riskPreferences: {
+    ...state.riskPreferences, pausedUntil: '2026-09-22',
+  } }), null);
+});
+
+test('weekly demo uses distinct non-material evidence and does not consume the urgent trend', () => {
+  const active = activatePlan(createFixture(), 'balanced');
+  const weekly = applyWeeklySummaryDemo(active);
+  assert.equal(weekly.decision?.outcome, 'weekly_summary');
+  assert.equal(weekly.state.riskSignals.length, 0);
+  const urgent = applySpendingTrendDemo(weekly.state);
+  assert.equal(urgent.decision?.outcome, 'immediate_signal');
+  assert.equal(urgent.state.riskSignals.length, 1);
+});
+
+test('unresolved risk suppresses future stable summaries and supersedes an existing one', () => {
+  const active = activatePlan(createFixture(), 'balanced');
+  const existing = buildWeeklyRiskSummary(active);
+  assert.ok(existing);
+  const urgent = applySpendingTrendDemo({ ...active, weeklyRiskSummaries: [existing] }).state;
+  assert.equal(urgent.weeklyRiskSummaries[0].status, 'dismissed');
+  const followingWeek = { ...urgent, clock: '2026-09-28' };
+  assert.equal(buildWeeklyRiskSummary(followingWeek), null);
+});
+
+test('deferred delivery exposes the actual quiet-hours release time', () => {
+  const preferences = { ...DEFAULT_RISK_PREFERENCES, quietHours: { start: '22:00', end: '07:00' } };
+  const delivery = notificationDelivery(preferences, 'immediate', new Date('2026-09-21T15:00:00.000Z'));
+  assert.equal(delivery.mode, 'deferred');
+  assert.equal(delivery.availableAt, '2026-09-21T23:00:00.000Z');
 });

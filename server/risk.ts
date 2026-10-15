@@ -6,6 +6,8 @@ import type {
   RiskPreferences,
   SpendingPattern,
   Transaction,
+  NotificationDelivery,
+  WeeklyRiskSummary,
 } from '../shared/contracts.ts';
 import { assessGoal } from './domain.ts';
 
@@ -32,6 +34,73 @@ function inWindow(date: string, start: string, end: string): boolean {
 }
 function spendTotal(items: Transaction[]): number {
   return items.reduce((sum, item) => sum + Math.max(0, -item.amountCents), 0);
+}
+
+export function shanghaiWeek(clock: string) {
+  // Noon UTC stays on the same civil date in Shanghai and avoids the previous-day UTC boundary.
+  const weekday = new Date(`${clock}T12:00:00.000Z`).getUTCDay();
+  const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+  const weekStart = addDays(clock, -daysFromMonday);
+  return { weekStart, weekEnd: addDays(weekStart, 6) };
+}
+
+function inQuietHours(value: string, quiet: NonNullable<RiskPreferences['quietHours']>) {
+  return quiet.start <= quiet.end
+    ? value >= quiet.start && value < quiet.end
+    : value >= quiet.start || value < quiet.end;
+}
+
+function quietRelease(now: Date, end: string) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(now).filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+  const [hour, minute] = end.split(':').map(Number);
+  const currentMinutes = Number(parts.hour) * 60 + Number(parts.minute);
+  const endMinutes = hour * 60 + minute;
+  const nextDay = endMinutes <= currentMinutes ? 1 : 0;
+  return new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day) + nextDay,
+    hour - 8, minute)).toISOString();
+}
+
+export function notificationDelivery(preferences: RiskPreferences, kind: 'summary' | 'immediate',
+  now = new Date()): NotificationDelivery {
+  const availableAt = now.toISOString();
+  if (kind === 'summary') return { mode: 'summary', availableAt, urgent: false };
+  const time = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit',
+    hour12: false }).format(now);
+  if (preferences.quietHours && inQuietHours(time, preferences.quietHours))
+    return { mode: 'deferred', availableAt: quietRelease(now, preferences.quietHours.end), urgent: true };
+  return { mode: 'immediate', availableAt, urgent: true };
+}
+
+export function buildWeeklyRiskSummary(state: DemoState): WeeklyRiskSummary | null {
+  if (state.goal.status !== 'active' || !state.riskPreferences.weeklySummaryEnabled
+      || Boolean(state.riskPreferences.pausedUntil && state.riskPreferences.pausedUntil >= state.clock)) return null;
+  const { weekStart, weekEnd } = shanghaiWeek(state.clock);
+  if (state.riskSignals.some(signal => signal.goalId === state.goal.id
+      && (signal.status === 'active' || signal.status === 'later'))) return null;
+  const immediatePatternIds = new Set(state.riskSignals.map(signal => signal.patternId));
+  const patterns = state.spendingPatterns.filter(pattern => pattern.periodEnd >= weekStart
+    && pattern.periodEnd <= weekEnd && pattern.meetsTrendEvidence && !immediatePatternIds.has(pattern.id));
+  const watch = patterns.length > 0;
+  return {
+    id: `summary:${state.goal.id}:${weekStart}`,
+    goalId: state.goal.id,
+    weekStart,
+    weekEnd,
+    patternIds: patterns.map(pattern => pattern.id),
+    outcome: watch ? 'watch' : 'stable',
+    title: watch ? `${state.goal.title} · 本周趋势摘要` : `${state.goal.title} · 本周按计划推进`,
+    body: watch
+      ? `${patterns.map(pattern => pattern.label).join('、')}出现持续趋势，但尚未使目标越过即时提醒边界。`
+      : '本周没有发现需要打扰你的显著变化，目标仍按当前计划推进。',
+    twinVersion: state.twinVersion,
+    ruleVersion: RISK_RULE_VERSION,
+    status: 'available',
+    dedupeKey: `weekly:${state.goal.id}:${weekStart}`,
+    createdAt: `${state.clock}T09:00:00+08:00`,
+    delivery: notificationDelivery(state.riskPreferences, 'summary', new Date(`${state.clock}T01:00:00.000Z`)),
+  };
 }
 
 export function analyzeSpendingPattern(
@@ -227,6 +296,16 @@ const demoTransactions: Transaction[] = [
   { id: 'trend-current-5', accountId: 'checking', date: '2026-09-21', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -35000 },
 ];
 
+const weeklyDemoTransactions: Transaction[] = [
+  { id: 'weekly-old-1', accountId: 'checking', date: '2026-06-28', title: '数字订阅', category: 'subscriptions_demo', amountCents: -10000 },
+  { id: 'weekly-old-2', accountId: 'checking', date: '2026-07-12', title: '数字订阅', category: 'subscriptions_demo', amountCents: -10000 },
+  { id: 'weekly-previous-1', accountId: 'checking', date: '2026-07-28', title: '数字订阅', category: 'subscriptions_demo', amountCents: -10000 },
+  { id: 'weekly-previous-2', accountId: 'checking', date: '2026-08-12', title: '数字订阅', category: 'subscriptions_demo', amountCents: -10000 },
+  { id: 'weekly-current-1', accountId: 'checking', date: '2026-09-02', title: '数字订阅', category: 'subscriptions_demo', amountCents: -20000 },
+  { id: 'weekly-current-2', accountId: 'checking', date: '2026-09-09', title: '数字订阅', category: 'subscriptions_demo', amountCents: -20000 },
+  { id: 'weekly-current-3', accountId: 'checking', date: '2026-09-21', title: '数字订阅', category: 'subscriptions_demo', amountCents: -20000 },
+];
+
 function roundHundredYuan(cents: number): number { return Math.ceil(cents / 10000) * 10000; }
 
 export function applySpendingTrendDemo(state: DemoState): {
@@ -292,9 +371,27 @@ export function applySpendingTrendDemo(state: DemoState): {
   const next: DemoState = {
     ...common,
     riskSignals: [...state.riskSignals, signal],
+    weeklyRiskSummaries: state.weeklyRiskSummaries.map(summary => summary.goalId === state.goal.id
+      && summary.status === 'available' ? { ...summary, status: 'dismissed' as const } : summary),
     pendingImpact: impact,
   };
   return { state: next, decision, replayed: false };
+}
+
+export function applyWeeklySummaryDemo(state: DemoState): {
+  state: DemoState; decision: RiskDecision | null; replayed: boolean;
+} {
+  const knownIds = new Set(state.transactions.map(item => item.id));
+  if (weeklyDemoTransactions.every(item => knownIds.has(item.id)))
+    return { state, decision: null, replayed: true };
+  const transactions = [...weeklyDemoTransactions.filter(item => !knownIds.has(item.id)), ...state.transactions];
+  const pattern = analyzeSpendingPattern(transactions, 'subscriptions_demo', state.clock);
+  if (!pattern) throw new Error('RISK_EVIDENCE_INCOMPLETE');
+  const decision = evaluateSpendingRisk(state, pattern, state.riskPreferences);
+  if (decision.outcome === 'immediate_signal') throw new Error('WEEKLY_DEMO_BECAME_MATERIAL');
+  return { state: { ...state,
+    transactions, spendingPatterns: [...state.spendingPatterns.filter(item => item.id !== pattern.id), pattern],
+    twinVersion: state.twinVersion + 1 }, decision, replayed: false };
 }
 
 export function markActiveRiskSignal(state: DemoState, decision: 'A' | 'B' | 'later' | 'dismiss', impactId?: string): DemoState {

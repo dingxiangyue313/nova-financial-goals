@@ -45,6 +45,18 @@ export const RiskPreferencesSchema = z.object({
   })).default({}),
 });
 export type RiskPreferences = z.infer<typeof RiskPreferencesSchema>;
+export const RiskPreferencesPatchSchema = z.object({
+  amountThresholdCents: MoneySchema.optional(),
+  goalImpactRatioThresholdBps: z.number().int().min(0).max(10000).optional(),
+  weeklySummaryEnabled: z.boolean().optional(),
+  quietHours: z.object({ start: z.string().regex(/^\d{2}:\d{2}$/), end: z.string().regex(/^\d{2}:\d{2}$/) }).nullable().optional(),
+  pausedUntil: IsoDateSchema.nullable().optional(),
+  goalOverrides: z.record(z.string(), z.object({
+    amountThresholdCents: MoneySchema.optional(),
+    goalImpactRatioThresholdBps: z.number().int().min(0).max(10000).optional(),
+  })).optional(),
+});
+export type RiskPreferencesPatch = z.infer<typeof RiskPreferencesPatchSchema>;
 
 export const SpendingPatternSchema = z.object({
   id: z.string(), category: z.string(), label: z.string(),
@@ -85,6 +97,25 @@ export const GoalImpactSignalSchema = z.object({
   suppressionKey: z.string(),
 });
 export type GoalImpactSignal = z.infer<typeof GoalImpactSignalSchema>;
+
+export const NotificationDeliverySchema = z.object({
+  mode: z.enum(['summary', 'immediate', 'deferred', 'suppressed']),
+  availableAt: z.string(),
+  urgent: z.boolean(),
+});
+export type NotificationDelivery = z.infer<typeof NotificationDeliverySchema>;
+
+export const WeeklyRiskSummarySchema = z.object({
+  id: z.string().min(1), goalId: z.string().min(1),
+  weekStart: IsoDateSchema, weekEnd: IsoDateSchema,
+  patternIds: z.array(z.string()), outcome: z.enum(['stable', 'watch']),
+  title: z.string(), body: z.string(),
+  twinVersion: z.number().int().positive(), ruleVersion: z.string(),
+  status: z.enum(['available', 'read', 'dismissed']),
+  dedupeKey: z.string().min(1), createdAt: z.string(),
+  delivery: NotificationDeliverySchema,
+});
+export type WeeklyRiskSummary = z.infer<typeof WeeklyRiskSummarySchema>;
 
 export const BillSchema = z.object({
   id: z.string(), title: z.string(), dueDate: IsoDateSchema, amountCents: MoneySchema, paid: z.boolean(),
@@ -177,6 +208,7 @@ export const DemoStateSchema = z.object({
   }),
   spendingPatterns: z.array(SpendingPatternSchema).default([]),
   riskSignals: z.array(GoalImpactSignalSchema).default([]),
+  weeklyRiskSummaries: z.array(WeeklyRiskSummarySchema).default([]),
 });
 export type DemoState = z.infer<typeof DemoStateSchema>;
 
@@ -198,6 +230,39 @@ export const AssessmentSchema = z.object({
   updatedAt: IsoDateSchema,
 });
 export type Assessment = z.infer<typeof AssessmentSchema>;
+
+export const GoalAssumptionsSchema = z.object({
+  targetCents: MoneySchema.positive(),
+  targetDate: IsoDateSchema,
+  monthlyContributionCents: MoneySchema,
+  protectedCents: MoneySchema,
+  flexibilityWeeks: z.number().int().min(0).max(52),
+});
+export type GoalAssumptions = z.infer<typeof GoalAssumptionsSchema>;
+
+export const PlanStepSchema = z.object({
+  id: z.enum(['goal_details', 'assumptions', 'plan_selection', 'activation']),
+  label: z.string(),
+  status: z.enum(['complete', 'current', 'pending']),
+  detail: z.string(),
+});
+export type PlanStep = z.infer<typeof PlanStepSchema>;
+
+export const GoalScenarioPreviewSchema = z.object({
+  id: z.string().min(1), goalId: z.string().min(1),
+  baseTwinVersion: z.number().int().positive(), generatedAt: IsoDateSchema,
+  assumptions: GoalAssumptionsSchema,
+  assessment: AssessmentSchema,
+  plans: z.array(PlanSchema).max(3),
+  steps: z.array(PlanStepSchema).length(4),
+  impact: z.object({
+    protectedFundsSafe: z.boolean(),
+    safeToSpendCents: z.number().int(),
+    projectedDate: IsoDateSchema.nullable(),
+    delayDays: z.number().int().nonnegative(),
+  }),
+});
+export type GoalScenarioPreview = z.infer<typeof GoalScenarioPreviewSchema>;
 
 export const UiCardSchema = z.object({
   id: z.string(), type: z.enum(['goal_input','goal_progress_card','goal_feasibility_card','assumption_editor','scenario_compare','goal_impact_signal','approval_sheet','risk_disclosure','execution_receipt','error_recovery','explanation']),
@@ -236,11 +301,27 @@ export const AgentComponentSchema = z.discriminatedUnion('type', [
   AgentComponentBase.extend({ type: z.literal('audit_summary'), title: z.string(), body: z.string(), chainValid: z.boolean() }),
   AgentComponentBase.extend({ type: z.literal('clarification'), title: z.string(), body: z.string(), suggestions: z.array(z.string()).max(4) }),
   AgentComponentBase.extend({ type: z.literal('error_recovery'), title: z.string(), body: z.string(), code: z.string() }),
+  AgentComponentBase.extend({ type: z.literal('goal_input_card'), title: z.string(), goal: GoalSchema.pick({
+    title: true, targetCents: true, savedCents: true, targetDate: true, protectedCents: true, status: true,
+  }), draftId: z.string().optional() }),
+  AgentComponentBase.extend({ type: z.literal('goal_feasibility_card'), title: z.string(), assessment: AssessmentSchema }),
+  AgentComponentBase.extend({ type: z.literal('goal_progress_card'), title: z.string(), goal: GoalSchema,
+    progressPercent: z.number().min(0).max(100) }),
+  AgentComponentBase.extend({ type: z.literal('assumption_editor'), title: z.string(),
+    assumptions: GoalAssumptionsSchema, baseTwinVersion: z.number().int().positive() }),
+  AgentComponentBase.extend({ type: z.literal('what_if_simulator'), title: z.string(),
+    assumptions: GoalAssumptionsSchema, baseTwinVersion: z.number().int().positive() }),
+  AgentComponentBase.extend({ type: z.literal('scenario_compare'), title: z.string(), plans: z.array(PlanSchema).min(1).max(3) }),
+  AgentComponentBase.extend({ type: z.literal('plan_steps'), title: z.string(), steps: z.array(PlanStepSchema) }),
+  AgentComponentBase.extend({ type: z.literal('goal_impact_brief'), title: z.string(), body: z.string(),
+    summary: WeeklyRiskSummarySchema.optional(), signal: GoalImpactSignalSchema.optional() }),
+  AgentComponentBase.extend({ type: z.literal('notification_preference_card'), title: z.string(),
+    preferences: RiskPreferencesSchema, goalId: z.string() }),
 ]);
 export type AgentComponent = z.infer<typeof AgentComponentSchema>;
 
 export const AgentThreadSchema = z.object({
-  id: z.string(), title: z.string().min(1).max(80), kind: z.enum(['task', 'risk']),
+  id: z.string(), title: z.string().min(1).max(80), kind: z.enum(['task', 'risk', 'summary']),
   status: z.enum(['active', 'archived']), unread: z.boolean(), readOnly: z.boolean(),
   createdAt: z.string(), updatedAt: z.string(),
 });
@@ -257,6 +338,7 @@ export const AgentTurnSchema = z.object({
   provider: z.enum(['deepseek', 'deterministic']), fallbackReason: z.string().nullable(),
   twinVersion: z.number().int().positive(), message: AgentMessageSchema,
   components: z.array(AgentComponentSchema), suggestedPrompts: z.array(z.string()).max(4),
+  canvasComponents: z.array(AgentComponentSchema).default([]),
 });
 export type AgentTurn = z.infer<typeof AgentTurnSchema>;
 
@@ -270,5 +352,6 @@ export const SnapshotSchema = z.object({
   riskPreferences: RiskPreferencesSchema,
   spendingPatterns: z.array(SpendingPatternSchema),
   riskSignals: z.array(GoalImpactSignalSchema),
+  weeklyRiskSummaries: z.array(WeeklyRiskSummarySchema),
 });
 export type Snapshot = z.infer<typeof SnapshotSchema>;

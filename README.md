@@ -10,8 +10,8 @@
 
 ## 三条演示流程
 
-1. **目标规划**：创建或修改目标 → 比较三种节奏 → 明确选择方案 → 激活计划。没有选择时不能激活。
-2. **目标感知风险**：激活计划时确认智能守护设置。NOVA 自动整理模拟流水；单笔小额保持安静，累计趋势只有在真正影响目标时才解释证据、目标影响和调整方向，应急金保持隔离。
+1. **目标规划**：自然语言创建目标 → 在 Governed Canvas 修改金额、日期、月投入、保护资金和浮动周数 → What-if 只读试算 → 比较三种以内方案 → 确认应用并激活。没有选择方案时不能激活。
+2. **目标感知风险**：激活计划时确认智能守护设置。NOVA 自动整理模拟流水；普通趋势进入每周安静摘要，累计变化真正影响目标时才建立未读风险会话，应急金保持隔离。
 3. **外部 Agent**：在“我的 → 授权与执行记录”创建限额、类别、有效期授权，分别模拟 Execute、Ask、Block、Manual Review 和 Unknown；查看凭证与 Hash 审计链，并可撤销授权。
 
 三条流程也可从底部 **NOVA** 工作台用自然语言完成：
@@ -23,6 +23,8 @@
 后端还提供版本化 Financial Twin、一次性 Approval Token、模拟转账、换汇报价与执行、Mandate 生命周期、HMAC 签名和 Nonce 防重放、受限 MCP、结构化日志，以及 JSON/CSV 审计证据导出。
 
 目标感知风险演示位于顶部“模拟数据”面板：`模拟外卖与打车趋势（¥600 → ¥1,900）`。过去两个 30 天窗口平均每月 ¥600，本期多笔小额流水累计至 ¥1,900；当日本旅行预计延期约 16 天后，NOVA 才建立未读风险会话。它不会拦截用户自己的银行卡消费；只有由 NOVA 或外部 Agent 经过 Banking Tools 发起的模拟操作，才会得到 Execute、Ask、Manual Review 或 Block。
+
+工作台在手机端使用单列消息流，在自适应桌面端使用约 32% 对话区与 68% Governed Canvas。每周摘要按亚洲上海时区的自然周去重，不显示紧急红点；用户可设置摘要开关、金额阈值、目标占比阈值、暂停日期、静默时间和当前目标覆盖。
 
 金额在服务端统一用整数分，日期使用 ISO 格式。目标进度、预测、权限和执行结果由确定性规则计算。DeepSeek 只识别意图、解析自然语言目标并生成短解释；组件、金额和 `actionId` 由服务端白名单与规则引擎生成。未设置 Key、超时、输出无效或检测到 Prompt Injection 时自动回退，演示流程仍可完成。
 
@@ -78,10 +80,11 @@ NOVA_SESSION_SECRET="$(openssl rand -hex 32)" npm start
 ## 接口与安全
 
 - `/api/session` 提供同一体验者的页面快照。Cookie 签名且只供本站使用。
-- `/api/agent/threads`、`/api/agent/turn`、`/api/agent/action` 提供长期会话、完整生成回合和受控确认动作；旧 `/api/agent` 保留为兼容入口。
+- `/api/agent/threads`、`/api/agent/turn`、`/api/agent/preview`、`/api/agent/action` 提供长期会话、完整生成回合、只读 What-if 预览和受控确认动作；旧 `/api/agent` 保留为兼容入口。
 - `/api/financial-twin`、`/api/goal-flow`、`/api/banking-tools` 是 Twin、目标状态机与工具入口；原页面 API 保留为兼容封装。
 - `/api/activity`、`/api/audit/export?format=json|csv` 提供可验证活动和证据导出。
-- `/api/risk/preferences`、`/api/risk/signals` 提供智能守护偏好、趋势证据和目标影响信号。
+- `/api/risk/preferences`、`/api/risk/signals`、`/api/risk/summaries` 提供智能守护偏好、趋势证据、即时目标影响和安静周摘要；`POST /api/risk/summaries/ensure` 会幂等检查本周摘要。
+- `/api/demo/weekly-summary` 生成固定的周摘要演示；同一用户、目标和自然周最多一份。
 - `/api/demo/spending-trend` 注入固定的外卖与打车累计趋势故事；相同事实幂等且忽略后不重复提醒。
 - `/api/external-agent/request` 要求 HMAC 签名、5 分钟时间窗口和一次性 Nonce。
 - `/mcp` 是需要会话令牌的 MCP Streamable HTTP 入口，只暴露白名单模拟工具。令牌由 `/api/mcp/token` 在当前浏览器会话内获取，不是 DeepSeek Key；不要公开分享。

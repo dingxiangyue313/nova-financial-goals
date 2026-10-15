@@ -25,7 +25,9 @@ test('对话故事一：自然语言生成目标卡，明确确认后激活并�
   await activateGoalFromWorkspace(page);
   await page.reload();
   await openWorkspace(page);
-  await expect(page.getByRole('button', { name: /我想年底去日本旅行/ }).first()).toBeVisible();
+  const savedThread = page.getByRole('button', { name: /我想年底去日本旅行/ }).last();
+  await expect(savedThread).toBeVisible();
+  await savedThread.click();
   await expect(page.getByText(/目标计划已激活/).first()).toBeVisible();
 });
 
@@ -87,4 +89,67 @@ test('首页与空工作台使用同一透明 NOVA 标志', async ({ page }) => 
   await expect(workspaceMark).toBeVisible();
   await expect(workspaceMark).toHaveAttribute('data-size', '64');
   await expect(workspaceMark).toHaveAttribute('data-transparent', 'true');
+});
+
+test('目标画布支持修改假设、只读试算和确认应用', async ({ page }) => {
+  await openApp(page);
+  await openWorkspace(page);
+  await page.getByRole('button', { name: '我想年底去日本旅行，预算 ¥8,000' }).click();
+  const editor = page.getByTestId('assumption-editor').first();
+  await editor.getByLabel('目标金额').fill('9000');
+  await editor.getByLabel('每月投入').fill('1600');
+  await editor.getByLabel('目标日期').fill('2027-01-15');
+  await editor.getByRole('button', { name: 'What-if 实时试算' }).click();
+  await expect(page.getByText('What-if 可行性').first()).toBeVisible();
+  await expect(page.getByText('计划步骤').first()).toBeVisible();
+  await page.getByRole('button', { name: '确认应用' }).click();
+  await expect(page.getByText(/目标假设已应用/).first()).toBeVisible();
+  await expect(page.getByText('三种推进节奏').first()).toBeVisible();
+});
+
+test('自适应桌面工作台使用 32/68 Governed Canvas', async ({ page }, testInfo) => {
+  await openApp(page);
+  await page.getByTitle('切换为自适应全屏').click();
+  await openWorkspace(page);
+  const canvas = page.getByTestId('governed-canvas');
+  if (testInfo.project.name !== 'desktop-1440') {
+    await expect(canvas).toBeHidden();
+    return;
+  }
+  await expect(canvas).toBeVisible();
+  await expect(canvas.getByRole('heading', { name: '当前任务画布' })).toBeVisible();
+  await page.getByPlaceholder('描述目标、风险或授权范围…').fill('我想年底去日本旅行，预算 ¥8,000');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect(canvas.getByText('核对并试算目标假设')).toBeVisible();
+});
+
+test('每周摘要安静呈现并可配置完整通知偏好', async ({ page }) => {
+  await openApp(page);
+  await activateGoalFromWorkspace(page);
+  await page.getByRole('button', { name: '返回首页' }).click();
+  await openWorkspace(page);
+  const summary = page.getByRole('button', { name: /摘要 · 每周摘要/ });
+  await expect(summary).toHaveAttribute('data-unread', 'false');
+  await summary.click();
+  await expect(page.getByText('每周安静摘要').first()).toBeVisible();
+  await page.getByRole('button', { name: '展开高级设置' }).click();
+  await page.getByLabel('金额阈值').fill('650');
+  await page.getByLabel('目标占比阈值').fill('6');
+  await page.getByLabel('暂停守护至').fill('2026-09-22');
+  await page.getByLabel('当前目标单独覆盖').check();
+  await page.getByRole('button', { name: '保存守护设置' }).click();
+  await expect(page.getByLabel('每周安静摘要')).toBeEnabled();
+  await page.getByLabel('每周安静摘要').click();
+  await expect(page.getByLabel('每周安静摘要')).not.toBeChecked();
+  await expect(page.getByText('设置保存失败')).not.toBeVisible();
+
+  await page.reload();
+  await openWorkspace(page);
+  await page.getByRole('button', { name: /摘要 · 每周摘要/ }).click();
+  await expect(page.getByLabel('每周安静摘要')).not.toBeChecked();
+  await page.getByRole('button', { name: '展开高级设置' }).click();
+  await expect(page.getByLabel('金额阈值')).toHaveValue('650');
+  await expect(page.getByLabel('目标占比阈值')).toHaveValue('6');
+  await expect(page.getByLabel('暂停守护至')).toHaveValue('2026-09-22');
+  await expect(page.getByLabel('当前目标单独覆盖')).toBeChecked();
 });

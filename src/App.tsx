@@ -159,6 +159,11 @@ export default function App() {
       showToast('累计趋势已影响目标，NOVA 已生成风险解释');
     } else showToast('趋势已记录，本次无需即时提醒');
   };
+  const handleWeeklySummary = async () => {
+    await mutate('/api/demo/weekly-summary', 'POST');
+    navigateTo('workspace');
+    showToast('已生成本周安静摘要，不会显示紧急红点');
+  };
   const handleDeposit = async () => {
     await mutate('/api/demo/deposit', 'POST', { amountCents: 150000 });
     showToast('已模拟存入 ¥1,500');
@@ -409,6 +414,13 @@ export default function App() {
               </p>
 
               <div className="space-y-2">
+                <button
+                  onClick={() => { void handleWeeklySummary(); setShowSimulateModal(false); }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-[#F2FAFA] hover:bg-[#D8E7E7] text-[#0F6B6D] font-semibold text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">event_note</span><span>生成本周安静摘要</span></div>
+                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                </button>
                 <button
                   onClick={() => { void handleSpendingTrend(); setShowSimulateModal(false); }}
                   className="w-full py-2.5 px-3 rounded-xl bg-[#FFF7E6] hover:bg-[#F5A623] hover:text-white text-[#8A5A00] font-semibold text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer"

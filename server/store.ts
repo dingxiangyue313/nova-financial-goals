@@ -43,6 +43,11 @@ CREATE TABLE IF NOT EXISTS risk_signals (
   status TEXT NOT NULL, payload_json TEXT NOT NULL,
   PRIMARY KEY(session_id, id), UNIQUE(session_id, suppression_key)
 );
+CREATE TABLE IF NOT EXISTS weekly_risk_summaries (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, dedupe_key TEXT NOT NULL,
+  status TEXT NOT NULL, payload_json TEXT NOT NULL,
+  PRIMARY KEY(session_id, id), UNIQUE(session_id, dedupe_key)
+);
 CREATE TABLE IF NOT EXISTS agent_runs (
   session_id TEXT PRIMARY KEY, current_run_id TEXT NOT NULL
 );
@@ -90,6 +95,9 @@ function syncArtifacts(sessionId: string, state: DemoState) {
   for (const signal of state.riskSignals) db.prepare(`INSERT INTO risk_signals(session_id,id,suppression_key,status,payload_json)
     VALUES(?,?,?,?,?) ON CONFLICT(session_id,suppression_key) DO UPDATE SET status=excluded.status,payload_json=excluded.payload_json`)
     .run(sessionId, signal.id, signal.suppressionKey, signal.status, JSON.stringify(signal));
+  for (const summary of state.weeklyRiskSummaries) db.prepare(`INSERT INTO weekly_risk_summaries(session_id,id,dedupe_key,status,payload_json)
+    VALUES(?,?,?,?,?) ON CONFLICT(session_id,dedupe_key) DO UPDATE SET status=excluded.status,payload_json=excluded.payload_json`)
+    .run(sessionId, summary.id, summary.dedupeKey, summary.status, JSON.stringify(summary));
   for (const approval of state.approvals) db.prepare(`INSERT INTO approval_artifacts(id,session_id,status,payload_json)
     VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,payload_json=excluded.payload_json`)
     .run(approval.id, sessionId, approval.status, JSON.stringify(approval));
@@ -147,6 +155,7 @@ export function resetState(sessionId: string): DemoState {
     db.prepare('DELETE FROM risk_preferences WHERE session_id=?').run(sessionId);
     db.prepare('DELETE FROM spending_patterns WHERE session_id=?').run(sessionId);
     db.prepare('DELETE FROM risk_signals WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM weekly_risk_summaries WHERE session_id=?').run(sessionId);
     const runId = randomUUID();
     db.prepare('UPDATE agent_threads SET read_only=1, status=\'archived\', updated_at=? WHERE session_id=?')
       .run(new Date().toISOString(), sessionId);
@@ -171,18 +180,20 @@ function threadFromRow(row: Record<string, unknown>): AgentThread {
 }
 
 export function createAgentThread(sessionId: string, input: {
-  title: string; kind?: 'task' | 'risk'; unread?: boolean; dedupeKey?: string;
+  title: string; kind?: 'task' | 'risk' | 'summary'; unread?: boolean; dedupeKey?: string;
 }): AgentThread {
+  const runId = currentRunId(sessionId);
+  const storedDedupeKey = input.dedupeKey ? `${runId}:${input.dedupeKey}` : null;
   if (input.dedupeKey) {
-    const existing = db.prepare('SELECT * FROM agent_threads WHERE session_id=? AND dedupe_key=?')
-      .get(sessionId, input.dedupeKey) as Record<string, unknown> | undefined;
+    const existing = db.prepare('SELECT * FROM agent_threads WHERE session_id=? AND run_id=? AND dedupe_key=?')
+      .get(sessionId, runId, storedDedupeKey) as Record<string, unknown> | undefined;
     if (existing) return threadFromRow(existing);
   }
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(`INSERT INTO agent_threads(id,session_id,run_id,title,kind,status,unread,read_only,dedupe_key,created_at,updated_at)
-    VALUES(?,?,?,?,?,'active',?,0,?,?,?)`).run(id, sessionId, currentRunId(sessionId), input.title,
-      input.kind ?? 'task', input.unread ? 1 : 0, input.dedupeKey ?? null, now, now);
+    VALUES(?,?,?,?,?,'active',?,0,?,?,?)`).run(id, sessionId, runId, input.title,
+      input.kind ?? 'task', input.unread ? 1 : 0, storedDedupeKey, now, now);
   return AgentThreadSchema.parse({ id, title: input.title, kind: input.kind ?? 'task', status: 'active',
     unread: Boolean(input.unread), readOnly: false, createdAt: now, updatedAt: now });
 }
@@ -216,6 +227,13 @@ export function setAgentThreadStatus(sessionId: string, threadId: string, status
 export function markAgentThreadRead(sessionId: string, threadId: string) {
   getAgentThread(sessionId, threadId);
   db.prepare('UPDATE agent_threads SET unread=0 WHERE id=? AND session_id=?').run(threadId, sessionId);
+}
+
+export function markAgentThreadUnread(sessionId: string, threadId: string) {
+  getAgentThread(sessionId, threadId);
+  db.prepare('UPDATE agent_threads SET unread=1,updated_at=? WHERE id=? AND session_id=?')
+    .run(new Date().toISOString(), threadId, sessionId);
+  return getAgentThread(sessionId, threadId);
 }
 
 export function deleteAgentThread(sessionId: string, threadId: string) {

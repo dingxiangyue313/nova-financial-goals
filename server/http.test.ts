@@ -63,7 +63,30 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     assert.equal((defaultPreferences.data as { preferences: { amountThresholdCents: number } }).preferences.amountThresholdCents, 50000);
     const changedPreferences = await call('/api/risk/preferences', 'PATCH', { amountThresholdCents: 60000 });
     assert.equal((changedPreferences.data as { preferences: { amountThresholdCents: number } }).preferences.amountThresholdCents, 60000);
+    await call('/api/risk/preferences', 'PATCH', { pausedUntil: '2026-09-22' });
+    const preservedPreferences = await call('/api/risk/preferences', 'PATCH', { weeklySummaryEnabled: false });
+    assert.deepEqual((preservedPreferences.data as { preferences: { amountThresholdCents: number;
+      weeklySummaryEnabled: boolean; pausedUntil: string | null } }).preferences, {
+      amountThresholdCents: 60000,
+      goalImpactRatioThresholdBps: 500,
+      weeklySummaryEnabled: false,
+      quietHours: null,
+      pausedUntil: '2026-09-22',
+      goalOverrides: {},
+    });
+    await call('/api/risk/preferences', 'PATCH', { pausedUntil: null, weeklySummaryEnabled: true });
     await call('/api/risk/preferences', 'PATCH', { amountThresholdCents: 50000 });
+
+    const weeklyDemo = await call('/api/demo/weekly-summary', 'POST');
+    assert.equal(weeklyDemo.code, 200);
+    assert.equal((weeklyDemo.data as Snapshot).spendingPatterns.some(pattern => pattern.category === 'subscriptions_demo'), true);
+    const weekly = await call('/api/risk/summaries/ensure', 'POST');
+    assert.equal(weekly.code, 200);
+    assert.equal((weekly.data as { summary: { weekStart: string } }).summary.weekStart, '2026-09-21');
+    const weeklyReplay = await call('/api/risk/summaries/ensure', 'POST');
+    assert.equal((weeklyReplay.data as { replayed: boolean }).replayed, true);
+    const summaries = await call('/api/risk/summaries');
+    assert.equal((summaries.data as { summaries: unknown[] }).summaries.length, 1);
 
     const trend = await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'delivery-rides-september' });
     const trendSnapshot = trend.data as Snapshot;
@@ -130,6 +153,17 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     const newThread = await call('/api/agent/threads', 'POST', { title: '日本旅行目标' });
     assert.equal(newThread.code, 200);
     const threadId = (newThread.data as { thread: { id: string } }).thread.id;
+    const preview = await call('/api/agent/preview', 'POST', { threadId, twinVersion: 1, assumptions: {
+      targetCents: 900000, targetDate: '2027-01-15', monthlyContributionCents: 160000,
+      protectedCents: 2000000, flexibilityWeeks: 3,
+    } });
+    assert.equal(preview.code, 200);
+    assert.equal((preview.data as { preview: { assumptions: { targetCents: number } } }).preview.assumptions.targetCents, 900000);
+    assert.equal(((await call('/api/session')).data as Snapshot).goal.targetCents, 800000);
+    const previewActionId = (preview.data as { actionId: string }).actionId;
+    const previewApplied = await call('/api/agent/action', 'POST', { actionId: previewActionId, decision: 'confirm' });
+    assert.equal((previewApplied.data as { snapshot: Snapshot }).snapshot.goal.targetCents, 900000);
+    assert.equal((previewApplied.data as { snapshot: Snapshot }).snapshot.goal.monthlyContributionCents, 160000);
     const turn = await call('/api/agent/turn', 'POST', { threadId, message: '我想年底去日本旅行，预算 ¥8,000' });
     assert.equal(turn.code, 200);
     const turnData = turn.data as { intent: string; components: Array<{ type: string; action?: { actionId: string } }> };
@@ -142,7 +176,7 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     const actionReplay = await call('/api/agent/action', 'POST', { actionId, decision: 'confirm' });
     assert.equal((actionReplay.data as { replayed: boolean }).replayed, true);
     const messages = await call(`/api/agent/threads/${threadId}/messages`);
-    assert.equal((messages.data as { messages: unknown[] }).messages.length, 3);
+    assert.equal((messages.data as { messages: unknown[] }).messages.length, 5);
     assert.equal((await call(`/api/agent/threads/${threadId}`, 'PATCH', { title: '冬季日本旅行' })).code, 200);
     assert.equal((await call(`/api/agent/threads/${threadId}`, 'DELETE')).code, 200);
   } finally {

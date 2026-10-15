@@ -28,10 +28,12 @@ const schemas = {
   get_goal_progress: z.object({}),
   create_goal: z.object({ title: z.string().min(1).max(60), targetCents: money,
     targetDate: z.iso.date(), protectedCents: z.number().int().nonnegative(), quote: z.string().max(500).default(''),
-    flexibilityWeeks: z.number().int().min(0).max(52).default(2) }),
+    flexibilityWeeks: z.number().int().min(0).max(52).default(2), id: z.string().optional(),
+    monthlyContributionCents: z.number().int().nonnegative().default(0) }),
   update_goal: z.object({ title: z.string().min(1).max(60).optional(), targetCents: money.optional(),
     targetDate: z.iso.date().optional(), protectedCents: z.number().int().nonnegative().optional(),
-    quote: z.string().max(500).optional(), flexibilityWeeks: z.number().int().min(0).max(52).optional() }),
+    monthlyContributionCents: z.number().int().nonnegative().optional(), quote: z.string().max(500).optional(),
+    flexibilityWeeks: z.number().int().min(0).max(52).optional() }),
   select_goal_plan: z.object({ planId: z.enum(['conservative', 'balanced', 'accelerated']) }),
   activate_goal: z.object({ planId: z.enum(['conservative', 'balanced', 'accelerated']), approvalToken: z.string() }),
   create_approval_snapshot: z.object({ action: z.string().min(1), parameters: z.record(z.string(), z.unknown()), expiresInSeconds: z.number().int().min(60).max(1800).default(300) }),
@@ -142,10 +144,10 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
     case 'create_goal': {
       const savedCents = input.title === state.goal.title ? state.goal.savedCents : 0;
       let next: DemoState = { ...state, twinVersion: state.twinVersion + 1,
-        goal: { ...state.goal, id: randomUUID(), title: input.title, targetCents: input.targetCents,
+        goal: { ...state.goal, id: input.id ?? randomUUID(), title: input.title, targetCents: input.targetCents,
           savedCents, targetDate: input.targetDate, originalDate: input.targetDate,
           protectedCents: input.protectedCents, flexibilityWeeks: input.flexibilityWeeks, quote: input.quote,
-          status: 'draft', selectedPlanId: null, monthlyContributionCents: 0 },
+          status: 'draft', selectedPlanId: null, monthlyContributionCents: input.monthlyContributionCents },
         finance: { ...state.finance, emergencyCents: input.protectedCents }, pendingImpact: null, mandate: null,
         accounts: state.accounts.map(item => item.id === 'emergency' ? { ...item, balanceCents: input.protectedCents }
           : item.id === 'goal-wallet' ? { ...item, balanceCents: savedCents } : item) };
@@ -155,7 +157,8 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
     case 'update_goal': {
       let next: DemoState = { ...state, twinVersion: state.twinVersion + 1,
         goal: { ...state.goal, ...input, originalDate: input.targetDate ?? state.goal.originalDate,
-          status: 'draft', selectedPlanId: null, monthlyContributionCents: 0 },
+          status: 'draft', selectedPlanId: null,
+          monthlyContributionCents: input.monthlyContributionCents ?? 0 },
         finance: input.protectedCents === undefined ? state.finance : { ...state.finance, emergencyCents: input.protectedCents },
         accounts: input.protectedCents === undefined ? state.accounts : state.accounts.map(item => item.id === 'emergency' ? { ...item, balanceCents: input.protectedCents } : item),
         pendingImpact: null, mandate: null };

@@ -12,12 +12,12 @@ import { assessGoal, injectExpense, resolveImpact } from './domain.ts';
 import { composeUiCards, interpretGoal } from './agent.ts';
 import { verifyOperation } from './tools.ts';
 import { registerMcp } from './mcp.ts';
-import { IsoDateSchema, RiskPreferencesSchema, type DemoState } from '../shared/contracts.ts';
+import { GoalAssumptionsSchema, IsoDateSchema, RiskPreferencesPatchSchema, RiskPreferencesSchema, type DemoState } from '../shared/contracts.ts';
 import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './banking.ts';
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
 import { containsPromptInjection, signExternalRequest, verifyExternalRequest } from './security.ts';
-import { createAgentTurn, ensureImpactThread, executeWorkspaceAction } from './workspace.ts';
-import { applySpendingTrendDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
+import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary, executeWorkspaceAction } from './workspace.ts';
+import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
 import { installApiRateLimits, installRequestHardening } from './http-hardening.ts';
 
 const app = express();
@@ -117,7 +117,7 @@ app.get('/api/risk/preferences', route((req, res) => {
   res.json({ preferences: state.riskPreferences, twinVersion: state.twinVersion });
 }));
 app.patch('/api/risk/preferences', route((req, res) => {
-  const changes = RiskPreferencesSchema.partial().parse(req.body);
+  const changes = RiskPreferencesPatchSchema.parse(req.body);
   const state = mutateState(sessionId(req, res), old => appendAuditEvent({
     ...old,
     riskPreferences: RiskPreferencesSchema.parse({ ...old.riskPreferences, ...changes }),
@@ -128,6 +128,16 @@ app.patch('/api/risk/preferences', route((req, res) => {
 app.get('/api/risk/signals', route((req, res) => {
   const state = getState(sessionId(req, res));
   res.json({ signals: state.riskSignals, patterns: state.spendingPatterns, twinVersion: state.twinVersion });
+}));
+app.get('/api/risk/summaries', route((req, res) => {
+  const state = getState(sessionId(req, res));
+  res.json({ summaries: state.weeklyRiskSummaries, twinVersion: state.twinVersion });
+}));
+app.post('/api/risk/summaries/ensure', route((req, res) => {
+  const id = sessionId(req, res);
+  let outcome: ReturnType<typeof ensureWeeklyRiskSummary> | undefined;
+  mutateState(id, old => { ensureImpactThread(id, old); outcome = ensureWeeklyRiskSummary(id, old); return outcome.state; });
+  res.json({ summary: outcome!.summary, thread: outcome!.thread, replayed: outcome!.replayed });
 }));
 app.get('/api/audit/export', route((req, res) => {
   const format = z.enum(['json', 'csv']).catch('json').parse(req.query.format);
@@ -172,6 +182,14 @@ app.post('/api/agent/turn', route(async (req, res) => {
   const id = sessionId(req, res);
   res.json(await createAgentTurn(id, body.threadId, body.message, getState(id)));
 }));
+app.post('/api/agent/preview', route((req, res) => {
+  const body = z.object({ threadId: z.string(), twinVersion: z.number().int().positive(),
+    assumptions: GoalAssumptionsSchema }).parse(req.body);
+  const id = sessionId(req, res);
+  const state = getState(id);
+  if (state.twinVersion !== body.twinVersion) throw new Error('TWIN_VERSION_CHANGED');
+  res.json(createScenarioPreview(id, body.threadId, body.assumptions, state));
+}));
 app.post('/api/agent/action', route((req, res) => {
   const body = z.object({ actionId: z.string(), decision: z.enum(['confirm', 'cancel']) }).parse(req.body);
   const id = sessionId(req, res); let outcome: ReturnType<typeof executeWorkspaceAction> | undefined;
@@ -204,6 +222,16 @@ app.post('/api/demo/spending-trend', route((req, res) => {
       '外卖与打车累计趋势已由目标感知风险引擎评估');
   });
   ensureImpactThread(id, state);
+  return respond(res, state);
+}));
+app.post('/api/demo/weekly-summary', route((req, res) => {
+  const id = sessionId(req, res);
+  let summaryOutcome: ReturnType<typeof ensureWeeklyRiskSummary> | undefined;
+  const state = mutateState(id, old => {
+    const trend = applyWeeklySummaryDemo(old);
+    summaryOutcome = ensureWeeklyRiskSummary(id, trend.state);
+    return summaryOutcome.state;
+  });
   return respond(res, state);
 }));
 app.post('/api/demo/clock', route((req, res) => {
