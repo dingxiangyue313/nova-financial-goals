@@ -115,7 +115,12 @@ function executedOperation(state: DemoState, tool: string, key: string, inputHas
   const receipt: Receipt = { operationId, tool, status: 'succeeded', amountCents, currency: 'CNY',
     executedAt: todayTime(state), twinVersion: state.twinVersion };
   const operation: Operation = { operationId, idempotencyKey: key, inputHash, tool, status: 'executed',
-    category: tool, amountCents, reason: 'Permission、Risk、Execute 与 Verify 均已通过。', receipt };
+    originalDecision: 'execute', category: tool, amountCents,
+    reason: 'Permission、Risk、Execute 与 Verify 均已通过。', receipt,
+    createdAt: todayTime(state), verificationRequirement: 'none', verificationStatus: 'not_required',
+    balanceBeforeCents: state.finance.checkingCents, balanceAfterCents: state.finance.checkingCents,
+    mandateSpentBeforeCents: state.mandate?.spentCents ?? null, mandateSpentAfterCents: state.mandate?.spentCents ?? null,
+    twinVersionBefore: state.twinVersion, twinVersionAfter: state.twinVersion };
   return { state: { ...state, operations: [...state.operations, operation], receipts: [...state.receipts, receipt] }, operation, receipt };
 }
 

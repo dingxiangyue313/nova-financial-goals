@@ -10,7 +10,7 @@ import { artifactCounts, createAgentThread, deleteAgentThread, getAgentMessages,
 import { snapshot } from './presentation.ts';
 import { assessGoal, injectExpense, resolveImpact } from './domain.ts';
 import { composeUiCards, interpretGoal } from './agent.ts';
-import { verifyOperation } from './tools.ts';
+import { quickConfirmOperation, retryOperation, verifyOperation } from './tools.ts';
 import { registerMcp } from './mcp.ts';
 import { GoalAssumptionsSchema, IsoDateSchema, RiskPreferencesPatchSchema, RiskPreferencesSchema, type DemoState } from '../shared/contracts.ts';
 import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './banking.ts';
@@ -19,6 +19,7 @@ import { containsPromptInjection, signExternalRequest, verifyExternalRequest } f
 import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary, executeWorkspaceAction } from './workspace.ts';
 import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
 import { installApiRateLimits, installRequestHardening } from './http-hardening.ts';
+import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -61,7 +62,7 @@ function sessionId(req: express.Request, res: express.Response): string {
 function respond(res: express.Response, state: DemoState) { return res.json(snapshot(state)); }
 function failure(res: express.Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
-  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_)/.test(message);
+  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_)/.test(message);
   return res.status(bad ? 400 : 500).json({ error: bad ? message : '服务暂时不可用，请稍后重试。' });
 }
 function route(fn: (req: express.Request, res: express.Response) => Promise<unknown> | unknown): express.RequestHandler {
@@ -374,9 +375,31 @@ app.post('/api/operations/:id/approve', route((req, res) => respond(res, mutateS
   }, { userConfirmed: true });
   return runBankingTool(confirmed.state, 'approve_external_operation', { ...parameters, approvalToken: confirmed.result.approvalToken }).state;
 }))));
+app.post('/api/operations/:id/quick-confirm', route((req, res) =>
+  respond(res, mutateState(sessionId(req, res), old => quickConfirmOperation(old, req.params.id)))));
+app.post('/api/operations/:id/retry', route((req, res) => {
+  const id = sessionId(req, res);
+  const state = mutateState(id, old => retryOperation(old, req.params.id).state);
+  return respond(res, state);
+}));
 app.post('/api/operations/:id/reconcile', route((req, res) => respond(res, mutateState(sessionId(req, res), old =>
   runBankingTool(old, 'reconcile_operation', { operationId: req.params.id }).state))));
 app.get('/api/operations/:id', route((req, res) => res.json(verifyOperation(getState(sessionId(req, res)), req.params.id))));
+app.get('/api/security/passkey/status', route((req, res) => res.json(passkeyStatus(sessionId(req, res)))));
+app.post('/api/security/passkey/register/options', route(async (req, res) => res.json(await registrationOptions(sessionId(req, res)))));
+app.post('/api/security/passkey/register/verify', route(async (req, res) => {
+  const body = z.object({ challengeId: z.string().min(1), response: z.unknown() }).parse(req.body);
+  res.json(await verifyRegistration(sessionId(req, res), body.challengeId, body.response as never));
+}));
+app.post('/api/operations/:id/auth/options', route(async (req, res) => {
+  const id = sessionId(req, res);
+  res.json(await authenticationOptions(id, req.params.id, getState(id)));
+}));
+app.post('/api/operations/:id/auth/verify', route(async (req, res) => {
+  const body = z.object({ challengeId: z.string().min(1), response: z.unknown() }).parse(req.body);
+  const id = sessionId(req, res);
+  return respond(res, await verifyAuthentication(id, body.challengeId, body.response as never));
+}));
 registerMcp(app, verifyMcpToken);
 
 if (production) {

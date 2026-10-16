@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createFixture } from './fixtures.ts';
 import { activatePlan } from './domain.ts';
-import { approveOperation, createMandate, evaluateExternalRequest, reconcileOperation, revokeMandate } from './tools.ts';
+import { approveOperation, createMandate, evaluateExternalRequest, quickConfirmOperation, reconcileOperation, retryOperation, revokeMandate } from './tools.ts';
 
 test('mandate requires confirmation and keeps the emergency fund isolated', () => {
   const state = activatePlan(createFixture(), 'balanced');
@@ -17,17 +17,29 @@ test('mandate requires confirmation and keeps the emergency fund isolated', () =
   const replay = evaluateExternalRequest(result.state, { agentId: 'travel-agent-demo', category: 'transport', amountCents: 30000, idempotencyKey: 'trip-1' });
   assert.equal(replay.state.finance.checkingCents, result.state.finance.checkingCents);
   assert.equal(replay.operation.operationId, result.operation.operationId);
+  assert.equal(result.operation.verificationRequirement, 'none');
+  assert.equal(result.operation.balanceBeforeCents, withMandate.finance.checkingCents);
+  assert.equal(result.operation.balanceAfterCents, withMandate.finance.checkingCents - 30000);
+  assert.equal(result.operation.mandateSpentBeforeCents, 0);
+  assert.equal(result.operation.mandateSpentAfterCents, 30000);
+  assert.equal(result.operation.twinVersionBefore, withMandate.twinVersion);
+  assert.equal(result.operation.twinVersionAfter, withMandate.twinVersion + 1);
+  assert.deepEqual(result.state.audit.filter(event => event.operationId === result.operation.operationId).map(event => event.action),
+    ['request_received', 'permission', 'risk', 'user_confirmation', 'execute', 'verify', 'receipt', 'audit']);
 });
 
 test('shopping asks for approval and over-limit requests are blocked', () => {
   const state = createMandate(activatePlan(createFixture(), 'balanced'), { confirmed: true });
   const ask = evaluateExternalRequest(state, { agentId: 'travel-agent-demo', category: 'shopping', amountCents: 20000, idempotencyKey: 'shop-1' });
   assert.equal(ask.operation.status, 'ask');
+  assert.equal(ask.operation.verificationRequirement, 'quick_confirm');
   assert.equal(ask.state.finance.checkingCents, state.finance.checkingCents);
   const approved = approveOperation(ask.state, ask.operation.operationId);
   assert.equal(approved.finance.checkingCents, state.finance.checkingCents - 20000);
   assert.equal(approved.finance.currentMonthExpenseCents, state.finance.currentMonthExpenseCents + 20000);
   assert.equal(approved.transactions[0].id, `agent-payment:${ask.operation.operationId}`);
+  assert.deepEqual(approved.audit.filter(event => event.operationId === ask.operation.operationId).map(event => event.action),
+    ['request_received', 'permission', 'risk', 'user_confirmation', 'execute', 'verify', 'receipt', 'audit']);
   const blocked = evaluateExternalRequest(state, { agentId: 'travel-agent-demo', category: 'transport', amountCents: 200000, idempotencyKey: 'trip-over-limit' });
   assert.equal(blocked.operation.status, 'blocked');
 });
@@ -36,7 +48,10 @@ test('near-limit requests require manual review before execution', () => {
   const state = createMandate(activatePlan(createFixture(), 'balanced'), { confirmed: true });
   const result = evaluateExternalRequest(state, { agentId: 'travel-agent-demo', category: 'transport', amountCents: 40000, idempotencyKey: 'manual-1' });
   assert.equal(result.operation.status, 'manual_review');
+  assert.equal(result.operation.verificationRequirement, 'platform');
+  assert.equal(result.operation.verificationStatus, 'pending');
   assert.equal(result.state.finance.checkingCents, state.finance.checkingCents);
+  assert.throws(() => approveOperation(result.state, result.operation.operationId), /USER_VERIFICATION_REQUIRED/);
 });
 
 test('timeout keeps status unknown and does not spend money on retry', () => {
@@ -77,4 +92,16 @@ test('approval is bound to the original mandate and timeout can be reconciled', 
   const recovered = reconcileOperation(timeout.state, timeout.operation.operationId);
   assert.equal(recovered.operations.at(-1)?.status, 'blocked');
   assert.equal(recovered.finance.checkingCents, base.finance.checkingCents);
+});
+
+test('changed mandates preserve the old request and retry with a new operation identity', () => {
+  const base = createMandate(activatePlan(createFixture(), 'balanced'), { confirmed: true });
+  const ask = evaluateExternalRequest(base, { agentId: 'travel-agent-demo', category: 'shopping', amountCents: 20000, idempotencyKey: 'stale-ask' });
+  const replaced = createMandate(ask.state, { confirmed: true, category: 'shopping' });
+  const invalidated = quickConfirmOperation(replaced, ask.operation.operationId);
+  assert.match(invalidated.operations[0].reason, /MANDATE_CHANGED/);
+  const retried = retryOperation(invalidated, ask.operation.operationId);
+  assert.notEqual(retried.operation.operationId, ask.operation.operationId);
+  assert.notEqual(retried.operation.idempotencyKey, ask.operation.idempotencyKey);
+  assert.equal(retried.state.operations.some(item => item.operationId === ask.operation.operationId), true);
 });

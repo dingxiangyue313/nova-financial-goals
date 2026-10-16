@@ -128,10 +128,19 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
       'Content-Type': 'application/json', Cookie: cookie, 'x-nova-signature': signExternalRequest(externalSecret, envelope),
     }, body: JSON.stringify(envelope) });
     assert.equal(replay.status, 400);
-    for (const [scenario, status] of [['transport','executed'], ['shopping','ask'], ['over_limit','blocked'], ['timeout','unknown']] as const) {
+    let askOperationId = '';
+    let manualOperationId = '';
+    for (const [scenario, status] of [['transport','executed'], ['shopping','ask'], ['manual_review','manual_review'], ['over_limit','blocked'], ['timeout','unknown']] as const) {
       const response = await call('/api/demo/agent-request', 'POST', { scenario });
-      assert.equal((response.data as Snapshot).operations.at(-1)?.status, status);
+      const operation = (response.data as Snapshot).operations.at(-1)!;
+      assert.equal(operation.status, status);
+      if (status === 'ask') askOperationId = operation.operationId;
+      if (status === 'manual_review') manualOperationId = operation.operationId;
     }
+    assert.equal((await call(`/api/operations/${manualOperationId}/approve`, 'POST', {})).code, 400);
+    assert.equal((await call(`/api/operations/${askOperationId}/quick-confirm`, 'POST', {})).code, 200);
+    const confirmedAsk = await call(`/api/operations/${askOperationId}`);
+    assert.equal((confirmedAsk.data as { status: string }).status, 'executed');
     const after = await call('/api/session');
     assert.equal((after.data as Snapshot).audit.length > 0, true);
     assert.equal((after.data as Snapshot).auditChainValid, true);

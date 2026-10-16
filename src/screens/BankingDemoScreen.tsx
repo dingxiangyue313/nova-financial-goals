@@ -5,10 +5,11 @@ import { GenerativeCard } from '../components/GenerativeCard';
 interface Props {
   snapshot: Snapshot;
   mutate: (url: string, method: string, body?: unknown) => Promise<Snapshot>;
+  onNavigateActivity: () => void;
 }
 const styles = 'w-full rounded-xl bg-white border border-[#E5E8EB] p-3.5 shadow-sm';
 const button = 'rounded-lg px-3 py-2 bg-[#0F6B6D] text-white text-[12px] font-semibold hover:bg-[#084C4E] disabled:opacity-40';
-export function BankingDemoScreen({ snapshot, mutate }: Props) {
+export function BankingDemoScreen({ snapshot, mutate, onNavigateActivity }: Props) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const run = async (url: string, body: unknown) => {
@@ -51,15 +52,9 @@ export function BankingDemoScreen({ snapshot, mutate }: Props) {
     </div>
     {message && <div className="rounded-lg bg-amber-50 p-2 text-[12px] text-amber-800">{message}</div>}
     <div className={styles}>
-      <h3 className="font-bold text-[13px] mb-2">执行凭证与审计</h3>
-      {snapshot.operations.length === 0 && <p className="text-[12px] text-[#5A616B]">尚无请求</p>}
-      {[...snapshot.operations].reverse().map(op => <div key={op.operationId} className="border-t border-[#E5E8EB] py-2 text-[12px]">
-        <div className="flex justify-between"><strong>{op.category} · ¥{op.amountCents / 100}</strong><span className="text-[#0F6B6D] font-bold">{op.status.toUpperCase()}</span></div>
-        <p className="text-[#5A616B]">{op.reason}</p>
-        <p className="text-[#8F959E] break-all">凭证 {op.operationId}</p>
-        {(op.status === 'ask' || op.status === 'manual_review') && <button className={`${button} mt-2`} disabled={busy} onClick={() => run(`/api/operations/${op.operationId}/approve`, {})}>核对并确认本次模拟请求</button>}
-        {op.status === 'unknown' && <button className={`${button} mt-2`} disabled={busy} onClick={() => run(`/api/operations/${op.operationId}/reconcile`, {})}>查询原请求并恢复</button>}
-      </div>)}
+      <h3 className="font-bold text-[13px] mb-2">执行结果统一进入动态页</h3>
+      <p className="text-[12px] text-[#5A616B]">这里用于创建演示请求。请求、风险判断、设备验证、余额变化、Receipt 与审计链统一在「动态」页展开查看。</p>
+      <button className={`${button} mt-3 w-full`} onClick={onNavigateActivity}>前往动态页查看完整链路</button>
       <p className="text-[11px] text-[#5A616B] mt-2">Twin v{snapshot.twinVersion} · 审计事件 {snapshot.audit.length} 条 · Hash 链{snapshot.auditChainValid ? '有效' : '异常'} · 凭证 {snapshot.receipts.length} 条</p>
       <div className="mt-3 flex gap-2">
         <a className={button} href="/api/audit/export?format=json" download>导出 JSON</a>

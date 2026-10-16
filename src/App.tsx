@@ -346,10 +346,12 @@ export default function App() {
           )}
 
           {currentScreen === 'activity' && (
-            <ActivityScreen audit={snapshot.audit} hasImpactPending={hasImpactPending} onNavigateToImpact={() => navigateTo('impact')} />
+            <ActivityScreen snapshot={snapshot} mutate={mutate} hasImpactPending={hasImpactPending}
+              onNavigateToImpact={() => navigateTo('impact')} onNavigateToBanking={() => navigateTo('banking_demo')} />
           )}
 
-          {currentScreen === 'banking_demo' && <BankingDemoScreen snapshot={snapshot} mutate={mutate} />}
+          {currentScreen === 'banking_demo' && <BankingDemoScreen snapshot={snapshot} mutate={mutate}
+            onNavigateActivity={() => navigateTo('activity')} />}
 
           {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame}
             starter={workspaceStarter} onSnapshot={setSnapshot} onNavigate={navigateTo} />}

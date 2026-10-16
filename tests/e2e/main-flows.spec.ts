@@ -79,15 +79,44 @@ test('故事三：限定授权分别产生 Execute、Ask、Manual Review 和 Blo
   await page.getByRole('button', { name: '确认创建交通类模拟授权' }).click();
 
   await page.getByRole('button', { name: '交通 Execute' }).click();
-  await expect(page.getByText('EXECUTED').first()).toBeVisible();
   await page.getByRole('button', { name: '购物 Ask' }).click();
-  await expect(page.getByText('ASK').first()).toBeVisible();
   await page.getByRole('button', { name: '高额 Manual Review' }).click();
-  await expect(page.getByText('MANUAL_REVIEW').first()).toBeVisible();
   await page.getByRole('button', { name: '超限 Block' }).click();
-  await expect(page.getByText('BLOCKED').first()).toBeVisible();
+  await page.getByRole('button', { name: '前往动态页查看完整链路' }).click();
+  await expect(page.getByText('已执行').first()).toBeVisible();
+  await expect(page.getByText('待确认').first()).toBeVisible();
+  await expect(page.getByText('待设备验证').first()).toBeVisible();
+  await expect(page.getByText('已拦截').first()).toBeVisible();
+  await page.locator('article').first().locator(':scope > button').evaluate((element: HTMLButtonElement) => element.click());
+  await expect(page.getByRole('list', { name: '请求执行链路' }).first()).toBeVisible();
+});
 
-  await expect(page.getByText(/Hash 链有效/)).toBeVisible();
-  await expect(page.getByRole('link', { name: '导出 JSON' })).toBeVisible();
-  await expect(page.getByRole('link', { name: '导出 CSV' })).toBeVisible();
+test('人工复核：平台 Passkey 验证成功后才执行', async ({ page, context }) => {
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('WebAuthn.enable');
+  const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', { options: {
+    protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true,
+    isUserVerified: true, automaticPresenceSimulation: true,
+  } });
+  try {
+    await openApp(page);
+    await activateBalancedGoal(page);
+    await page.getByTitle('个人设置').click();
+    await page.getByRole('button', { name: /授权、外部 Agent 与执行记录/ }).click();
+    await page.getByRole('button', { name: '确认创建交通类模拟授权' }).click();
+    await page.getByRole('button', { name: '高额 Manual Review' }).click();
+    await page.getByRole('button', { name: '前往动态页查看完整链路' }).click();
+    await page.getByRole('button', { name: '启用此设备验证' }).click();
+    await expect(page.getByText('已启用', { exact: true })).toBeVisible();
+    const card = page.locator('article').filter({ has: page.getByRole('heading', { name: 'transport · ¥400' }) });
+    const disclosure = card.locator(':scope > button').first();
+    await disclosure.evaluate((element: HTMLButtonElement) => element.click());
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    await card.getByRole('button', { name: '使用设备验证并执行' })
+      .evaluate((element: HTMLButtonElement) => element.click());
+    await expect(card.getByText('已执行', { exact: true })).toBeVisible();
+    await expect(card.getByText(/校验有效/)).toBeVisible();
+  } finally {
+    if (!page.isClosed()) await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
+  }
 });

@@ -12,7 +12,7 @@
 
 1. **目标规划**：自然语言创建目标 → 在 Governed Canvas 修改金额、日期、月投入、保护资金和浮动周数 → What-if 只读试算 → 比较三种以内方案 → 确认应用并激活。没有选择方案时不能激活。
 2. **目标感知风险**：激活计划时确认智能守护设置。NOVA 自动整理模拟流水；普通趋势进入每周安静摘要，累计变化真正影响目标时才建立未读风险会话，应急金保持隔离。
-3. **外部 Agent**：在“我的 → 授权与执行记录”创建限额、类别、有效期授权，分别模拟 Execute、Ask、Block、Manual Review 和 Unknown；查看凭证与 Hash 审计链，并可撤销授权。
+3. **外部 Agent**：在“我的 → 授权与执行记录”创建限额、类别、有效期授权，分别模拟 Execute、Ask、Block、Manual Review 和 Unknown；随后在“动态”页展开请求、判断、确认、执行、Receipt、余额变化和 Hash 审计链。Manual Review 必须通过系统 Passkey 设备验证。
 
 三条流程也可从底部 **NOVA** 工作台用自然语言完成：
 
@@ -41,6 +41,8 @@ npm run dev
 ```
 
 浏览器打开终端显示的地址，默认是 [http://localhost:3000](http://localhost:3000)。若端口已占用，可运行 `PORT=3001 npm run dev`。`.env` 中的 `DEEPSEEK_API_KEY` 可留空，确定性模式即可完整演示。只有真实使用 DeepSeek 解析和卡片编排时才填写自己的 Key；Key 不应发送给队友或提交到 GitHub。`.env` 已加入 `.gitignore`。
+
+本地设备验证默认使用 `NOVA_RP_ID=localhost` 和 `NOVA_ORIGIN=http://localhost:3000`。部署公网或手机访问时必须使用 HTTPS，并把这两个值改为实际域名和完整 HTTPS 来源。NOVA 只保存凭据 ID、公钥、计数器和 transports，不读取或保存 Face ID、Touch ID、指纹或设备密码。
 
 | 命令 | 作用 |
 | --- | --- |

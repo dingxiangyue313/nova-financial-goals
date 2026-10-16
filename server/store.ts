@@ -74,6 +74,15 @@ CREATE TABLE IF NOT EXISTS agent_actions (
   twin_version INTEGER NOT NULL, status TEXT NOT NULL, payload_json TEXT NOT NULL,
   result_json TEXT, expires_at TEXT NOT NULL, idempotency_key TEXT NOT NULL, created_at TEXT NOT NULL,
   UNIQUE(session_id, idempotency_key)
+);
+CREATE TABLE IF NOT EXISTS passkey_credentials (
+  session_id TEXT PRIMARY KEY, credential_id TEXT NOT NULL UNIQUE, public_key BLOB NOT NULL,
+  counter INTEGER NOT NULL, transports_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS webauthn_challenges (
+  challenge TEXT PRIMARY KEY, session_id TEXT NOT NULL, kind TEXT NOT NULL, operation_id TEXT,
+  input_hash TEXT, mandate_id TEXT, twin_version INTEGER, expires_at TEXT NOT NULL,
+  consumed_at TEXT, created_at TEXT NOT NULL
 );`);
 
 function ensureColumn(table: string, column: string, definition: string) {
@@ -123,19 +132,93 @@ export function getState(sessionId: string): DemoState {
 export function mutateState(sessionId: string, change: (state: DemoState) => DemoState): DemoState {
   db.exec('BEGIN IMMEDIATE');
   try {
-    const old = getState(sessionId);
-    const next = DemoStateSchema.parse(change(old));
-    const newEvents = next.audit.slice(old.audit.length);
-    const result = db.prepare('UPDATE demo_sessions SET state_json = ?, version = version + 1, updated_at = ? WHERE id = ?')
-      .run(JSON.stringify(next), new Date().toISOString(), sessionId);
-    if (!result.changes) throw new Error('SESSION_NOT_FOUND');
-    for (const event of newEvents) db.prepare(`INSERT INTO audit_events
-      (id,session_id,at,action,outcome,detail,operation_id,request_id,approval_id,twin_version,sequence,previous_hash,event_hash)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(event.id, sessionId, event.at, event.action, event.outcome, event.detail, event.operationId ?? null,
-        event.requestId ?? null, event.approvalId ?? null, event.twinVersion ?? null, event.sequence ?? null,
-        event.previousHash ?? null, event.eventHash ?? null);
-    syncArtifacts(sessionId, next);
+    const next = persistStateChange(sessionId, change);
+    db.exec('COMMIT');
+    return next;
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+function persistStateChange(sessionId: string, change: (state: DemoState) => DemoState): DemoState {
+  const old = getState(sessionId);
+  const next = DemoStateSchema.parse(change(old));
+  const newEvents = next.audit.slice(old.audit.length);
+  const result = db.prepare('UPDATE demo_sessions SET state_json = ?, version = version + 1, updated_at = ? WHERE id = ?')
+    .run(JSON.stringify(next), new Date().toISOString(), sessionId);
+  if (!result.changes) throw new Error('SESSION_NOT_FOUND');
+  for (const event of newEvents) db.prepare(`INSERT INTO audit_events
+    (id,session_id,at,action,outcome,detail,operation_id,request_id,approval_id,twin_version,sequence,previous_hash,event_hash)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(event.id, sessionId, event.at, event.action, event.outcome, event.detail, event.operationId ?? null,
+      event.requestId ?? null, event.approvalId ?? null, event.twinVersion ?? null, event.sequence ?? null,
+      event.previousHash ?? null, event.eventHash ?? null);
+  syncArtifacts(sessionId, next);
+  return next;
+}
+
+export interface StoredPasskeyCredential {
+  credentialId: string; publicKey: Uint8Array; counter: number; transports: string[];
+}
+export interface StoredWebAuthnChallenge {
+  challenge: string; kind: 'registration' | 'authentication'; operationId: string | null;
+  inputHash: string | null; mandateId: string | null; twinVersion: number | null;
+  expiresAt: string; consumedAt: string | null;
+}
+
+export function getPasskeyCredential(sessionId: string): StoredPasskeyCredential | null {
+  const row = db.prepare('SELECT * FROM passkey_credentials WHERE session_id=?').get(sessionId) as Record<string, unknown> | undefined;
+  return row ? { credentialId: String(row.credential_id), publicKey: new Uint8Array(row.public_key as Uint8Array),
+    counter: Number(row.counter), transports: JSON.parse(String(row.transports_json)) } : null;
+}
+
+export function saveWebAuthnChallenge(sessionId: string, value: StoredWebAuthnChallenge) {
+  db.prepare(`INSERT INTO webauthn_challenges(challenge,session_id,kind,operation_id,input_hash,mandate_id,twin_version,expires_at,consumed_at,created_at)
+    VALUES(?,?,?,?,?,?,?,?,NULL,?)`).run(value.challenge, sessionId, value.kind, value.operationId, value.inputHash,
+      value.mandateId, value.twinVersion, value.expiresAt, new Date().toISOString());
+}
+
+export function getWebAuthnChallenge(sessionId: string, challenge: string): StoredWebAuthnChallenge {
+  const row = db.prepare('SELECT * FROM webauthn_challenges WHERE challenge=? AND session_id=?').get(challenge, sessionId) as Record<string, unknown> | undefined;
+  if (!row) throw new Error('WEBAUTHN_CHALLENGE_NOT_FOUND');
+  return { challenge: String(row.challenge), kind: row.kind as StoredWebAuthnChallenge['kind'],
+    operationId: row.operation_id ? String(row.operation_id) : null, inputHash: row.input_hash ? String(row.input_hash) : null,
+    mandateId: row.mandate_id ? String(row.mandate_id) : null, twinVersion: row.twin_version == null ? null : Number(row.twin_version),
+    expiresAt: String(row.expires_at), consumedAt: row.consumed_at ? String(row.consumed_at) : null };
+}
+
+function assertUsableChallenge(sessionId: string, challenge: string, kind: StoredWebAuthnChallenge['kind']) {
+  const record = getWebAuthnChallenge(sessionId, challenge);
+  if (record.kind !== kind) throw new Error('WEBAUTHN_CHALLENGE_TYPE_MISMATCH');
+  if (record.consumedAt) throw new Error('WEBAUTHN_CHALLENGE_REPLAYED');
+  if (Date.parse(record.expiresAt) <= Date.now()) throw new Error('WEBAUTHN_CHALLENGE_EXPIRED');
+  return record;
+}
+
+export function completePasskeyRegistration(sessionId: string, challenge: string, credential: StoredPasskeyCredential) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    assertUsableChallenge(sessionId, challenge, 'registration');
+    const now = new Date().toISOString();
+    db.prepare('UPDATE webauthn_challenges SET consumed_at=? WHERE challenge=? AND session_id=? AND consumed_at IS NULL').run(now, challenge, sessionId);
+    db.prepare(`INSERT INTO passkey_credentials(session_id,credential_id,public_key,counter,transports_json,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET credential_id=excluded.credential_id,
+      public_key=excluded.public_key,counter=excluded.counter,transports_json=excluded.transports_json,updated_at=excluded.updated_at`)
+      .run(sessionId, credential.credentialId, Buffer.from(credential.publicKey), credential.counter,
+        JSON.stringify(credential.transports), now, now);
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+export function completePasskeyAuthentication(sessionId: string, challenge: string, credentialId: string,
+  newCounter: number, change: (state: DemoState, binding: StoredWebAuthnChallenge) => DemoState): DemoState {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const binding = assertUsableChallenge(sessionId, challenge, 'authentication');
+    const credential = getPasskeyCredential(sessionId);
+    if (!credential || credential.credentialId !== credentialId) throw new Error('WEBAUTHN_CREDENTIAL_MISMATCH');
+    const next = persistStateChange(sessionId, old => change(old, binding));
+    const now = new Date().toISOString();
+    db.prepare('UPDATE webauthn_challenges SET consumed_at=? WHERE challenge=? AND session_id=? AND consumed_at IS NULL').run(now, challenge, sessionId);
+    db.prepare('UPDATE passkey_credentials SET counter=?,updated_at=? WHERE session_id=?').run(newCounter, now, sessionId);
     db.exec('COMMIT');
     return next;
   } catch (error) { db.exec('ROLLBACK'); throw error; }

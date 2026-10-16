@@ -178,9 +178,16 @@ export type ToolRecord = z.infer<typeof ToolRecordSchema>;
 export const OperationSchema = z.object({
   operationId: z.string(), idempotencyKey: z.string(),
   status: z.enum(['executed', 'ask', 'blocked', 'manual_review', 'unknown']),
+  originalDecision: z.enum(['execute', 'ask', 'block', 'manual_review', 'unknown']).optional(),
   category: z.string(), amountCents: MoneySchema, reason: z.string(),
   agentId: z.string().optional(), mandateId: z.string().nullable().optional(),
   tool: z.string().default('external_payment'), inputHash: z.string().optional(),
+  createdAt: z.string().optional(),
+  verificationRequirement: z.enum(['none', 'quick_confirm', 'platform']).default('none'),
+  verificationStatus: z.enum(['not_required', 'pending', 'verified', 'failed']).default('not_required'),
+  balanceBeforeCents: MoneySchema.optional(), balanceAfterCents: MoneySchema.nullable().optional(),
+  mandateSpentBeforeCents: MoneySchema.nullable().optional(), mandateSpentAfterCents: MoneySchema.nullable().optional(),
+  twinVersionBefore: z.number().int().positive().optional(), twinVersionAfter: z.number().int().positive().nullable().optional(),
   receipt: ReceiptSchema.nullable().default(null),
 });
 export type Operation = z.infer<typeof OperationSchema>;
