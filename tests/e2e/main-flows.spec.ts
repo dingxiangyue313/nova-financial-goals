@@ -87,6 +87,7 @@ test('故事三：限定授权分别产生 Execute、Ask、Manual Review 和 Blo
   await expect(page.getByText('待确认').first()).toBeVisible();
   await expect(page.getByText('待设备验证').first()).toBeVisible();
   await expect(page.getByText('已拦截').first()).toBeVisible();
+  expect(await page.locator('article').first().evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(80);
   await page.locator('article').first().locator(':scope > button').evaluate((element: HTMLButtonElement) => element.click());
   await expect(page.getByRole('list', { name: '请求执行链路' }).first()).toBeVisible();
 });

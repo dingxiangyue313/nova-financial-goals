@@ -124,7 +124,7 @@ export function ActivityScreen({ snapshot, mutate, hasImpactPending, onNavigateT
   const grouped = useMemo(() => new Map(agentOperations.map(operation => [operation.operationId,
     snapshot.audit.filter(event => event.operationId === operation.operationId)])), [agentOperations, snapshot.audit]);
   const ordinary = [...snapshot.audit].reverse().filter(event => !event.operationId || !agentOperationIds.has(event.operationId));
-  return <div className="flex-1 flex flex-col pt-2 pb-safe px-4 overflow-y-auto no-scrollbar space-y-3">
+  return <div className="flex-1 pt-2 pb-safe px-4 overflow-y-auto no-scrollbar space-y-3">
     <div><h2 className="text-[18px] font-bold">收支动态与脉络</h2><p className="text-[12px] text-[#5A616B]">目标变化、Agent 请求与审计证据都在这里</p></div>
     <section className="rounded-xl border border-[#B9D8D8] bg-[#F1F8F8] p-3.5" aria-label="设备验证状态">
       <div className="flex items-start justify-between gap-3"><div><h3 className="text-[14px] font-bold">设备验证</h3>
