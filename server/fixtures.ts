@@ -42,6 +42,7 @@ export function createFixture(): DemoState {
       goalOverrides: {},
     },
     spendingPatterns: [], riskSignals: [], weeklyRiskSummaries: [],
+    dataConnections: [], dataSyncBatches: [],
     pendingImpact: null, mandate: null, audit: [], operations: [],
   };
 }

@@ -44,7 +44,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             onClick={onOpenSimulateModal}
             className="px-2.5 py-0.5 rounded-full bg-[#F0F2F5] hover:bg-[#E5E8EB] active:scale-95 text-[#5A616B] text-[12px] font-medium transition-all cursor-pointer flex items-center gap-1"
-            title="点击切换模拟数据或事件"
+            title="查看模拟时间与自动同步"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#8F959E]"></span>
             <span>模拟数据</span>

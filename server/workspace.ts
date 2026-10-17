@@ -216,7 +216,8 @@ export function createScenarioPreview(sessionId: string, threadId: string, input
 }
 
 export function executeWorkspaceAction(sessionId: string, actionId: string, decision: 'confirm' | 'cancel',
-  state: DemoState): { state: DemoState; replayed: boolean; message: ReturnType<typeof saveAgentMessage> } {
+  state: DemoState): { state: DemoState; replayed: boolean; message: ReturnType<typeof saveAgentMessage>;
+    nextStep: 'connect_data' | null } {
   const action = getAgentAction(sessionId, actionId);
   if (action.status === 'consumed') {
     const messages = getAgentMessages(sessionId, action.threadId);
@@ -224,7 +225,9 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
       ? String((action.result as { messageId: unknown }).messageId) : null;
     const previous = messages.find(message => message.id === messageId) ?? messages.at(-1);
     if (!previous) throw new Error('AGENT_ACTION_RESULT_NOT_FOUND');
-    return { state, replayed: true, message: previous };
+    const requiresConnection = ['upsert_goal', 'apply_goal_scenario'].includes(action.actionType)
+      && !state.dataConnections.some(item => item.status === 'connected');
+    return { state, replayed: true, message: previous, nextStep: requiresConnection ? 'connect_data' : null };
   }
   if (action.status !== 'pending') throw new Error('AGENT_ACTION_NOT_PENDING');
   if (Date.parse(action.expiresAt) < Date.now() || state.twinVersion !== action.twinVersion) {
@@ -233,13 +236,13 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
     const message = saveAgentMessage(sessionId, action.threadId, { role: 'assistant', content: '数据已经变化，请重新生成并核对操作。',
       components: [{ id: componentId(), type: 'error_recovery', title: '需要重新计算',
         body: 'NOVA 已停止旧操作，没有写入任何数据。请再次描述任务以使用最新 Financial Twin。', code }] });
-    return { state, replayed: false, message };
+    return { state, replayed: false, message, nextStep: null };
   }
   if (decision === 'cancel') {
     finishAgentAction(sessionId, actionId, 'cancelled', state);
     const message = saveAgentMessage(sessionId, action.threadId, { role: 'assistant', content: '已取消，本次没有修改任何数据。',
       components: [{ id: componentId(), type: 'receipt', title: '操作已取消', body: 'Financial Twin 未发生变化。', status: 'failed' }] });
-    return { state, replayed: false, message };
+    return { state, replayed: false, message, nextStep: null };
   }
   let next = state;
   let detail = '操作已完成';
@@ -294,14 +297,20 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
   const receipt: AgentComponent = { id: componentId(), type: 'receipt', title: 'NOVA 操作凭证', body: detail,
     status: 'succeeded', operationId: next.operations.at(-1)?.operationId };
   let followups: AgentComponent[] = [];
-  if (action.actionType === 'upsert_goal' || action.actionType === 'apply_goal_scenario')
+  const requiresConnection = ['upsert_goal', 'apply_goal_scenario'].includes(action.actionType)
+    && !next.dataConnections.some(item => item.status === 'connected');
+  if (requiresConnection) followups = [{ id: componentId(), type: 'explanation',
+    title: '连接模拟数据后再计算',
+    body: '先选择要读取的模拟银行卡、微信支付和支付宝来源。NOVA 只读取余额与近 90 天流水，不获得扣款或转账权限。',
+    tone: 'neutral' }];
+  else if (action.actionType === 'upsert_goal' || action.actionType === 'apply_goal_scenario')
     followups = statusComponents(sessionId, action.threadId, next);
   if (action.actionType === 'create_mandate') followups = externalRequestComponents(sessionId, action.threadId, next);
   if (action.actionType === 'simulate_agent_request') followups = [{ id: componentId(), type: 'audit_summary',
     title: '治理与审计', body: '请求已按固定安全链路记录，可在执行记录中导出证据。', chainValid: verifyAuditChain(next.audit) }];
   const message = saveAgentMessage(sessionId, action.threadId, { role: 'assistant', content: detail, components: [receipt, ...followups] });
   finishAgentAction(sessionId, actionId, 'consumed', { messageId: message.id });
-  return { state: next, replayed: false, message };
+  return { state: next, replayed: false, message, nextStep: requiresConnection ? 'connect_data' : null };
 }
 
 export function ensureImpactThread(sessionId: string, state: DemoState, now = new Date()) {

@@ -10,7 +10,7 @@
 
 ## 三条演示流程
 
-1. **目标规划**：自然语言创建目标 → 在 Governed Canvas 修改金额、日期、月投入、保护资金和浮动周数 → What-if 只读试算 → 比较三种以内方案 → 确认应用并激活。没有选择方案时不能激活。
+1. **目标规划**：自然语言创建目标 → 首次选择银行卡、微信支付和支付宝模拟来源 → 自动读取近 90 天流水 → 修改金额、日期、月投入、保护资金和浮动周数 → What-if 只读试算 → 比较三种以内方案 → 确认应用并激活。没有选择方案时不能激活。
 2. **目标感知风险**：激活计划时确认智能守护设置。NOVA 自动整理模拟流水；普通趋势进入每周安静摘要，累计变化真正影响目标时才建立未读风险会话，应急金保持隔离。
 3. **外部 Agent**：在“我的 → 授权与执行记录”创建限额、类别、有效期授权，分别模拟 Execute、Ask、Block、Manual Review 和 Unknown；随后在“动态”页展开请求、判断、确认、执行、Receipt、余额变化和 Hash 审计链。Manual Review 必须通过系统 Passkey 设备验证。
 
@@ -22,7 +22,9 @@
 
 后端还提供版本化 Financial Twin、一次性 Approval Token、模拟转账、换汇报价与执行、Mandate 生命周期、HMAC 签名和 Nonce 防重放、受限 MCP、结构化日志，以及 JSON/CSV 审计证据导出。
 
-目标感知风险演示位于顶部“模拟数据”面板：`模拟外卖与打车趋势（¥600 → ¥1,900）`。过去两个 30 天窗口平均每月 ¥600，本期多笔小额流水累计至 ¥1,900；当日本旅行预计延期约 16 天后，NOVA 才建立未读风险会话。它不会拦截用户自己的银行卡消费；只有由 NOVA 或外部 Agent 经过 Banking Tools 发起的模拟操作，才会得到 Execute、Ask、Manual Review 或 Block。
+模拟连接只提供读取权限，不创建扣款、转账或外部 Agent 授权。首次连接立即导入三个月历史；应用打开、回到前台及保持打开期间会自动检查新批次，重复检查不会重复入账。“我的 → 数据连接与自动守护”可查看来源、覆盖范围、更新时间并停止后续同步，历史依据和审计仍会保留。
+
+目标感知风险演示位于顶部“模拟数据”面板。连接来源并激活目标后，先推进到 9 月 22 日观察普通趋势进入安静摘要，再推进到 9 月 23 日观察外卖与打车由过去两个 30 天窗口平均 ¥600 增至本期 ¥1,900。当日本旅行预计延期约 16 天后，NOVA 才建立未读风险会话。它不会拦截用户自己的银行卡消费；只有由 NOVA 或外部 Agent 经过 Banking Tools 发起的模拟操作，才会得到 Execute、Ask、Manual Review 或 Block。
 
 工作台在手机端使用单列消息流，在自适应桌面端使用约 32% 对话区与 68% Governed Canvas。每周摘要按亚洲上海时区的自然周去重，不显示紧急红点；用户可设置摘要开关、金额阈值、目标占比阈值、暂停日期、静默时间和当前目标覆盖。
 
@@ -86,8 +88,8 @@ NOVA_SESSION_SECRET="$(openssl rand -hex 32)" npm start
 - `/api/financial-twin`、`/api/goal-flow`、`/api/banking-tools` 是 Twin、目标状态机与工具入口；原页面 API 保留为兼容封装。
 - `/api/activity`、`/api/audit/export?format=json|csv` 提供可验证活动和证据导出。
 - `/api/risk/preferences`、`/api/risk/signals`、`/api/risk/summaries` 提供智能守护偏好、趋势证据、即时目标影响和安静周摘要；`POST /api/risk/summaries/ensure` 会幂等检查本周摘要。
-- `/api/demo/weekly-summary` 生成固定的周摘要演示；同一用户、目标和自然周最多一份。
-- `/api/demo/spending-trend` 注入固定的外卖与打车累计趋势故事；相同事实幂等且忽略后不重复提醒。
+- `/api/data-connections` 提供模拟来源状态；`connect`、`sync/ensure` 和 `:source/revoke` 分别处理首次连接、幂等自动同步和停止未来同步。
+- `/api/demo/clock` 只推进比赛演示时钟；新流水由已连接来源自动出现，页面不提供手工注入流水按钮。
 - `/api/external-agent/request` 要求 HMAC 签名、5 分钟时间窗口和一次性 Nonce。
 - `/mcp` 是需要会话令牌的 MCP Streamable HTTP 入口，只暴露白名单模拟工具。令牌由 `/api/mcp/token` 在当前浏览器会话内获取，不是 DeepSeek Key；不要公开分享。
 - Helmet 为浏览器响应设置安全头；普通 API 每分钟最多 180 次请求，Agent 与模型相关入口每分钟最多 30 次。Pino 日志隐藏 Cookie、Authorization、签名、请求正文、API Key 和完整账户标识。

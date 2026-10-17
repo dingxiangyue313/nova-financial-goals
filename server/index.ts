@@ -12,7 +12,8 @@ import { assessGoal, injectExpense, resolveImpact } from './domain.ts';
 import { composeUiCards, interpretGoal } from './agent.ts';
 import { quickConfirmOperation, retryOperation, verifyOperation } from './tools.ts';
 import { registerMcp } from './mcp.ts';
-import { GoalAssumptionsSchema, IsoDateSchema, RiskPreferencesPatchSchema, RiskPreferencesSchema, type DemoState } from '../shared/contracts.ts';
+import { DataSourceKindSchema, GoalAssumptionsSchema, IsoDateSchema, RiskPreferencesPatchSchema, RiskPreferencesSchema,
+  type DataSyncResult, type DemoState } from '../shared/contracts.ts';
 import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './banking.ts';
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
 import { containsPromptInjection, signExternalRequest, verifyExternalRequest } from './security.ts';
@@ -20,6 +21,7 @@ import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeekl
 import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
 import { installApiRateLimits, installRequestHardening } from './http-hardening.ts';
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
+import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, revokeDataSource } from './data-connections.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -62,7 +64,7 @@ function sessionId(req: express.Request, res: express.Response): string {
 function respond(res: express.Response, state: DemoState) { return res.json(snapshot(state)); }
 function failure(res: express.Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
-  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_)/.test(message);
+  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_|DATA_)/.test(message);
   return res.status(bad ? 400 : 500).json({ error: bad ? message : '服务暂时不可用，请稍后重试。' });
 }
 function route(fn: (req: express.Request, res: express.Response) => Promise<unknown> | unknown): express.RequestHandler {
@@ -83,6 +85,40 @@ app.get('/api/health', route((req, res) => {
     auditChainValid: verifyAuditChain(getState(id).audit), artifacts: artifactCounts(id) });
 }));
 app.get('/api/session', route((req, res) => respond(res, getState(sessionId(req, res)))));
+app.get('/api/data-connections', route((req, res) => {
+  const state = getState(sessionId(req, res));
+  res.json({ connections: state.dataConnections, simulated: true,
+    availableSources: DataSourceKindSchema.options.map(source => ({ source, label: DATA_SOURCE_LABELS[source],
+      permissionScopes: ['balances', 'transactions_90_days'] })) });
+}));
+app.post('/api/data-connections/connect', route((req, res) => {
+  const body = z.object({ sources: z.array(DataSourceKindSchema).min(1) }).parse(req.body);
+  const id = sessionId(req, res);
+  let result: DataSyncResult | undefined;
+  const state = mutateState(id, old => {
+    const outcome = connectDataSources(old, body.sources);
+    result = outcome.result;
+    return outcome.state;
+  });
+  res.json({ snapshot: snapshot(state), result });
+}));
+app.post('/api/data-connections/sync/ensure', route((req, res) => {
+  const id = sessionId(req, res);
+  let result: DataSyncResult | undefined;
+  const state = mutateState(id, old => {
+    const outcome = ensureDataSync(old);
+    result = outcome.result;
+    if (!outcome.result.batchKinds.includes('weekly_trend')) return outcome.state;
+    return ensureWeeklyRiskSummary(id, outcome.state).state;
+  });
+  ensureImpactThread(id, state);
+  res.json({ snapshot: snapshot(state), result });
+}));
+app.post('/api/data-connections/:source/revoke', route((req, res) => {
+  const source = DataSourceKindSchema.parse(req.params.source);
+  const state = mutateState(sessionId(req, res), old => revokeDataSource(old, source));
+  res.json({ snapshot: snapshot(state) });
+}));
 const toolNames = new Set<string>(bankingToolDefinitions.map(item => item.name));
 const BankingCallSchema = z.object({ tool: z.string().refine(value => toolNames.has(value), 'UNKNOWN_TOOL'),
   input: z.record(z.string(), z.unknown()).default({}), userConfirmed: z.boolean().default(false),
@@ -195,7 +231,8 @@ app.post('/api/agent/action', route((req, res) => {
   const body = z.object({ actionId: z.string(), decision: z.enum(['confirm', 'cancel']) }).parse(req.body);
   const id = sessionId(req, res); let outcome: ReturnType<typeof executeWorkspaceAction> | undefined;
   const state = mutateState(id, old => { outcome = executeWorkspaceAction(id, body.actionId, body.decision, old); return outcome.state; });
-  res.json({ snapshot: snapshot(state), message: outcome!.message, replayed: outcome!.replayed });
+  res.json({ snapshot: snapshot(state), message: outcome!.message, replayed: outcome!.replayed,
+    nextStep: outcome!.nextStep });
 }));
 app.get('/api/ui/cards', route(async (req, res) => {
   const cards = snapshot(getState(sessionId(req, res))).cards;

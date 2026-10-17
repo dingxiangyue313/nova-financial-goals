@@ -48,6 +48,21 @@ CREATE TABLE IF NOT EXISTS weekly_risk_summaries (
   status TEXT NOT NULL, payload_json TEXT NOT NULL,
   PRIMARY KEY(session_id, id), UNIQUE(session_id, dedupe_key)
 );
+CREATE TABLE IF NOT EXISTS data_connections (
+  session_id TEXT NOT NULL, source TEXT NOT NULL, status TEXT NOT NULL,
+  payload_json TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY(session_id, source)
+);
+CREATE TABLE IF NOT EXISTS data_sync_batches (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, dedupe_key TEXT NOT NULL,
+  kind TEXT NOT NULL, payload_json TEXT NOT NULL,
+  PRIMARY KEY(session_id, id), UNIQUE(session_id, dedupe_key)
+);
+CREATE TABLE IF NOT EXISTS imported_transactions (
+  session_id TEXT NOT NULL, source TEXT NOT NULL, external_transaction_id TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  PRIMARY KEY(session_id, source, external_transaction_id)
+);
 CREATE TABLE IF NOT EXISTS agent_runs (
   session_id TEXT PRIMARY KEY, current_run_id TEXT NOT NULL
 );
@@ -107,6 +122,18 @@ function syncArtifacts(sessionId: string, state: DemoState) {
   for (const summary of state.weeklyRiskSummaries) db.prepare(`INSERT INTO weekly_risk_summaries(session_id,id,dedupe_key,status,payload_json)
     VALUES(?,?,?,?,?) ON CONFLICT(session_id,dedupe_key) DO UPDATE SET status=excluded.status,payload_json=excluded.payload_json`)
     .run(sessionId, summary.id, summary.dedupeKey, summary.status, JSON.stringify(summary));
+  for (const connection of state.dataConnections) db.prepare(`INSERT INTO data_connections(session_id,source,status,payload_json,updated_at)
+    VALUES(?,?,?,?,?) ON CONFLICT(session_id,source) DO UPDATE SET status=excluded.status,payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
+    .run(sessionId, connection.source, connection.status, JSON.stringify(connection), new Date().toISOString());
+  for (const batch of state.dataSyncBatches) db.prepare(`INSERT INTO data_sync_batches(session_id,id,dedupe_key,kind,payload_json)
+    VALUES(?,?,?,?,?) ON CONFLICT(session_id,dedupe_key) DO UPDATE SET payload_json=excluded.payload_json`)
+    .run(sessionId, batch.id, batch.dedupeKey, batch.kind, JSON.stringify(batch));
+  for (const transaction of state.transactions) {
+    if (!transaction.sourceKind) continue;
+    db.prepare(`INSERT INTO imported_transactions(session_id,source,external_transaction_id,payload_json)
+      VALUES(?,?,?,?) ON CONFLICT(session_id,source,external_transaction_id) DO UPDATE SET payload_json=excluded.payload_json`)
+      .run(sessionId, transaction.sourceKind, transaction.id, JSON.stringify(transaction));
+  }
   for (const approval of state.approvals) db.prepare(`INSERT INTO approval_artifacts(id,session_id,status,payload_json)
     VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,payload_json=excluded.payload_json`)
     .run(approval.id, sessionId, approval.status, JSON.stringify(approval));
@@ -239,6 +266,9 @@ export function resetState(sessionId: string): DemoState {
     db.prepare('DELETE FROM spending_patterns WHERE session_id=?').run(sessionId);
     db.prepare('DELETE FROM risk_signals WHERE session_id=?').run(sessionId);
     db.prepare('DELETE FROM weekly_risk_summaries WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM data_connections WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM data_sync_batches WHERE session_id=?').run(sessionId);
+    db.prepare('DELETE FROM imported_transactions WHERE session_id=?').run(sessionId);
     const runId = randomUUID();
     db.prepare('UPDATE agent_threads SET read_only=1, status=\'archived\', updated_at=? WHERE session_id=?')
       .run(new Date().toISOString(), sessionId);

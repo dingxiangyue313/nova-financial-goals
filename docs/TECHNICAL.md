@@ -7,6 +7,7 @@ React 原版界面 + 对话工作台 ── same-origin /api ── Express 服�
                                    ├─ Zod 共享契约 / 白名单卡片
                                    ├─ 确定性目标与风险规则
                                    ├─ DeepSeek 可选解析 / 编排
+                                   ├─ 模拟连接器、幂等同步批次与数据来源证明
                                    ├─ SQLite Thread、Turn、Component、Action、Twin 与审计
                                    └─ 受保护 /mcp 模拟工具
 ```
@@ -15,6 +16,7 @@ React 原版界面 + 对话工作台 ── same-origin /api ── Express 服�
 - 状态：`server/store.ts` 为每个签名 Cookie 建立独立 SQLite 会话。版本化 Financial Twin 包含账户、交易、账单、订阅、目标和 Mandate；写入在 SQLite 事务内同步状态与证据表。
 - 契约：`shared/contracts.ts` 使用 Zod；金额均为整数分，日期是 `YYYY-MM-DD`。页面只把分转换为显示用元。
 - 规则：`server/domain.ts` 计算资金余量、预测日期和三方案；`server/risk.ts` 统一分析流水趋势、目标影响、用户提醒和外部 Agent 决策；`server/banking.ts` 是统一工具运行时，覆盖目标状态、转账、换汇、Mandate、外部请求、幂等、Operation、Receipt 和审计导出。受保护应急金不进入可用余额。
+- 数据连接：`server/data-connections.ts` 提供银行卡、微信支付和支付宝确定性模拟连接器。外部流水按体验者、来源和外部编号去重；同一事务更新流水、账户、Twin Version、风险判断、活动与审计。客户端在启动、回到前台和每分钟调用幂等 `sync/ensure`。
 - 批准：`server/governance.ts` 冻结 action、参数、Twin Version 和过期时间并计算 SHA-256；用户确认后签发短期一次性 Token。参数、版本、期限或消费状态不匹配即拒绝。
 - 外部认证：`server/security.ts` 用 HMAC 绑定 Agent ID、会话主体、时间戳、Nonce 和请求体；5 分钟窗口和持久化 Nonce 防止重放。它同时提供 Prompt Injection 检测与本地限流。
 - 工作台：`server/workspace.ts` 生成完整 Agent Turn。最近 20 条消息和精简 Twin 状态仅用于意图理解；服务端按白名单组合组件，并为写操作签发绑定会话、Twin Version、期限和幂等键的 `actionId`。
@@ -26,7 +28,7 @@ React 原版界面 + 对话工作台 ── same-origin /api ── Express 服�
 
 | 场景 | 输入 | 规则结果 | 页面/记录 |
 | --- | --- | --- | --- |
-| 创建目标 | 描述、金额、日期、保护额 | 草案；要求显式选择方案 | 创建页 → 可行性页 |
+| 创建目标 | 描述、金额、日期、保护额 | 草案；未连接时先读取近 90 天模拟流水 | 创建页 → 数据连接 → 可行性页 |
 | 方案未选 | 激活 `null` | `PLAN_NOT_SELECTED` | 不激活 |
 | 正常 | 可用月结余足够、历史数据 ≥2 月 | `on_track` | 首页按时预测 |
 | 数据不足 | 历史数据 <2 月 | `insufficient_data` | 表明依据不足 |
@@ -67,17 +69,19 @@ Agent 请求按固定顺序判断：身份、有效期、余额、保护资金�
 | `GET /api/activity`, `/api/audit/export` | Hash 链活动与 JSON/CSV 证据 |
 | `GET/PATCH /api/risk/preferences` | 读取或更新会话内智能守护偏好 |
 | `GET /api/risk/signals` | 读取趋势证据和目标影响信号 |
-| `POST /api/demo/spending-trend` | 幂等注入固定的累计消费趋势故事 |
+| `GET /api/data-connections` | 查看模拟来源、权限、覆盖范围与更新时间 |
+| `POST /api/data-connections/connect` | 连接选定来源并立即导入近 90 天数据 |
+| `POST /api/data-connections/sync/ensure` | 幂等补齐模拟时钟对应的新批次并运行自动守护 |
+| `POST /api/data-connections/:source/revoke` | 停止该来源未来同步并保留历史证据 |
 | `POST /api/external-agent/request` | HMAC、时间戳、Nonce 认证的外部请求 |
 | `POST /api/goal/interpret` | DeepSeek 或确定性自然语言解析 |
 | `POST /api/goals`, `PATCH /api/goals/current` | 新建、修改目标草案 |
 | `POST /api/goals/activate` | 明确选择后激活方案 |
-| `POST /api/demo/expense`, `/api/demo/deposit` | 注入模拟支出/存入 |
 | `POST /api/impact/decision` | 选择 A/B、稍后或忽略 |
 | `POST /api/mandates`, `/api/mandates/revoke` | 创建、撤销模拟授权 |
 | `POST /api/demo/agent-request` | 演示外部 Agent 请求 |
 | `POST /api/operations/:id/approve`, `GET /api/operations/:id` | 逐次同意与查验 |
-| `POST /api/demo/scenario`, `/api/demo/clock`, `/api/demo/reset` | 演示状态与时钟、重置 |
+| `POST /api/demo/clock`, `/api/demo/reset` | 推进确定性演示时钟或清除目标、连接与模拟财务数据 |
 | `GET /api/ui/cards` | 可选模型重排白名单卡片 |
 | `GET /api/health` | 健康检查 |
 

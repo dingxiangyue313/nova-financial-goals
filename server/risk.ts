@@ -294,7 +294,7 @@ const demoTransactions: Transaction[] = [
   { id: 'trend-current-3', accountId: 'checking', date: '2026-09-09', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -40000 },
   { id: 'trend-current-4', accountId: 'checking', date: '2026-09-15', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -35000 },
   { id: 'trend-current-5', accountId: 'checking', date: '2026-09-21', title: '外卖与打车', category: 'delivery_and_rides', amountCents: -35000 },
-];
+].map((item): Transaction => ({ ...item, sourceKind: 'wechat_pay', provenance: 'connected_data' }));
 
 const weeklyDemoTransactions: Transaction[] = [
   { id: 'weekly-old-1', accountId: 'checking', date: '2026-06-28', title: '数字订阅', category: 'subscriptions_demo', amountCents: -10000 },
@@ -304,7 +304,7 @@ const weeklyDemoTransactions: Transaction[] = [
   { id: 'weekly-current-1', accountId: 'checking', date: '2026-09-02', title: '数字订阅', category: 'subscriptions_demo', amountCents: -20000 },
   { id: 'weekly-current-2', accountId: 'checking', date: '2026-09-09', title: '数字订阅', category: 'subscriptions_demo', amountCents: -20000 },
   { id: 'weekly-current-3', accountId: 'checking', date: '2026-09-21', title: '数字订阅', category: 'subscriptions_demo', amountCents: -20000 },
-];
+].map((item): Transaction => ({ ...item, sourceKind: 'alipay', provenance: 'connected_data' }));
 
 function roundHundredYuan(cents: number): number { return Math.ceil(cents / 10000) * 10000; }
 
@@ -363,7 +363,7 @@ export function applySpendingTrendDemo(state: DemoState): {
     title: '外卖与打车支出趋势影响日本旅行', decision: decision.outcome,
     evidence: pattern.evidenceTransactionIds.map(transactionId => {
       const item = transactions.find(transaction => transaction.id === transactionId)!;
-      return { transactionId, date: item.date, amountCents: Math.max(0, -item.amountCents) };
+      return { transactionId, date: item.date, amountCents: Math.max(0, -item.amountCents), sourceKind: item.sourceKind };
     }),
     confidence: pattern.confidence, ruleVersion: RISK_RULE_VERSION, twinVersion: state.twinVersion + 1,
     impact: impactData, status: 'active', suppressionKey,

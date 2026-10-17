@@ -25,6 +25,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const cards = SnapshotSchema.shape.cards.parse(snapshot.cards).map(card => normalizeUiCard(card));
   const insight = cards.find(card => card.type === 'goal_feasibility_card');
   const impact = snapshot.pendingImpact;
+  const connectedSources = snapshot.dataConnections.filter(item => item.status === 'connected');
+  const lastSyncedAt = connectedSources.map(item => item.lastSyncedAt).filter(Boolean).sort().at(-1);
 
   return (
     <div className="flex flex-col w-full gap-3.5 select-none py-2 px-4">
@@ -36,7 +38,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] text-[11px] font-semibold">
             <span className="material-symbols-outlined text-[13px]">verified</span>
-            智能守护中
+            {connectedSources.length ? '智能守护中' : '等待连接数据'}
           </span>
         </div>
         <h1 className="text-[20px] font-bold text-[#1F2329] tracking-tight">
@@ -53,6 +55,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </button>
         </div>
       </section>
+
+      <div className="flex items-center gap-1.5 rounded-lg border border-[#E5E8EB] bg-white px-3 py-2 text-[11px] text-[#5A616B]">
+        <span className="material-symbols-outlined text-[15px] text-[#0F6B6D]">sync</span>
+        {connectedSources.length
+          ? `已连接 ${connectedSources.length} 个模拟来源 · 数据更新于 ${lastSyncedAt ? new Date(lastSyncedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '等待首次同步'}`
+          : '尚未连接流水 · 当前结果仅为演示估算'}
+      </div>
 
       {/* Proactive Alert Banner for Impact (if event is active) */}
       {hasImpactPending && (

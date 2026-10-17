@@ -3,6 +3,42 @@ import { z } from 'zod';
 export const MoneySchema = z.number().int().nonnegative();
 export const IsoDateSchema = z.iso.date();
 
+export const DataSourceKindSchema = z.enum(['bank', 'wechat_pay', 'alipay']);
+export type DataSourceKind = z.infer<typeof DataSourceKindSchema>;
+
+export const DataPermissionScopeSchema = z.enum(['balances', 'transactions_90_days']);
+export type DataPermissionScope = z.infer<typeof DataPermissionScopeSchema>;
+
+export const DataProvenanceSchema = z.enum(['connected_data', 'system_calculated', 'user_assumption']);
+export type DataProvenance = z.infer<typeof DataProvenanceSchema>;
+
+export const DataConnectionSchema = z.object({
+  id: z.string().min(1), source: DataSourceKindSchema, label: z.string().min(1),
+  status: z.enum(['connected', 'revoked', 'error']), simulated: z.literal(true),
+  permissionScopes: z.array(DataPermissionScopeSchema).min(1),
+  connectedAt: z.string(), revokedAt: z.string().nullable().default(null),
+  lastSyncedAt: z.string().nullable().default(null),
+  coverageStart: IsoDateSchema.nullable().default(null), coverageEnd: IsoDateSchema.nullable().default(null),
+});
+export type DataConnection = z.infer<typeof DataConnectionSchema>;
+
+export const DataSyncBatchSchema = z.object({
+  id: z.string().min(1), dedupeKey: z.string().min(1),
+  kind: z.enum(['historical', 'weekly_trend', 'goal_risk']),
+  sources: z.array(DataSourceKindSchema).min(1), status: z.literal('completed'),
+  importedCount: z.number().int().nonnegative(), completedAt: z.string(),
+  twinVersionBefore: z.number().int().positive(), twinVersionAfter: z.number().int().positive(),
+});
+export type DataSyncBatch = z.infer<typeof DataSyncBatchSchema>;
+
+export const DataSyncResultSchema = z.object({
+  importedCount: z.number().int().nonnegative(), replayed: z.boolean(),
+  batchKinds: z.array(DataSyncBatchSchema.shape.kind),
+  coverageStart: IsoDateSchema.nullable(), coverageEnd: IsoDateSchema.nullable(),
+  twinVersion: z.number().int().positive(),
+});
+export type DataSyncResult = z.infer<typeof DataSyncResultSchema>;
+
 export const GoalSchema = z.object({
   id: z.string().min(1), title: z.string().min(1).max(60),
   targetCents: MoneySchema, savedCents: MoneySchema, targetDate: IsoDateSchema,
@@ -30,6 +66,7 @@ export type Account = z.infer<typeof AccountSchema>;
 export const TransactionSchema = z.object({
   id: z.string(), accountId: z.string(), date: IsoDateSchema, title: z.string(),
   category: z.string(), amountCents: z.number().int(),
+  sourceKind: DataSourceKindSchema.optional(), provenance: DataProvenanceSchema.optional(),
 });
 export type Transaction = z.infer<typeof TransactionSchema>;
 
@@ -90,7 +127,8 @@ export type RiskDecision = z.infer<typeof RiskDecisionSchema>;
 export const GoalImpactSignalSchema = z.object({
   id: z.string(), goalId: z.string(), patternId: z.string(), impactId: z.string(), createdAt: IsoDateSchema,
   title: z.string(), decision: z.literal('immediate_signal'),
-  evidence: z.array(z.object({ transactionId: z.string(), date: IsoDateSchema, amountCents: MoneySchema })),
+  evidence: z.array(z.object({ transactionId: z.string(), date: IsoDateSchema, amountCents: MoneySchema,
+    sourceKind: DataSourceKindSchema.optional() })),
   confidence: z.enum(['low', 'medium', 'high']), ruleVersion: z.string(),
   twinVersion: z.number().int().positive(), impact: GoalRiskImpactSchema,
   status: z.enum(['active', 'later', 'dismissed', 'resolved']),
@@ -216,6 +254,8 @@ export const DemoStateSchema = z.object({
   spendingPatterns: z.array(SpendingPatternSchema).default([]),
   riskSignals: z.array(GoalImpactSignalSchema).default([]),
   weeklyRiskSummaries: z.array(WeeklyRiskSummarySchema).default([]),
+  dataConnections: z.array(DataConnectionSchema).default([]),
+  dataSyncBatches: z.array(DataSyncBatchSchema).default([]),
 });
 export type DemoState = z.infer<typeof DemoStateSchema>;
 
@@ -360,5 +400,7 @@ export const SnapshotSchema = z.object({
   spendingPatterns: z.array(SpendingPatternSchema),
   riskSignals: z.array(GoalImpactSignalSchema),
   weeklyRiskSummaries: z.array(WeeklyRiskSummarySchema),
+  dataConnections: z.array(DataConnectionSchema).default([]),
+  dataSyncBatches: z.array(DataSyncBatchSchema).default([]),
 });
 export type Snapshot = z.infer<typeof SnapshotSchema>;

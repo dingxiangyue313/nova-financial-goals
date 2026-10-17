@@ -25,7 +25,8 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
   async function refreshThreads(preferred?: string | null) {
     const result = await api<{ threads: AgentThread[] }>('/api/agent/threads?includeArchived=true');
     setThreads(result.threads);
-    const defaultThread = result.threads.find(item => item.status === 'active' && !item.unread && item.kind !== 'risk')
+    const defaultThread = result.threads.find(item => item.status === 'active' && item.unread && item.kind === 'risk')
+      || result.threads.find(item => item.status === 'active' && !item.unread && item.kind !== 'risk')
       || result.threads.find(item => item.status === 'active' && item.kind !== 'risk')
       || result.threads.find(item => item.status === 'active' && !item.unread)
       || null;
@@ -67,8 +68,10 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
     if (busy) return;
     setBusy(true); setError(null);
     try {
-      const result = await api<{ snapshot: Snapshot; message: AgentMessage; replayed: boolean }>('/api/agent/action', 'POST', { actionId, decision: 'confirm' });
+      const result = await api<{ snapshot: Snapshot; message: AgentMessage; replayed: boolean;
+        nextStep: 'connect_data' | null }>('/api/agent/action', 'POST', { actionId, decision: 'confirm' });
       onSnapshot(result.snapshot);
+      if (result.nextStep === 'connect_data') { onNavigate('data_connections'); return; }
       if (activeThreadId) await loadMessages(activeThreadId);
       await refreshThreads(activeThreadId || undefined);
     } catch (value) { setError(value instanceof Error ? value.message : '操作失败'); }

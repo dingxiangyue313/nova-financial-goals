@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScreenId, Goal } from './types';
 import { api, cents, displayGoal, displayImpact } from './api';
-import type { RiskPreferences, Snapshot, UiCard } from '../shared/contracts';
+import type { DataSourceKind, DataSyncResult, RiskPreferences, Snapshot, UiCard } from '../shared/contracts';
 import { normalizeUiCard } from '../shared/generative';
 import { TopBar } from './components/TopBar';
 import { BottomNav } from './components/BottomNav';
@@ -14,6 +14,7 @@ import { ActivityScreen } from './screens/ActivityScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { BankingDemoScreen } from './screens/BankingDemoScreen';
 import { AgentWorkspaceScreen } from './screens/AgentWorkspaceScreen';
+import { DataConnectionScreen } from './screens/DataConnectionScreen';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('home');
@@ -26,6 +27,8 @@ export default function App() {
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
   const [workspaceStarter, setWorkspaceStarter] = useState('');
+  const [connectionBusy, setConnectionBusy] = useState(false);
+  const autoSyncing = useRef(false);
   useEffect(() => {
     api('/api/session').then(setSnapshot).catch(e => setLoadError(e.message));
   }, []);
@@ -39,6 +42,31 @@ export default function App() {
     }).catch(() => {});
     return () => { current = false; };
   }, [snapshot?.goal.id, snapshot?.goal.savedCents, snapshot?.goal.selectedPlanId, snapshot?.pendingImpact?.id, snapshot?.operations.length]);
+  const hasConnectedData = Boolean(snapshot?.dataConnections.some(item => item.status === 'connected'));
+  useEffect(() => {
+    if (!hasConnectedData) return;
+    let active = true;
+    const ensure = async () => {
+      if (autoSyncing.current || document.visibilityState === 'hidden') return;
+      autoSyncing.current = true;
+      try {
+        const outcome = await api<{ snapshot: Snapshot; result: DataSyncResult }>('/api/data-connections/sync/ensure', 'POST');
+        if (!active) return;
+        setSnapshot(outcome.snapshot);
+        if (outcome.result.batchKinds.includes('goal_risk')) {
+          setToastMessage('新流水已影响目标，NOVA 已生成风险解释');
+          setTimeout(() => setToastMessage(null), 2800);
+        }
+      } catch {
+        // Automatic checks stay quiet; the connection screen shows persistent status.
+      } finally { autoSyncing.current = false; }
+    };
+    void ensure();
+    const timer = window.setInterval(() => void ensure(), 60_000);
+    const onVisibility = () => { if (document.visibilityState === 'visible') void ensure(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibility); };
+  }, [hasConnectedData]);
   const goal = snapshot ? displayGoal(snapshot) : null;
   const scenario = snapshot ? displayImpact(snapshot) : null;
   const hasImpactPending = Boolean(snapshot?.pendingImpact);
@@ -76,6 +104,8 @@ export default function App() {
       }
     } else if (currentScreen === 'create_goal') {
       setCurrentScreen('home');
+    } else if (currentScreen === 'data_connections') {
+      setCurrentScreen(previousScreen === 'profile' ? 'profile' : 'create_goal');
     } else if (currentScreen === 'impact') {
       setCurrentScreen('home');
     } else if (currentScreen === 'workspace' || currentScreen === 'goals_list' || currentScreen === 'activity' || currentScreen === 'profile' || currentScreen === 'banking_demo') {
@@ -109,13 +139,41 @@ export default function App() {
   const handleNext = async (updated: Partial<Goal>) => {
     if (!goal) return;
     const combined = { ...goal, ...draftChanges, ...updated };
-    await mutate('/api/goals', 'POST', {
+    const next = await mutate('/api/goals', 'POST', {
       title: combined.title, targetCents: cents(combined.targetAmount), targetDate: combined.targetDate,
       protectedCents: cents(combined.emergencyFundProtected), quote: combined.quote || '',
       flexibilityWeeks: combined.flexibilityWeeks,
     });
     setDraftChanges({});
-    navigateTo('feasibility');
+    navigateTo(next.dataConnections.some(item => item.status === 'connected') ? 'feasibility' : 'data_connections');
+  };
+  const handleConnectData = async (sources: DataSourceKind[]) => {
+    setConnectionBusy(true);
+    try {
+      const outcome = await api<{ snapshot: Snapshot; result: DataSyncResult }>('/api/data-connections/connect', 'POST', { sources });
+      setSnapshot(outcome.snapshot);
+      showToast(`已读取近 90 天模拟流水（${outcome.result.importedCount} 笔）`);
+      if (previousScreen !== 'profile') navigateTo('feasibility');
+    } catch (error) { showToast(error instanceof Error ? error.message : '连接失败'); }
+    finally { setConnectionBusy(false); }
+  };
+  const handleRevokeData = async (source: DataSourceKind) => {
+    setConnectionBusy(true);
+    try {
+      const outcome = await api<{ snapshot: Snapshot }>(`/api/data-connections/${source}/revoke`, 'POST');
+      setSnapshot(outcome.snapshot);
+      showToast('已停止后续同步；历史判断依据仍保留');
+    } catch (error) { showToast(error instanceof Error ? error.message : '撤销失败'); }
+    finally { setConnectionBusy(false); }
+  };
+  const handleAdvanceDemo = async (date: '2026-09-22' | '2026-09-23') => {
+    await mutate('/api/demo/clock', 'POST', { date });
+    const outcome = await api<{ snapshot: Snapshot; result: DataSyncResult }>('/api/data-connections/sync/ensure', 'POST');
+    setSnapshot(outcome.snapshot);
+    if (outcome.result.batchKinds.includes('goal_risk')) {
+      showToast('自动守护发现目标受到影响');
+      navigateTo('workspace');
+    } else showToast('自动同步完成；本次变化保持安静');
   };
   const handleConfirmPlan = async (planId: string) => {
     await mutate('/api/goals/activate', 'POST', { planId });
@@ -147,31 +205,6 @@ export default function App() {
     await mutate('/api/demo/reset', 'POST');
     showToast('已重置演示数据');
   };
-  const handleTriggerImpact = async (amount = 900) => {
-    const result = await mutate('/api/demo/expense', 'POST', { amountCents: cents(amount), title: '汽车保养' });
-    if (result.pendingImpact) { navigateTo('impact'); showToast(`已模拟 ¥${amount} 支出，目标影响已更新`); }
-    else showToast(`已模拟 ¥${amount} 支出，未触发显著影响提醒`);
-  };
-  const handleSpendingTrend = async () => {
-    const result = await mutate('/api/demo/spending-trend', 'POST', { idempotencyKey: 'delivery-rides-september' });
-    if (result.pendingImpact) {
-      navigateTo('impact');
-      showToast('累计趋势已影响目标，NOVA 已生成风险解释');
-    } else showToast('趋势已记录，本次无需即时提醒');
-  };
-  const handleWeeklySummary = async () => {
-    await mutate('/api/demo/weekly-summary', 'POST');
-    navigateTo('workspace');
-    showToast('已生成本周安静摘要，不会显示紧急红点');
-  };
-  const handleDeposit = async () => {
-    await mutate('/api/demo/deposit', 'POST', { amountCents: 150000 });
-    showToast('已模拟存入 ¥1,500');
-  };
-  const handleScenario = async (scenario: 'insufficient_data' | 'infeasible' | 'normal') => {
-    await mutate('/api/demo/scenario', 'POST', { scenario });
-    showToast(scenario === 'insufficient_data' ? '已切换为数据不足' : scenario === 'infeasible' ? '已切换为不可行' : '已恢复正常数据');
-  };
   // Get screen titles for TopBar
   const getScreenTitle = () => {
     switch (currentScreen) {
@@ -179,6 +212,8 @@ export default function App() {
         return '创建目标';
       case 'feasibility':
         return '目标可行性';
+      case 'data_connections':
+        return '数据连接';
       case 'impact':
         return '目标影响';
       case 'goals_list':
@@ -322,6 +357,17 @@ export default function App() {
             />
           )}
 
+          {currentScreen === 'data_connections' && (
+            <DataConnectionScreen
+              connections={snapshot.dataConnections}
+              onboarding={previousScreen !== 'profile'}
+              busy={connectionBusy}
+              onConnect={handleConnectData}
+              onRevoke={handleRevokeData}
+              onBack={handleBack}
+            />
+          )}
+
           {currentScreen === 'impact' && scenario && (
             <GoalImpactScreen
               goal={goal}
@@ -333,7 +379,7 @@ export default function App() {
             />
           )}
 
-          {currentScreen === 'impact' && !scenario && <div className="m-4 bg-white rounded-xl p-5 text-sm text-[#5A616B]">目前没有显著支出影响。请先激活计划，再在模拟数据面板注入支出。</div>}
+          {currentScreen === 'impact' && !scenario && <div className="m-4 bg-white rounded-xl p-5 text-sm text-[#5A616B]">目前没有显著支出影响。连接数据并激活计划后，NOVA 会随新流水自动判断。</div>}
 
           {currentScreen === 'goals_list' && (
             <GoalsListScreen
@@ -360,11 +406,9 @@ export default function App() {
             <ProfileScreen
               goal={goal}
               onNavigate={navigateTo}
-              onTriggerImpact={handleTriggerImpact}
-              onWeeklySummary={handleWeeklySummary}
-              onSpendingTrend={handleSpendingTrend}
               onResetData={handleResetData}
               onBankingDemo={() => navigateTo('banking_demo')}
+              onDataConnections={() => navigateTo('data_connections')}
             />
           )}
         </main>
@@ -401,9 +445,7 @@ export default function App() {
                   <span className="material-symbols-outlined text-[18px] text-[#0F6B6D]">
                     science
                   </span>
-                  <span className="font-bold text-[14px] text-[#1F2329]">
-                    模拟数据与事件注入
-                  </span>
+                  <span className="font-bold text-[14px] text-[#1F2329]">模拟时间与自动同步</span>
                 </div>
                 <button
                   onClick={() => setShowSimulateModal(false)}
@@ -413,60 +455,26 @@ export default function App() {
                 </button>
               </div>
 
-              <p className="text-[12px] text-[#5A616B]">
-                你可以在此随时模拟生活变动，测试 NOVA 如何动态护航你的目标与应急金。
-              </p>
+              <p className="text-[12px] text-[#5A616B]">推进演示日期后，已连接的数据来源会自动出现对应流水；用户无需记账或手动同步。</p>
 
               <div className="space-y-2">
                 <button
-                  onClick={() => { void handleWeeklySummary(); setShowSimulateModal(false); }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-[#F2FAFA] hover:bg-[#D8E7E7] text-[#0F6B6D] font-semibold text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer"
+                  onClick={() => { void handleAdvanceDemo('2026-09-22'); setShowSimulateModal(false); }}
+                  disabled={!hasConnectedData}
+                  className="w-full py-2.5 px-3 rounded-xl bg-[#F2FAFA] hover:bg-[#D8E7E7] text-[#0F6B6D] font-semibold text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer disabled:opacity-40"
                 >
-                  <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">event_note</span><span>生成本周安静摘要</span></div>
+                  <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">event_note</span><span>推进到 9月22日 · 普通趋势</span></div>
                   <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                 </button>
                 <button
-                  onClick={() => { void handleSpendingTrend(); setShowSimulateModal(false); }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-[#FFF7E6] hover:bg-[#F5A623] hover:text-white text-[#8A5A00] font-semibold text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer"
+                  onClick={() => { void handleAdvanceDemo('2026-09-23'); setShowSimulateModal(false); }}
+                  disabled={!hasConnectedData}
+                  className="w-full py-2.5 px-3 rounded-xl bg-[#FFF7E6] hover:bg-[#F5A623] hover:text-white text-[#8A5A00] font-semibold text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer disabled:opacity-40"
                 >
-                  <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">insights</span><span>模拟外卖与打车趋势（¥600 → ¥1,900）</span></div>
+                  <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">insights</span><span>推进到 9月23日 · 目标风险</span></div>
                   <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                 </button>
-                <button
-                  onClick={() => {
-                    void handleTriggerImpact();
-                    setShowSimulateModal(false);
-                  }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-[#E6F2F2] hover:bg-[#0F6B6D] hover:text-white text-[#0F6B6D] font-semibold text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[18px]">car_repair</span>
-                    <span>模拟突发支出 ¥900 (触发目标影响)</span>
-                  </div>
-                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    void handleDeposit();
-                    setShowSimulateModal(false);
-                  }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-[#F5F7F8] hover:bg-[#E5E8EB] text-[#1F2329] font-medium text-[13px] text-left flex items-center justify-between transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[18px] text-[#276B4E]">
-                      savings
-                    </span>
-                    <span>模拟额外存入 ¥1,500 (超额提速)</span>
-                  </div>
-                  <span className="material-symbols-outlined text-[16px]">add</span>
-                </button>
-
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button onClick={() => { void handleTriggerImpact(10); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#5A616B]">小额波动 ¥10</button>
-                  <button onClick={() => { void handleScenario('insufficient_data'); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#5A616B]">数据不足</button>
-                  <button onClick={() => { void handleScenario('infeasible'); setShowSimulateModal(false); }} className="rounded-lg border border-[#E5E8EB] p-2 text-[11px] text-[#5A616B]">目标不可行</button>
-                </div>
+                {!hasConnectedData && <p className="rounded-lg bg-[#FFF7E6] p-2 text-[11px] text-[#8A5A00]">请先在创建目标流程或“我的 → 数据连接与自动守护”连接模拟来源。</p>}
 
                 <button
                   onClick={() => {

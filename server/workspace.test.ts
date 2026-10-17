@@ -77,6 +77,9 @@ test('workspace action is idempotent and rejects a changed financial twin', asyn
   assert.ok(confirmation && confirmation.type === 'confirmation');
   const first = executeWorkspaceAction(sessionId, confirmation.action.actionId, 'confirm', state);
   assert.equal(first.state.goal.targetCents, 800000);
+  assert.equal(first.nextStep, 'connect_data');
+  assert.ok(first.message.components.some(component => component.type === 'explanation'
+    && component.title === '连接模拟数据后再计算'));
   const replay = executeWorkspaceAction(sessionId, confirmation.action.actionId, 'confirm', first.state);
   assert.equal(replay.replayed, true);
   assert.equal(replay.state.twinVersion, first.state.twinVersion);

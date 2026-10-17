@@ -12,6 +12,8 @@ async function openApp(page: Page) {
 async function activateBalancedGoal(page: Page) {
   await page.getByRole('button', { name: '2. 创建目标' }).click();
   await page.getByRole('button', { name: '下一步：查看可行性' }).click();
+  await expect(page.getByRole('heading', { name: '连接模拟数据' })).toBeVisible();
+  await page.getByRole('button', { name: '连接并开始智能守护' }).click();
   await expect(page.getByText('选择适合你的节奏', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '请选择一个方案' })).toBeDisabled();
   await page.getByRole('button', { name: /平衡方案/ }).click();
@@ -31,44 +33,57 @@ test('故事一：目标可行性必须先选择方案，再激活计划', async
   await expect(page.getByText('已选择并启用计划')).toBeVisible();
 });
 
+test('创建目标后连接三类模拟数据，再进入可行性分析', async ({ page }) => {
+  await openApp(page);
+  await page.getByRole('button', { name: '2. 创建目标' }).click();
+  await page.getByRole('button', { name: '下一步：查看可行性' }).click();
+  await expect(page.getByRole('heading', { name: '连接模拟数据' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: /银行卡/ })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /微信支付/ })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /支付宝/ })).toBeChecked();
+  await page.getByRole('button', { name: '连接并开始智能守护' }).click();
+  await expect(page.getByText('选择适合你的节奏', { exact: true })).toBeVisible();
+  await expect(page.getByText(/已读取近 90 天模拟流水/)).toBeVisible();
+});
+
 test('故事二扩展：累计小额流水形成趋势后才解释目标风险', async ({ page }) => {
   await openApp(page);
   await activateBalancedGoal(page);
 
-  await page.getByTitle('点击切换模拟数据或事件').click();
-  await page.getByRole('button', { name: /模拟外卖与打车趋势/ }).click();
+  await page.getByTitle('查看模拟时间与自动同步').click();
+  await page.getByRole('button', { name: /推进到 9月22日/ }).click();
+  await expect(page.getByText('自动同步完成；本次变化保持安静')).toBeVisible();
+  await expect(page.getByText('外卖与打车持续上升')).not.toBeVisible();
+
+  await page.getByTitle('查看模拟时间与自动同步').click();
+  await page.getByRole('button', { name: /推进到 9月23日/ }).click();
   await expect(page.getByText('外卖与打车持续上升').first()).toBeVisible();
   await expect(page.getByText(/¥1,300/).first()).toBeVisible();
   await expect(page.getByText(/延期 16 天/).first()).toBeVisible();
-  await expect(page.getByText(/应急金未受影响/)).toBeVisible();
+  await expect(page.getByText(/应急金未受影响/).first()).toBeVisible();
 });
 
-test('故事二：小额波动保持安静，显著支出才触发目标调整', async ({ page }) => {
+test('故事二：自动守护只在显著趋势影响目标后提供调整', async ({ page }) => {
   await openApp(page);
   await activateBalancedGoal(page);
 
-  await page.getByTitle('点击切换模拟数据或事件').click();
-  await page.getByRole('button', { name: '小额波动 ¥10' }).click();
-  await expect(page.getByText('已模拟 ¥10 支出，未触发显著影响提醒')).toBeVisible();
-
-  await page.getByTitle('点击切换模拟数据或事件').click();
-  await page.getByRole('button', { name: /模拟突发支出 ¥900/ }).click();
-  await expect(page.getByText(/两个不动应急金的办法/)).toBeVisible();
-  await expect(page.getByText(/应急金未受影响/)).toBeVisible();
-  await page.getByRole('button', { name: /方案 B · 调整目标日期/ }).click();
-  await page.getByRole('button', { name: /确认应用：方案 B/ }).click();
-  await expect(page.getByText('已应用方案 B')).toBeVisible();
+  await page.getByTitle('查看模拟时间与自动同步').click();
+  await page.getByRole('button', { name: /推进到 9月23日/ }).click();
+  await expect(page.getByText(/外卖与打车支出趋势影响日本旅行/).first()).toBeVisible();
+  await expect(page.getByText(/应急金/).first()).toBeVisible();
 });
 
-test('个人设置的突发支出按钮使用默认 ¥900 金额', async ({ page }) => {
+test('个人设置可以撤销单个来源并保留历史覆盖信息', async ({ page }) => {
   await openApp(page);
   await activateBalancedGoal(page);
 
   await page.getByTitle('个人设置').click();
-  await page.getByRole('button', { name: '模拟突发支出 ¥900' }).click();
-
-  await expect(page.getByText(/两个不动应急金的办法/)).toBeVisible();
-  await expect(page.getByText(/amountCents/)).not.toBeVisible();
+  await page.getByRole('button', { name: /数据连接与自动守护/ }).click();
+  await expect(page.getByRole('heading', { name: '连接模拟数据' })).toBeVisible();
+  const wechat = page.getByRole('region', { name: '微信支付数据来源' });
+  await wechat.getByRole('button', { name: '停止后续同步' }).click();
+  await expect(wechat.getByText('已停止', { exact: true })).toBeVisible();
+  await expect(wechat.getByText(/覆盖/)).toBeVisible();
 });
 
 test('故事三：限定授权分别产生 Execute、Ask、Manual Review 和 Block', async ({ page }) => {

@@ -4,21 +4,17 @@ import { Goal, ScreenId } from '../types';
 interface ProfileScreenProps {
   goal: Goal;
   onNavigate: (s: ScreenId) => void;
-  onTriggerImpact: () => void;
-  onWeeklySummary: () => void;
-  onSpendingTrend: () => void;
   onResetData: () => void;
   onBankingDemo: () => void;
+  onDataConnections: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   goal,
   onNavigate,
-  onTriggerImpact,
-  onWeeklySummary,
-  onSpendingTrend,
   onResetData,
   onBankingDemo,
+  onDataConnections,
 }) => {
   return (
     <div className="flex-1 flex flex-col pt-2 pb-safe px-4 overflow-y-auto no-scrollbar space-y-3.5">
@@ -67,6 +63,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       </div>
 
       <button onClick={onBankingDemo} className="w-full bg-white border border-[#E5E8EB] rounded-xl p-4 shadow-sm flex items-center justify-between text-[#0F6B6D] font-semibold text-sm"><span>授权、外部 Agent 与执行记录</span><span className="material-symbols-outlined">arrow_forward</span></button>
+      <button onClick={onDataConnections} className="w-full bg-white border border-[#E5E8EB] rounded-xl p-4 shadow-sm flex items-center justify-between text-[#0F6B6D] font-semibold text-sm">
+        <span className="flex items-center gap-2"><span className="material-symbols-outlined text-[19px]">account_balance</span>数据连接与自动守护</span>
+        <span className="material-symbols-outlined">arrow_forward</span>
+      </button>
 
       {/* Quick Prototype Navigation & Simulation Tools */}
       <div className="bg-[#F8FAFB] border border-[#E5E8EB] rounded-xl p-3.5 space-y-2.5">
@@ -112,32 +112,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </button>
         </div>
 
-        <div className="pt-2 grid grid-cols-2 gap-2">
-          <button
-            onClick={onWeeklySummary}
-            className="py-2 px-2.5 rounded-lg bg-white border border-[#D8E4E4] hover:border-[#0F6B6D] text-[#0F6B6D] font-semibold text-[12px] transition-colors cursor-pointer flex items-center justify-center gap-1"
-          >
-            <span className="material-symbols-outlined text-[16px]">event_note</span>
-            生成每周摘要
-          </button>
-          <button
-            onClick={onSpendingTrend}
-            className="py-2 px-2.5 rounded-lg bg-[#FFF7E6] border border-[#F1D7A5] hover:bg-[#F5A623] hover:text-white text-[#8A5A00] font-semibold text-[12px] transition-colors cursor-pointer flex items-center justify-center gap-1"
-          >
-            <span className="material-symbols-outlined text-[16px]">insights</span>
-            模拟消费趋势
-          </button>
-          <button
-            onClick={() => onTriggerImpact()}
-            className="py-2 rounded-lg bg-[#E6F2F2] hover:bg-[#0F6B6D] hover:text-white text-[#0F6B6D] font-semibold text-[12px] transition-colors cursor-pointer"
-          >
-            模拟突发支出 ¥900
-          </button>
+        <div className="pt-2 grid grid-cols-1 gap-2">
           <button
             onClick={onResetData}
             className="py-2 px-3 rounded-lg bg-white border border-[#E5E8EB] text-[#5A616B] hover:text-[#1F2329] text-[12px] font-medium transition-colors cursor-pointer"
           >
-            重置数据
+            重置模拟目标、连接与流水
           </button>
         </div>
       </div>

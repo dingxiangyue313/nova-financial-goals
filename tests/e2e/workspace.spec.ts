@@ -15,34 +15,34 @@ async function activateGoalFromWorkspace(page: Page) {
   await page.getByRole('button', { name: '我想年底去日本旅行，预算 ¥8,000' }).click();
   await expect(page.getByText('确认目标草案')).toBeVisible();
   await page.getByRole('button', { name: '确认保存目标草案' }).click();
-  await expect(page.getByText('三种推进节奏')).toBeVisible();
-  await page.getByRole('button', { name: '确认平衡方案' }).click();
-  await expect(page.getByText(/目标计划已激活/).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: '连接模拟数据' })).toBeVisible();
+  await page.getByRole('button', { name: '连接并开始智能守护' }).click();
+  await expect(page.getByText('选择适合你的节奏', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /平衡方案/ }).click();
+  await page.getByRole('button', { name: /确认以此节奏推进/ }).click();
+  await expect(page.getByText('进度正常')).toBeVisible();
 }
 
 test('对话故事一：自然语言生成目标卡，明确确认后激活并长期保留', async ({ page }) => {
   await openApp(page);
   await activateGoalFromWorkspace(page);
   await page.reload();
+  await expect(page.getByText('已选择并启用计划')).toBeVisible();
   await openWorkspace(page);
   const savedThread = page.getByRole('button', { name: /我想年底去日本旅行/ }).last();
   await expect(savedThread).toBeVisible();
   await savedThread.click();
-  await expect(page.getByText(/目标计划已激活/).first()).toBeVisible();
+  await expect(page.getByText(/目标草案已保存/).first()).toBeVisible();
 });
 
 test('对话故事二：显著支出自动创建未读风险会话', async ({ page }) => {
   await openApp(page);
   await activateGoalFromWorkspace(page);
-  await page.getByRole('button', { name: '返回首页' }).click();
-  await page.getByTitle('点击切换模拟数据或事件').click();
-  await page.getByRole('button', { name: /模拟外卖与打车趋势/ }).click();
-  await expect(page.getByText(/两个不动应急金的办法/)).toBeVisible();
-  await page.getByRole('button', { name: '1. 首页' }).click();
-  await openWorkspace(page);
+  await page.getByTitle('查看模拟时间与自动同步').click();
+  await page.getByRole('button', { name: /推进到 9月23日/ }).click();
+  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
   const risk = page.getByRole('button', { name: /外卖与打车持续上升影响目标/ });
-  await expect(risk).toHaveAttribute('data-unread', 'true');
-  await risk.click();
+  // The demo transition opens the newly-created risk conversation, so viewing it clears the unread marker.
   await expect(risk).toHaveAttribute('data-unread', 'false');
   await expect(page.getByText(/应急金/).first()).toBeVisible();
   await expect(page.getByText('哪些流水形成趋势')).toBeVisible();
@@ -55,6 +55,7 @@ test('对话故事二：显著支出自动创建未读风险会话', async ({ pa
 test('对话故事三：创建限定授权并运行受治理的外部 Agent 请求', async ({ page }) => {
   await openApp(page);
   await activateGoalFromWorkspace(page);
+  await openWorkspace(page);
   const composer = page.getByPlaceholder('描述目标、风险或授权范围…');
   await composer.fill('允许旅行 Agent 在 ¥500 内订票');
   await page.getByRole('button', { name: '发送' }).click();
@@ -103,8 +104,10 @@ test('目标画布支持修改假设、只读试算和确认应用', async ({ pa
   await expect(page.getByText('What-if 可行性').first()).toBeVisible();
   await expect(page.getByText('计划步骤').first()).toBeVisible();
   await page.getByRole('button', { name: '确认应用' }).click();
-  await expect(page.getByText(/目标假设已应用/).first()).toBeVisible();
-  await expect(page.getByText('三种推进节奏').first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: '连接模拟数据' })).toBeVisible();
+  await page.getByRole('button', { name: '连接并开始智能守护' }).click();
+  await expect(page.getByText('选择适合你的节奏', { exact: true })).toBeVisible();
+  await expect(page.getByText(/完成 38\.9%/).first()).toBeVisible();
 });
 
 test('自适应桌面工作台使用 32/68 Governed Canvas', async ({ page }, testInfo) => {
@@ -126,7 +129,6 @@ test('自适应桌面工作台使用 32/68 Governed Canvas', async ({ page }, te
 test('每周摘要安静呈现并可配置完整通知偏好', async ({ page }) => {
   await openApp(page);
   await activateGoalFromWorkspace(page);
-  await page.getByRole('button', { name: '返回首页' }).click();
   await openWorkspace(page);
   const summary = page.getByRole('button', { name: /摘要 · 每周摘要/ });
   await expect(summary).toHaveAttribute('data-unread', 'false');

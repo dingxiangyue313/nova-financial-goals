@@ -4,6 +4,7 @@ import { normalizeAgentComponent } from '../../shared/generative';
 import type { ScreenId } from '../types';
 
 const money = (cents: number) => `¥${(cents / 100).toLocaleString('zh-CN')}`;
+const sourceName = { bank: '银行卡', wechat_pay: '微信支付', alipay: '支付宝' } as const;
 const tone = {
   neutral: 'border-[#E5E8EB] bg-white', good: 'border-emerald-200 bg-emerald-50',
   warning: 'border-amber-200 bg-amber-50', danger: 'border-rose-200 bg-rose-50',
@@ -108,7 +109,7 @@ export function AgentComponentRenderer({ value, onAction, onCancel, onNavigate, 
   if (component.type === 'impact_summary') return <article className="rounded-2xl border border-amber-200 bg-amber-50 p-3 shadow-sm">
     <div className="text-[11px] font-semibold text-amber-700">目标影响信号</div><h4 className="mt-1 text-[14px] font-bold">{component.title}</h4>
     <p className="mt-2 text-[12px] text-[#5A616B]">新增支出 {money(component.impact.expenseCents)}，预计延期 {component.impact.delayDays} 天。</p>
-    <p className="mt-2 rounded-lg bg-white/80 p-2 text-[11px] font-semibold text-[#276B4E]">应急金 {money(component.protectedCents)} 未受影响</p><button onClick={() => onNavigate('impact')} className="mt-2 text-[11px] font-semibold text-[#0F6B6D]">打开影响详情 →</button>
+    <p className="mt-2 rounded-lg bg-white/80 p-2 text-[11px] font-semibold text-[#276B4E]">应急金未受影响 · {money(component.protectedCents)} 严格隔离</p><button onClick={() => onNavigate('impact')} className="mt-2 text-[11px] font-semibold text-[#0F6B6D]">打开影响详情 →</button>
   </article>;
   if (component.type === 'risk_signal') return <article className="rounded-2xl border border-amber-200 bg-amber-50 p-3 shadow-sm">
     <div className="text-[11px] font-semibold text-amber-700">目标感知风险</div>
@@ -118,8 +119,13 @@ export function AgentComponentRenderer({ value, onAction, onCancel, onNavigate, 
       <p className="mt-1 text-[11px] text-[#5A616B]">过去两个月平均 {money(component.pattern.baselineCents)}，本期 {component.pattern.transactionCount} 笔累计 {money(component.pattern.currentCents)}。</p>
     </div>
     <div className="mt-2 rounded-xl bg-white/80 p-2.5 text-[11px] text-[#5A616B]">
-      <b className="text-[#1F2329]">具体影响</b> · 目标预计延期 {component.signal.impact.delayDays} 天；应急金 {money(component.protectedCents)} 未受影响。
+      <b className="text-[#1F2329]">具体影响</b> · 目标预计延期 {component.signal.impact.delayDays} 天；应急金未受影响，{money(component.protectedCents)} 继续严格隔离。
     </div>
+    <dl className="mt-2 grid gap-1 rounded-xl border border-amber-100 bg-white/80 p-2.5 text-[10px] text-[#5A616B]">
+      <div><dt className="inline font-semibold text-[#1F2329]">客观模拟流水：</dt><dd className="inline">{[...new Set(component.signal.evidence.map(item => item.sourceKind).filter((item): item is keyof typeof sourceName => Boolean(item)))].map(item => sourceName[item]).join('、') || '已连接来源'} · {component.pattern.periodStart} 至 {component.pattern.periodEnd}</dd></div>
+      <div><dt className="inline font-semibold text-[#1F2329]">系统计算结果：</dt><dd className="inline">规则 {component.signal.ruleVersion} · Twin v{component.signal.twinVersion}</dd></div>
+      <div><dt className="inline font-semibold text-[#1F2329]">用户目标假设：</dt><dd className="inline">日本旅行目标与受保护资金设置 · 更新于 {component.signal.createdAt}</dd></div>
+    </dl>
     <div className="mt-2 space-y-1 text-[11px]"><div className="rounded-lg border border-amber-100 bg-white px-2 py-1.5">1. 降低未来可选支出</div><div className="rounded-lg border border-amber-100 bg-white px-2 py-1.5">2. 增加目标投入</div><div className="rounded-lg border border-amber-100 bg-white px-2 py-1.5">3. 调整目标日期</div></div>
   </article>;
   if (component.type === 'mandate_preview') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-3 shadow-sm">
