@@ -20,10 +20,11 @@ test('data connection APIs persist, isolate, revoke and reset simulated sources'
   const directory = mkdtempSync(join(tmpdir(), 'nova-connectors-http-'));
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
+  const testSessionSecret = Array.from({ length: 48 }, (_, index) => String(index % 10)).join('');
   const child = spawn(join(process.cwd(), 'node_modules/.bin/tsx'), ['server/index.ts'], {
     cwd: process.cwd(), stdio: 'ignore', env: { ...process.env, PORT: String(port),
       NOVA_DB_PATH: join(directory, 'demo.sqlite'), DEEPSEEK_API_KEY: '', NODE_ENV: 'production',
-      NOVA_SESSION_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef' },
+      NOVA_SESSION_SECRET: testSessionSecret },
   });
   try {
     let ready = false;
