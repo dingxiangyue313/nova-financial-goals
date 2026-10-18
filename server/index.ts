@@ -19,7 +19,7 @@ import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.
 import { containsPromptInjection, signExternalRequest, verifyExternalRequest } from './security.ts';
 import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary, executeWorkspaceAction } from './workspace.ts';
 import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
-import { installApiRateLimits, installRequestHardening } from './http-hardening.ts';
+import { installApiRateLimits, installRequestHardening, setStaticCacheHeaders } from './http-hardening.ts';
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
 import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, failDataSource, recoverDataSource, revokeDataSource } from './data-connections.ts';
 
@@ -471,14 +471,7 @@ app.post('/api/operations/:id/auth/verify', route(async (req, res) => {
 registerMcp(app, verifyMcpToken);
 
 if (production) {
-  app.use(express.static(path.join(rootDir, 'dist'), { setHeaders: (res, filePath) => {
-    const name = path.basename(filePath);
-    if (name === 'sw.js' || name === 'manifest.webmanifest' || name === 'index.html') {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    }
-  } }));
+  app.use(express.static(path.join(rootDir, 'dist'), { setHeaders: setStaticCacheHeaders }));
   app.get(/.*/, (_req, res) => res.sendFile(path.join(rootDir, 'dist', 'index.html')));
 } else {
   const vite = await createViteServer({ root: rootDir, server: { middlewareMode: true, hmr: false }, appType: 'spa' });

@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
+import { setStaticCacheHeaders } from './http-hardening.ts';
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -16,6 +17,14 @@ async function freePort(): Promise<number> {
 }
 
 test('HTTP hardening adds CSP, separates sensitive limits, and redacts logs', { timeout: 30_000 }, async () => {
+  const headers = new Map<string, string>();
+  const response = { setHeader: (name: string, value: string) => headers.set(name, value) };
+  setStaticCacheHeaders(response as never, join(process.cwd(), 'dist', 'sw.js'));
+  assert.match(headers.get('Cache-Control') || '', /no-cache/);
+  headers.clear();
+  setStaticCacheHeaders(response as never, join(process.cwd(), 'dist', 'assets', 'app.js'));
+  assert.match(headers.get('Cache-Control') || '', /immutable/);
+
   const directory = mkdtempSync(join(tmpdir(), 'nova-hardening-'));
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
@@ -58,10 +67,6 @@ test('HTTP hardening adds CSP, separates sensitive limits, and redacts logs', { 
     assert.match(csp, /worker-src 'self'/);
     const cookie = initial.headers.get('set-cookie')?.split(';')[0] || '';
     assert.ok(cookie);
-
-    const serviceWorker = await fetch(`${base}/sw.js`);
-    assert.equal(serviceWorker.status, 200);
-    assert.match(serviceWorker.headers.get('cache-control') || '', /no-cache/);
 
     const sensitive = async () => fetch(`${base}/api/agent`, {
       method: 'POST',

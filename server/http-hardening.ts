@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import type express from 'express';
 import helmet from 'helmet';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
@@ -16,6 +17,15 @@ function sessionHint(cookie: string | undefined): string {
 function rateKey(req: express.Request): string {
   const ip = ipKeyGenerator(req.ip || req.socket.remoteAddress || 'unknown');
   return `${ip}:${sessionHint(req.headers.cookie)}`;
+}
+
+export function setStaticCacheHeaders(res: express.Response, filePath: string): void {
+  const name = path.basename(filePath);
+  if (name === 'sw.js' || name === 'manifest.webmanifest' || name === 'index.html') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  }
 }
 
 export function installRequestHardening(app: express.Express): void {
