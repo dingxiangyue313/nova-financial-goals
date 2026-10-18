@@ -26,6 +26,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const insight = cards.find(card => card.type === 'goal_feasibility_card');
   const impact = snapshot.pendingImpact;
   const connectedSources = snapshot.dataConnections.filter(item => item.status === 'connected');
+  const failedSources = snapshot.dataConnections.filter(item => item.status === 'error');
   const lastSyncedAt = connectedSources.map(item => item.lastSyncedAt).filter(Boolean).sort().at(-1);
 
   return (
@@ -62,6 +63,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           ? `已连接 ${connectedSources.length} 个模拟来源 · 数据更新于 ${lastSyncedAt ? new Date(lastSyncedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '等待首次同步'}`
           : '尚未连接流水 · 当前结果仅为演示估算'}
       </div>
+
+      {failedSources.length > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border border-[#F2D5A7] bg-[#FFF9ED] px-3 py-2 text-[11px] text-[#76551D]">
+          <span className="material-symbols-outlined mt-0.5 text-[15px]">cloud_off</span>
+          <div>
+            <p className="font-semibold">{connectedSources.length ? '部分数据待更新' : '守护结论暂缓更新'}</p>
+            <p>{failedSources.map(item => item.label).join('、')}暂时未更新；NOVA 不会基于缺失数据给出新的即时风险结论。</p>
+          </div>
+        </div>
+      )}
 
       {/* Proactive Alert Banner for Impact (if event is active) */}
       {hasImpactPending && (

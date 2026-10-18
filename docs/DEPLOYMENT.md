@@ -59,6 +59,8 @@ curl -fsS http://127.0.0.1:3000/api/health
 
 按 [Nginx 示例](nginx.nova.conf.example) 替换域名和证书路径，先用 ACME/Certbot 为域名签发有效证书，再启用配置与 HTTPS。不要将 `3000` 端口直接开放到公网。部署前需要确认 ECS 系统版本、SSH 用户、域名和现有反向代理配置；本仓库不包含服务器凭据。
 
+PWA 在公网必须通过 HTTPS 访问。Nginx 需要让 `/sw.js` 与 `/manifest.webmanifest` 使用 `Cache-Control: no-cache, no-store, must-revalidate`，避免旧 Service Worker 长期滞留；带内容哈希的 `/assets/` 文件可长期缓存。部署新版本后用浏览器确认安装入口、离线只读页和“新版本可用”提示。
+
 ## 更新、备份与回滚
 
 - 更新：拉取已评审的 `main`，`docker compose up -d --build`，确认健康检查与关键流程。

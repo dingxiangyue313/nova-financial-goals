@@ -86,6 +86,32 @@ test('个人设置可以撤销单个来源并保留历史覆盖信息', async ({
   await expect(wechat.getByText(/覆盖/)).toBeVisible();
 });
 
+test('微信模拟连接失败时安静提示，恢复后只补齐一次目标风险', async ({ page }) => {
+  await openApp(page);
+  await activateBalancedGoal(page);
+  await page.getByTitle('查看模拟时间与自动同步').click();
+  await page.getByRole('button', { name: /模拟微信支付连接失败/ }).click();
+  await expect(page.getByText('部分数据待更新')).toBeVisible();
+
+  await page.getByTitle('个人设置').click();
+  await page.getByRole('button', { name: /数据连接与自动守护/ }).click();
+  const wechat = page.getByRole('region', { name: '微信支付数据来源' });
+  await expect(wechat.getByText('连接异常', { exact: true })).toBeVisible();
+  await expect(wechat.getByText(/暂时无法连接/)).toBeVisible();
+
+  await page.getByRole('button', { name: '返回' }).click();
+  await page.getByRole('button', { name: /首页/ }).last().click();
+  await page.getByTitle('查看模拟时间与自动同步').click();
+  await page.getByRole('button', { name: /推进到 9月23日/ }).click();
+  await expect(page.getByText('部分数据待更新')).toBeVisible();
+  await expect(page.getByText(/外卖与打车支出趋势影响日本旅行/)).not.toBeVisible();
+
+  await page.getByTitle('个人设置').click();
+  await page.getByRole('button', { name: /数据连接与自动守护/ }).click();
+  await wechat.getByRole('button', { name: '重新连接' }).click();
+  await expect(wechat.getByText('已连接', { exact: true })).toBeVisible();
+});
+
 test('故事三：限定授权分别产生 Execute、Ask、Manual Review 和 Block', async ({ page }) => {
   await openApp(page);
   await activateBalancedGoal(page);

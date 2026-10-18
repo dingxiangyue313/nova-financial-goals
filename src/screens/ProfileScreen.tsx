@@ -7,6 +7,9 @@ interface ProfileScreenProps {
   onResetData: () => void;
   onBankingDemo: () => void;
   onDataConnections: () => void;
+  installState: 'available' | 'installed' | 'ios' | 'unavailable';
+  onInstall: () => void;
+  onClearOffline: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -15,6 +18,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onResetData,
   onBankingDemo,
   onDataConnections,
+  installState,
+  onInstall,
+  onClearOffline,
 }) => {
   return (
     <div className="flex-1 flex flex-col pt-2 pb-safe px-4 overflow-y-auto no-scrollbar space-y-3.5">
@@ -67,6 +73,30 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <span className="flex items-center gap-2"><span className="material-symbols-outlined text-[19px]">account_balance</span>数据连接与自动守护</span>
         <span className="material-symbols-outlined">arrow_forward</span>
       </button>
+
+      <section className="rounded-xl border border-[#D8E4E4] bg-white p-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <span className="material-symbols-outlined rounded-xl bg-[#E6F2F2] p-2 text-[#0F6B6D]">install_mobile</span>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[14px] font-bold text-[#1F2329]">安装 NOVA</h3>
+            <p className="mt-1 text-[11px] leading-relaxed text-[#5A616B]">
+              {installState === 'installed' ? '已作为应用安装，可从主屏幕直接打开。'
+                : installState === 'ios' ? '在 Safari 中点“分享”，再选“添加到主屏幕”。'
+                  : '添加到手机或电脑主屏幕。离线时只显示最近一次安全摘要。'}
+            </p>
+            {installState !== 'installed' && (
+              <button type="button" onClick={onInstall}
+                className="mt-2 rounded-lg bg-[#0F6B6D] px-3 py-2 text-[12px] font-semibold text-white">
+                {installState === 'ios' ? '查看安装方法' : installState === 'available' ? '安装到此设备' : '查看安装说明'}
+              </button>
+            )}
+            <button type="button" onClick={onClearOffline}
+              className="mt-2 block text-[11px] font-semibold text-[#5A616B] hover:text-[#1F2329]">
+              清除本机离线数据
+            </button>
+          </div>
+        </div>
+      </section>
 
       {/* Quick Prototype Navigation & Simulation Tools */}
       <div className="bg-[#F8FAFB] border border-[#E5E8EB] rounded-xl p-3.5 space-y-2.5">

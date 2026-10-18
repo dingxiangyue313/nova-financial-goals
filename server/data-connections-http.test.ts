@@ -60,6 +60,37 @@ test('data connection APIs persist, isolate, revoke and reset simulated sources'
     assert.equal((replay.data as { result: { replayed: boolean } }).result.replayed, true);
     assert.equal((replay.data as { snapshot: Snapshot }).snapshot.twinVersion, connectedVersion);
 
+    const planId = (connected.data as { snapshot: Snapshot }).snapshot.assessment.plans.find(item => item.recommended)?.id;
+    await call('/api/goals/activate', 'POST', { planId });
+
+    const failed = await call('/api/demo/data-connections/wechat_pay/fail', 'POST');
+    assert.equal((failed.data as { snapshot: Snapshot }).snapshot.dataConnections
+      .find(item => item.source === 'wechat_pay')?.status, 'error');
+    await call('/api/demo/clock', 'POST', { date: '2026-09-23' });
+    const partial = await call('/api/data-connections/sync/ensure', 'POST');
+    assert.equal((partial.data as { result: { status: string } }).result.status, 'partial');
+    assert.equal((partial.data as { snapshot: Snapshot }).snapshot.riskSignals.length, 0);
+    const recovered = await call('/api/data-connections/wechat_pay/retry', 'POST');
+    assert.equal((recovered.data as { snapshot: Snapshot }).snapshot.dataConnections
+      .find(item => item.source === 'wechat_pay')?.status, 'connected');
+    assert.equal((recovered.data as { snapshot: Snapshot }).snapshot.riskSignals.length, 1);
+
+    await call('/api/demo/reset', 'POST');
+    const weeklyBase = await call('/api/data-connections/connect', 'POST', { sources: ['bank', 'wechat_pay', 'alipay'] });
+    const weeklyPlan = (weeklyBase.data as { snapshot: Snapshot }).snapshot.assessment.plans.find(item => item.recommended)?.id;
+    await call('/api/goals/activate', 'POST', { planId: weeklyPlan });
+    await call('/api/demo/data-connections/alipay/fail', 'POST');
+    await call('/api/demo/clock', 'POST', { date: '2026-09-22' });
+    const weeklyPartial = await call('/api/data-connections/sync/ensure', 'POST');
+    assert.equal((weeklyPartial.data as { snapshot: Snapshot }).snapshot.weeklyRiskSummaries.length, 0);
+    const weeklyRecovered = await call('/api/data-connections/alipay/retry', 'POST');
+    assert.equal((weeklyRecovered.data as { snapshot: Snapshot }).snapshot.weeklyRiskSummaries.length, 1);
+    const weeklyReplay = await call('/api/data-connections/alipay/retry', 'POST');
+    assert.equal((weeklyReplay.data as { snapshot: Snapshot }).snapshot.weeklyRiskSummaries.length, 1);
+
+    await call('/api/demo/reset', 'POST');
+    await call('/api/data-connections/connect', 'POST', { sources: ['bank', 'wechat_pay', 'alipay'] });
+
     const originalCookie = cookie;
     cookie = '';
     const other = await call('/api/data-connections');

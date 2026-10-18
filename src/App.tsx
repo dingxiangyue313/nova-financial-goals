@@ -15,6 +15,15 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { BankingDemoScreen } from './screens/BankingDemoScreen';
 import { AgentWorkspaceScreen } from './screens/AgentWorkspaceScreen';
 import { DataConnectionScreen } from './screens/DataConnectionScreen';
+import { OfflineScreen } from './screens/OfflineScreen';
+import { clearOfflineSnapshot, createOfflineSnapshot, loadOfflineSnapshot, saveOfflineSnapshot, type OfflineSnapshot } from './offline';
+
+interface InstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
+interface PwaUpdateEvent extends Event { detail: { updateSW: (reloadPage?: boolean) => Promise<void> } }
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('home');
@@ -28,12 +37,74 @@ export default function App() {
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
   const [workspaceStarter, setWorkspaceStarter] = useState('');
   const [connectionBusy, setConnectionBusy] = useState(false);
+  const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
+  const [offlineSnapshot, setOfflineSnapshot] = useState<OfflineSnapshot | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(() => window.matchMedia('(display-mode: standalone)').matches
+    || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
+  const [showInstallHint, setShowInstallHint] = useState(false);
+  const [pwaUpdate, setPwaUpdate] = useState<((reloadPage?: boolean) => Promise<void>) | null>(null);
   const autoSyncing = useRef(false);
   useEffect(() => {
-    api('/api/session').then(setSnapshot).catch(e => setLoadError(e.message));
+    let active = true;
+    const load = async () => {
+      try {
+        const live = await api<Snapshot>('/api/session');
+        if (active) { setSnapshot(live); setLoadError(null); }
+      } catch (error) {
+        const cached = await loadOfflineSnapshot();
+        if (!active) return;
+        setIsOffline(true);
+        if (cached) setOfflineSnapshot(cached);
+        setLoadError(error instanceof Error ? error.message : '无法读取数据');
+      }
+    };
+    void load();
+    return () => { active = false; };
   }, []);
   useEffect(() => {
     if (!snapshot) return;
+    const safe = createOfflineSnapshot(snapshot);
+    setOfflineSnapshot(safe);
+    void saveOfflineSnapshot(safe);
+  }, [snapshot]);
+  useEffect(() => {
+    const onOffline = () => {
+      setIsOffline(true);
+      if (snapshot) setOfflineSnapshot(createOfflineSnapshot(snapshot));
+    };
+    const onOnline = async () => {
+      try {
+        const live = await api<Snapshot>('/api/session');
+        setSnapshot(live);
+        setIsOffline(false);
+        setLoadError(null);
+      } catch (error) {
+        setIsOffline(true);
+        const cached = await loadOfflineSnapshot();
+        if (cached) setOfflineSnapshot(cached);
+        setLoadError(error instanceof Error ? error.message : '重新连接失败');
+      }
+    };
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    return () => { window.removeEventListener('offline', onOffline); window.removeEventListener('online', onOnline); };
+  }, [snapshot]);
+  useEffect(() => {
+    const captureInstall = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
+    const installed = () => { setIsInstalled(true); setInstallPrompt(null); };
+    const update = (event: Event) => setPwaUpdate(() => (event as PwaUpdateEvent).detail.updateSW);
+    window.addEventListener('beforeinstallprompt', captureInstall);
+    window.addEventListener('appinstalled', installed);
+    window.addEventListener('nova-pwa-update', update);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', captureInstall);
+      window.removeEventListener('appinstalled', installed);
+      window.removeEventListener('nova-pwa-update', update);
+    };
+  }, []);
+  useEffect(() => {
+    if (!snapshot || isOffline) return;
     let current = true;
     api<{ cards: UiCard[]; provider: string }>('/api/ui/cards').then(result => {
       if (!current) return;
@@ -41,13 +112,13 @@ export default function App() {
       setSnapshot(previous => previous ? { ...previous, cards } : previous);
     }).catch(() => {});
     return () => { current = false; };
-  }, [snapshot?.goal.id, snapshot?.goal.savedCents, snapshot?.goal.selectedPlanId, snapshot?.pendingImpact?.id, snapshot?.operations.length]);
+  }, [isOffline, snapshot?.goal.id, snapshot?.goal.savedCents, snapshot?.goal.selectedPlanId, snapshot?.pendingImpact?.id, snapshot?.operations.length]);
   const hasConnectedData = Boolean(snapshot?.dataConnections.some(item => item.status === 'connected'));
   useEffect(() => {
-    if (!hasConnectedData) return;
+    if (!hasConnectedData || isOffline) return;
     let active = true;
     const ensure = async () => {
-      if (autoSyncing.current || document.visibilityState === 'hidden') return;
+      if (autoSyncing.current || document.visibilityState === 'hidden' || !navigator.onLine) return;
       autoSyncing.current = true;
       try {
         const outcome = await api<{ snapshot: Snapshot; result: DataSyncResult }>('/api/data-connections/sync/ensure', 'POST');
@@ -58,7 +129,8 @@ export default function App() {
           setTimeout(() => setToastMessage(null), 2800);
         }
       } catch {
-        // Automatic checks stay quiet; the connection screen shows persistent status.
+        // A failed service check switches to the last safe read-only snapshot.
+        if (active) setIsOffline(true);
       } finally { autoSyncing.current = false; }
     };
     void ensure();
@@ -66,7 +138,7 @@ export default function App() {
     const onVisibility = () => { if (document.visibilityState === 'visible') void ensure(); };
     document.addEventListener('visibilitychange', onVisibility);
     return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibility); };
-  }, [hasConnectedData]);
+  }, [hasConnectedData, isOffline]);
   const goal = snapshot ? displayGoal(snapshot) : null;
   const scenario = snapshot ? displayImpact(snapshot) : null;
   const hasImpactPending = Boolean(snapshot?.pendingImpact);
@@ -166,6 +238,20 @@ export default function App() {
     } catch (error) { showToast(error instanceof Error ? error.message : '撤销失败'); }
     finally { setConnectionBusy(false); }
   };
+  const handleRetryData = async (source: DataSourceKind) => {
+    setConnectionBusy(true);
+    try {
+      const outcome = await api<{ snapshot: Snapshot; result: DataSyncResult }>(`/api/data-connections/${source}/retry`, 'POST');
+      setSnapshot(outcome.snapshot);
+      showToast(outcome.result.batchKinds.includes('goal_risk') ? '连接已恢复，NOVA 已补齐目标影响判断' : '连接已恢复，数据已更新');
+    } catch (error) { showToast(error instanceof Error ? error.message : '重新连接失败'); }
+    finally { setConnectionBusy(false); }
+  };
+  const handleDemoConnection = async (action: 'fail' | 'recover') => {
+    const outcome = await api<{ snapshot: Snapshot; result?: DataSyncResult }>(`/api/demo/data-connections/wechat_pay/${action}`, 'POST');
+    setSnapshot(outcome.snapshot);
+    showToast(action === 'fail' ? '微信支付暂时无法更新，其他来源继续守护' : '微信支付连接已恢复');
+  };
   const handleAdvanceDemo = async (date: '2026-09-22' | '2026-09-23') => {
     await mutate('/api/demo/clock', 'POST', { date });
     const outcome = await api<{ snapshot: Snapshot; result: DataSyncResult }>('/api/data-connections/sync/ensure', 'POST');
@@ -178,6 +264,10 @@ export default function App() {
   const handleConfirmPlan = async (planId: string) => {
     await mutate('/api/goals/activate', 'POST', { planId });
     showToast('计划已激活；不会自动扣款');
+    if (!isInstalled && localStorage.getItem('nova-install-hint-shown') !== '1') {
+      localStorage.setItem('nova-install-hint-shown', '1');
+      setShowInstallHint(true);
+    }
     navigateTo('home');
   };
   const handleRiskPreferences = async (changes: Partial<RiskPreferences>) => {
@@ -204,6 +294,24 @@ export default function App() {
   const handleResetData = async () => {
     await mutate('/api/demo/reset', 'POST');
     showToast('已重置演示数据');
+  };
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const installState = isInstalled ? 'installed' as const : installPrompt ? 'available' as const
+    : isIos ? 'ios' as const : 'unavailable' as const;
+  const handleInstall = async () => {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      if (choice.outcome === 'accepted') setIsInstalled(true);
+      setInstallPrompt(null);
+      return;
+    }
+    showToast(isIos ? '在 Safari 点“分享”，然后选择“添加到主屏幕”' : '请使用浏览器菜单中的“安装应用”或“添加到主屏幕”');
+  };
+  const handleClearOffline = async () => {
+    await clearOfflineSnapshot();
+    setOfflineSnapshot(null);
+    showToast('本机离线数据已清除');
   };
   // Get screen titles for TopBar
   const getScreenTitle = () => {
@@ -239,7 +347,8 @@ export default function App() {
     currentScreen === 'activity' ||
     currentScreen === 'profile';
 
-  if (!snapshot || !goal) return <div className="min-h-screen grid place-items-center bg-[#F5F7F8] text-[#0F6B6D]">{loadError ? `加载失败：${loadError}。请刷新页面重试。` : 'NOVA 正在读取演示数据…'}</div>;
+  if (isOffline && offlineSnapshot) return <OfflineScreen snapshot={offlineSnapshot} onReconnect={() => window.location.reload()} />;
+  if (!snapshot || !goal) return <div className="min-h-screen grid place-items-center bg-[#F5F7F8] px-6 text-center text-[#0F6B6D]">{loadError ? `加载失败：${loadError}。${isOffline ? '当前没有可用的离线摘要。' : '请刷新页面重试。'}` : 'NOVA 正在读取演示数据…'}</div>;
 
   return (
     <div className="min-h-screen bg-[#E5E8EB] flex flex-col items-center justify-center p-0 md:py-6 text-[#1F2329] selection:bg-[#E6F2F2]">
@@ -364,6 +473,7 @@ export default function App() {
               busy={connectionBusy}
               onConnect={handleConnectData}
               onRevoke={handleRevokeData}
+              onRetry={handleRetryData}
               onBack={handleBack}
             />
           )}
@@ -409,6 +519,9 @@ export default function App() {
               onResetData={handleResetData}
               onBankingDemo={() => navigateTo('banking_demo')}
               onDataConnections={() => navigateTo('data_connections')}
+              installState={installState}
+              onInstall={() => void handleInstall()}
+              onClearOffline={() => void handleClearOffline()}
             />
           )}
         </main>
@@ -433,6 +546,24 @@ export default function App() {
             >
               <span className="material-symbols-outlined text-[16px]">close</span>
             </button>
+          </div>
+        )}
+
+        {showInstallHint && currentScreen === 'home' && (
+          <div className="absolute bottom-20 left-4 right-4 z-40 rounded-2xl border border-[#B9D9D8] bg-white p-4 shadow-xl">
+            <p className="text-[13px] font-bold text-[#1F2329]">把 NOVA 放到主屏幕</p>
+            <p className="mt-1 text-[11px] text-[#5A616B]">随时查看目标守护状态；离线时只展示最近一次摘要。</p>
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => { void handleInstall(); setShowInstallHint(false); }} className="flex-1 rounded-lg bg-[#0F6B6D] px-3 py-2 text-[12px] font-semibold text-white">{installState === 'available' ? '安装' : '查看方法'}</button>
+              <button onClick={() => setShowInstallHint(false)} className="rounded-lg border border-[#E5E8EB] px-3 py-2 text-[12px] text-[#5A616B]">以后再说</button>
+            </div>
+          </div>
+        )}
+
+        {pwaUpdate && (
+          <div className="absolute top-16 left-4 right-4 z-50 rounded-xl bg-[#1F2329] p-3 text-white shadow-xl">
+            <p className="text-[12px] font-semibold">NOVA 有新版本可用</p>
+            <button onClick={() => void pwaUpdate(true)} className="mt-2 rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold text-[#0F6B6D]">更新并重新打开</button>
           </div>
         )}
 
@@ -475,6 +606,25 @@ export default function App() {
                   <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                 </button>
                 {!hasConnectedData && <p className="rounded-lg bg-[#FFF7E6] p-2 text-[11px] text-[#8A5A00]">请先在创建目标流程或“我的 → 数据连接与自动守护”连接模拟来源。</p>}
+
+                {snapshot.dataConnections.some(item => item.source === 'wechat_pay' && item.status === 'connected') && (
+                  <button
+                    onClick={() => { void handleDemoConnection('fail'); setShowSimulateModal(false); }}
+                    className="w-full py-2.5 px-3 rounded-xl border border-[#F2D5A7] bg-[#FFF9ED] text-[#76551D] font-semibold text-[13px] text-left flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">cloud_off</span>模拟微信支付连接失败</span>
+                    <span className="text-[10px] font-normal">其他来源继续</span>
+                  </button>
+                )}
+                {snapshot.dataConnections.some(item => item.source === 'wechat_pay' && item.status === 'error') && (
+                  <button
+                    onClick={() => { void handleDemoConnection('recover'); setShowSimulateModal(false); }}
+                    className="w-full py-2.5 px-3 rounded-xl border border-[#B9D9D8] bg-[#F2FAFA] text-[#0F6B6D] font-semibold text-[13px] text-left flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">cloud_done</span>恢复微信支付连接</span>
+                    <span className="material-symbols-outlined text-[16px]">refresh</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => {

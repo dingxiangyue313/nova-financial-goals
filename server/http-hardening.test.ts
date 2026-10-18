@@ -55,8 +55,13 @@ test('HTTP hardening adds CSP, separates sensitive limits, and redacts logs', { 
     const csp = initial.headers.get('content-security-policy') || '';
     assert.match(csp, /fonts\.googleapis\.com/);
     assert.match(csp, /images\.unsplash\.com/);
+    assert.match(csp, /worker-src 'self'/);
     const cookie = initial.headers.get('set-cookie')?.split(';')[0] || '';
     assert.ok(cookie);
+
+    const serviceWorker = await fetch(`${base}/sw.js`);
+    assert.equal(serviceWorker.status, 200);
+    assert.match(serviceWorker.headers.get('cache-control') || '', /no-cache/);
 
     const sensitive = async () => fetch(`${base}/api/agent`, {
       method: 'POST',

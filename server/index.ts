@@ -21,7 +21,7 @@ import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeekl
 import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
 import { installApiRateLimits, installRequestHardening } from './http-hardening.ts';
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
-import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, revokeDataSource } from './data-connections.ts';
+import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, failDataSource, recoverDataSource, revokeDataSource } from './data-connections.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -118,6 +118,37 @@ app.post('/api/data-connections/:source/revoke', route((req, res) => {
   const source = DataSourceKindSchema.parse(req.params.source);
   const state = mutateState(sessionId(req, res), old => revokeDataSource(old, source));
   res.json({ snapshot: snapshot(state) });
+}));
+app.post('/api/data-connections/:source/retry', route((req, res) => {
+  const source = DataSourceKindSchema.parse(req.params.source);
+  const id = sessionId(req, res);
+  let result: DataSyncResult | undefined;
+  const state = mutateState(id, old => {
+    const outcome = recoverDataSource(old, source);
+    result = outcome.result;
+    if (!outcome.result.batchKinds.includes('weekly_trend')) return outcome.state;
+    return ensureWeeklyRiskSummary(id, outcome.state).state;
+  });
+  ensureImpactThread(id, state);
+  res.json({ snapshot: snapshot(state), result });
+}));
+app.post('/api/demo/data-connections/:source/fail', route((req, res) => {
+  const source = DataSourceKindSchema.parse(req.params.source);
+  const state = mutateState(sessionId(req, res), old => failDataSource(old, source));
+  res.json({ snapshot: snapshot(state) });
+}));
+app.post('/api/demo/data-connections/:source/recover', route((req, res) => {
+  const source = DataSourceKindSchema.parse(req.params.source);
+  const id = sessionId(req, res);
+  let result: DataSyncResult | undefined;
+  const state = mutateState(id, old => {
+    const outcome = recoverDataSource(old, source);
+    result = outcome.result;
+    if (!outcome.result.batchKinds.includes('weekly_trend')) return outcome.state;
+    return ensureWeeklyRiskSummary(id, outcome.state).state;
+  });
+  ensureImpactThread(id, state);
+  res.json({ snapshot: snapshot(state), result });
 }));
 const toolNames = new Set<string>(bankingToolDefinitions.map(item => item.name));
 const BankingCallSchema = z.object({ tool: z.string().refine(value => toolNames.has(value), 'UNKNOWN_TOOL'),
@@ -440,7 +471,14 @@ app.post('/api/operations/:id/auth/verify', route(async (req, res) => {
 registerMcp(app, verifyMcpToken);
 
 if (production) {
-  app.use(express.static(path.join(rootDir, 'dist')));
+  app.use(express.static(path.join(rootDir, 'dist'), { setHeaders: (res, filePath) => {
+    const name = path.basename(filePath);
+    if (name === 'sw.js' || name === 'manifest.webmanifest' || name === 'index.html') {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  } }));
   app.get(/.*/, (_req, res) => res.sendFile(path.join(rootDir, 'dist', 'index.html')));
 } else {
   const vite = await createViteServer({ root: rootDir, server: { middlewareMode: true, hmr: false }, appType: 'spa' });

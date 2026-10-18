@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test server/*.test.ts",
+    "test": "tsx --test server/*.test.ts src/*.test.ts",
     "test:properties": "tsx --test server/properties.test.ts",
     "test:a11y": "playwright test tests/e2e/accessibility.spec.ts",
     "eval:promptfoo": "node scripts/run-promptfoo-eval.mjs",
@@ -45,7 +45,8 @@
     "fast-check": "4.10.2",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite-plugin-pwa": "^2.0.0"
   },
   "engines": {
     "node": ">=22.13.0"

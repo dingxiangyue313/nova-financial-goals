@@ -18,7 +18,10 @@ export const DataConnectionSchema = z.object({
   permissionScopes: z.array(DataPermissionScopeSchema).min(1),
   connectedAt: z.string(), revokedAt: z.string().nullable().default(null),
   lastSyncedAt: z.string().nullable().default(null),
+  lastAttemptAt: z.string().nullable().default(null),
   coverageStart: IsoDateSchema.nullable().default(null), coverageEnd: IsoDateSchema.nullable().default(null),
+  errorCode: z.string().nullable().default(null), errorMessage: z.string().nullable().default(null),
+  consecutiveFailures: z.number().int().nonnegative().default(0),
 });
 export type DataConnection = z.infer<typeof DataConnectionSchema>;
 
@@ -33,6 +36,13 @@ export type DataSyncBatch = z.infer<typeof DataSyncBatchSchema>;
 
 export const DataSyncResultSchema = z.object({
   importedCount: z.number().int().nonnegative(), replayed: z.boolean(),
+  status: z.enum(['completed', 'partial', 'failed', 'unchanged']),
+  sources: z.array(z.object({
+    source: DataSourceKindSchema,
+    status: z.enum(['synced', 'unchanged', 'failed', 'skipped']),
+    importedCount: z.number().int().nonnegative(),
+    errorCode: z.string().nullable().default(null),
+  })),
   batchKinds: z.array(DataSyncBatchSchema.shape.kind),
   coverageStart: IsoDateSchema.nullable(), coverageEnd: IsoDateSchema.nullable(),
   twinVersion: z.number().int().positive(),

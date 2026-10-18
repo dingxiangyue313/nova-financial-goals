@@ -45,6 +45,8 @@ export function installRequestHardening(app: express.Express): void {
         objectSrc: ["'none'"],
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        workerSrc: ["'self'"],
+        manifestSrc: ["'self'"],
       },
     },
     crossOriginResourcePolicy: { policy: 'cross-origin' },

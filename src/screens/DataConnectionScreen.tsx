@@ -13,6 +13,7 @@ interface Props {
   busy: boolean;
   onConnect: (sources: DataSourceKind[]) => Promise<void>;
   onRevoke: (source: DataSourceKind) => Promise<void>;
+  onRetry: (source: DataSourceKind) => Promise<void>;
   onBack: () => void;
 }
 
@@ -22,7 +23,7 @@ function dateLabel(value: string | null) {
     hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
-export function DataConnectionScreen({ connections, onboarding, busy, onConnect, onRevoke }: Props) {
+export function DataConnectionScreen({ connections, onboarding, busy, onConnect, onRevoke, onRetry }: Props) {
   const active = connections.filter(item => item.status === 'connected').map(item => item.source);
   const [selected, setSelected] = useState<DataSourceKind[]>(active.length ? active : sources.map(item => item.source));
   useEffect(() => {
@@ -73,7 +74,8 @@ export function DataConnectionScreen({ connections, onboarding, busy, onConnect,
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${connection?.status === 'connected'
                       ? 'bg-[#EBF7F2] text-[#276B4E]' : connection?.status === 'revoked'
                         ? 'bg-[#F0F2F5] text-[#5A616B]' : 'bg-[#FFF7E6] text-[#8A5A00]'}`}>
-                      {connection?.status === 'connected' ? '已连接' : connection?.status === 'revoked' ? '已停止' : '待连接'}
+                      {connection?.status === 'connected' ? '已连接' : connection?.status === 'revoked' ? '已停止'
+                        : connection?.status === 'error' ? '连接异常' : '待连接'}
                     </span>
                   </div>
                   <p className="mt-0.5 text-[11px] text-[#5A616B]">{source.detail}</p>
@@ -82,12 +84,24 @@ export function DataConnectionScreen({ connections, onboarding, busy, onConnect,
                       覆盖 {connection.coverageStart} 至 {connection.coverageEnd} · 更新于 {dateLabel(connection.lastSyncedAt)}
                     </p>
                   )}
+                  {connection?.status === 'error' && (
+                    <div className="mt-2 rounded-lg bg-[#FFF7E6] p-2 text-[11px] leading-relaxed text-[#8A5A00]">
+                      <p>{connection.errorMessage || '模拟数据来源暂时无法连接，请稍后重试。'}</p>
+                      <p className="mt-0.5 text-[#6F737A]">最后成功更新：{dateLabel(connection.lastSyncedAt)}</p>
+                    </div>
+                  )}
                 </div>
               </div>
               {!onboarding && connection?.status === 'connected' && (
                 <button type="button" disabled={busy} onClick={() => void onRevoke(source.source)}
                   className="mt-2 ml-7 text-[11px] font-semibold text-[#A44040] hover:underline disabled:opacity-50">
                   停止后续同步
+                </button>
+              )}
+              {connection?.status === 'error' && (
+                <button type="button" disabled={busy} onClick={() => void onRetry(source.source)}
+                  className="mt-2 ml-7 rounded-lg bg-[#0F6B6D] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50">
+                  重新连接
                 </button>
               )}
             </section>
