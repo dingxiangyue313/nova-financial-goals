@@ -74,7 +74,15 @@ test('an unreachable API uses the cached read-only snapshot even when the browse
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
   await expect.poll(() => hasSavedOfflineSnapshot(page)).toBe(true);
-  await page.route('**/api/session', route => route.abort('failed'));
+  await page.addInitScript(() => {
+    const liveFetch = window.fetch.bind(window);
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' || input instanceof URL ? String(input) : input.url;
+      return url.includes('/api/session')
+        ? Promise.reject(new TypeError('Simulated API outage'))
+        : liveFetch(input, init);
+    };
+  });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: '离线查看' })).toBeVisible();
   await expect(page.getByText(/同步与操作已暂停/)).toBeVisible();
