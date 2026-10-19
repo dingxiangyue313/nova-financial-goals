@@ -61,7 +61,8 @@ export function activatePlan(state: DemoState, planId: string | null): DemoState
   const assessment = assessGoal(state);
   const plan = assessment.plans.find(p => p.id === planId);
   if (!plan || plan.status === 'infeasible') throw new Error('PLAN_NOT_AVAILABLE');
-  return { ...state, goal: { ...state.goal, status: 'active', selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents } };
+  const goal = { ...state.goal, status: 'active' as const, selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents };
+  return { ...state, goal, goals: state.goals.map(item => item.id === goal.id ? goal : item) };
 }
 
 export function injectExpense(state: DemoState, expenseCents: number, title: string): { state: DemoState; impact: Impact | null } {
@@ -77,7 +78,7 @@ export function injectExpense(state: DemoState, expenseCents: number, title: str
   const months = Math.max(1, Math.ceil(daysBetween(state.clock, state.goal.targetDate) / 30));
   const delayDays = Math.ceil(shortfall / Math.max(1, state.goal.monthlyContributionCents) * 30);
   const optionAContributionCents = roundHundredYuan(state.goal.monthlyContributionCents + shortfall / Math.max(1, months - 1));
-  const impact: Impact = { id: crypto.randomUUID(), title, expenseCents, detectedAt: state.clock, shortfallCents: shortfall,
+  const impact: Impact = { id: crypto.randomUUID(), goalId: state.goal.id, title, expenseCents, detectedAt: state.clock, shortfallCents: shortfall,
     delayDays, optionAContributionCents, optionAAvailable: optionAContributionCents <= availableMonthly(state),
     optionBDate: addDays(state.goal.targetDate, delayDays), dismissed: false };
   next.pendingImpact = impact;
@@ -90,9 +91,10 @@ export function resolveImpact(state: DemoState, decision: 'A' | 'B' | 'later' | 
   if (decision === 'later') return state;
   if (decision === 'dismiss') return { ...state, pendingImpact: null };
   if (decision === 'A' && !impact.optionAAvailable) throw new Error('PLAN_NOT_AVAILABLE');
-  return { ...state, pendingImpact: null, goal: {
+  const goal = {
     ...state.goal,
     monthlyContributionCents: decision === 'A' ? impact.optionAContributionCents : state.goal.monthlyContributionCents,
     targetDate: decision === 'B' ? impact.optionBDate : state.goal.originalDate,
-  } };
+  };
+  return { ...state, pendingImpact: null, goal, goals: state.goals.map(item => item.id === goal.id ? goal : item) };
 }

@@ -1,15 +1,15 @@
 import { AgentTurnSchema, GoalAssumptionsSchema, type AgentComponent, type AgentIntent,
-  type AgentTurn, type DemoState, type GoalAssumptions } from '../shared/contracts.ts';
+  type AgentTurn, type DemoState, type GoalAssumptions, type GoalDraft } from '../shared/contracts.ts';
 import { interpretAgentRequest, interpretGoal } from './agent.ts';
 import { buildWeeklyRiskSummary, markActiveRiskSignal, notificationDelivery } from './risk.ts';
-import { assessGoal, resolveImpact } from './domain.ts';
+import { assessGoal, availableMonthly, resolveImpact } from './domain.ts';
 import { runBankingTool } from './banking.ts';
 import { evaluateExternalRequest } from './tools.ts';
 import { verifyAuditChain } from './governance.ts';
 import { previewGoalScenario } from './scenario.ts';
 import {
-  createAgentAction, createAgentThread, finishAgentAction, getAgentAction, getAgentMessages,
-  getAgentThread, listAgentThreads, markAgentThreadRead, markAgentThreadUnread, saveAgentMessage, saveAgentTurnRecord,
+  createAgentAction, createAgentThread, finishAgentAction, getAgentAction, getAgentMessages, getGoalDraft,
+  getAgentThread, listAgentThreads, markAgentThreadRead, markAgentThreadUnread, saveAgentMessage, saveAgentTurnRecord, saveGoalDraft,
 } from './store.ts';
 
 const yuan = (value: number) => `¥${(value / 100).toLocaleString('zh-CN')}`;
@@ -45,6 +45,39 @@ function assumptionsFromGoal(state: DemoState, goal = state.goal) {
     flexibilityWeeks: goal.flexibilityWeeks };
 }
 
+const requiredDraftFields = ['title', 'targetCents', 'targetDate'] as const;
+function mergedGoalDraft(sessionId: string, threadId: string, parsed: Awaited<ReturnType<typeof interpretGoal>>['goal'],
+  state: DemoState): GoalDraft {
+  const previous = getGoalDraft(sessionId, threadId);
+  const next: GoalDraft = {
+    id: previous?.id ?? crypto.randomUUID(), threadId, goalId: previous?.goalId ?? null,
+    title: parsed.title ?? previous?.title ?? null,
+    targetCents: parsed.targetAmount != null ? Math.round(parsed.targetAmount * 100) : previous?.targetCents ?? null,
+    targetDate: parsed.targetDate ?? previous?.targetDate ?? null,
+    savedCents: parsed.savedAmount != null ? Math.round(parsed.savedAmount * 100) : previous?.savedCents ?? null,
+    monthlyContributionCapCents: parsed.monthlySavings != null ? Math.round(parsed.monthlySavings * 100) : previous?.monthlyContributionCapCents ?? null,
+    protectedCents: parsed.emergencyFundProtected != null ? Math.round(parsed.emergencyFundProtected * 100) : previous?.protectedCents ?? null,
+    flexibilityWeeks: parsed.flexibilityWeeks ?? previous?.flexibilityWeeks ?? null,
+    fieldSources: { ...(previous?.fieldSources ?? {}) }, missingRequiredFields: [], updatedAt: new Date().toISOString(),
+  };
+  for (const [key, present] of Object.entries({ title: parsed.title != null, targetCents: parsed.targetAmount != null,
+    targetDate: parsed.targetDate != null, savedCents: parsed.savedAmount != null,
+    monthlyContributionCents: parsed.monthlySavings != null, protectedCents: parsed.emergencyFundProtected != null,
+    flexibilityWeeks: parsed.flexibilityWeeks != null })) if (present) next.fieldSources[key] = 'user_provided';
+  next.missingRequiredFields = requiredDraftFields.filter(field => next[field] == null);
+  return saveGoalDraft(sessionId, next);
+}
+
+function clarificationForDraft(draft: GoalDraft): AgentComponent {
+  const labels = { title: '这个计划是为了什么', targetCents: '一共需要多少钱', targetDate: '希望什么时候完成' } as const;
+  const missing = draft.missingRequiredFields.map(field => labels[field]);
+  return { id: componentId(), type: 'clarification', title: '还需要一点信息',
+    body: `请告诉我${missing.join('、')}。信息完整后我再生成试算，不会先套用演示数据。`,
+    suggestions: draft.missingRequiredFields.includes('targetCents')
+      ? ['预算 ¥8,000', '需要 ¥12,000'] : draft.missingRequiredFields.includes('targetDate')
+        ? ['12 月 15 日前', '今年年底前'] : ['去日本旅行', '买一台相机'] };
+}
+
 function confirmation(sessionId: string, threadId: string, state: DemoState, actionType: string,
   payload: Record<string, unknown>, title: string, body: string, label: string, destructive = false): AgentComponent {
   const action = createAgentAction(sessionId, threadId, actionType, state.twinVersion, payload);
@@ -54,20 +87,17 @@ function confirmation(sessionId: string, threadId: string, state: DemoState, act
 
 function statusComponents(sessionId: string, threadId: string, state: DemoState): AgentComponent[] {
   const assessment = assessGoal(state);
+  const actions = state.goal.status === 'active' ? [] : assessment.plans.filter(item => item.status !== 'infeasible')
+    .map(plan => ({ planId: plan.id, actionId: createAgentAction(sessionId, threadId, 'activate_plan',
+      state.twinVersion, { planId: plan.id }).id }));
   const components: AgentComponent[] = [
     { id: componentId(), type: 'goal_progress_card', title: '当前目标进度', goal: state.goal,
       progressPercent: assessment.progressPercent },
     { id: componentId(), type: 'goal_feasibility_card', title: '目标可行性', assessment },
     { id: componentId(), type: 'assumption_editor', title: '调整目标假设',
-      assumptions: assumptionsFromGoal(state), baseTwinVersion: state.twinVersion },
-    { id: componentId(), type: 'scenario_compare', title: '三种推进节奏', plans: assessment.plans },
+      assumptions: assumptionsFromGoal(state), baseTwinVersion: state.twinVersion, fieldSources: {} },
+    { id: componentId(), type: 'scenario_compare', title: '三种推进节奏', plans: assessment.plans, actions, selectedPlanId: state.goal.selectedPlanId },
   ];
-  if (state.goal.status !== 'active') {
-    for (const plan of assessment.plans.filter(item => item.status !== 'infeasible')) components.push(confirmation(
-      sessionId, threadId, state, 'activate_plan', { planId: plan.id }, `选择${plan.label}`,
-      `${yuan(plan.monthlyCents)}/月；${plan.explanation}。确认后将激活模拟计划，不会自动扣款。`,
-      `确认${plan.label}`));
-  }
   return components;
 }
 
@@ -108,14 +138,17 @@ function mandateComponents(sessionId: string, threadId: string, state: DemoState
 function externalRequestComponents(sessionId: string, threadId: string, state: DemoState): AgentComponent[] {
   if (!state.mandate?.active) return [...mandateComponents(sessionId, threadId, state),
     { id: componentId(), type: 'explanation', title: '需要先创建授权', body: '外部 Agent 不能自行授权或确认请求。', tone: 'warning' }];
-  const scenarios = [
-    ['transport', '交通请求 · Execute', '¥300，在授权范围内'],
-    ['shopping', '购物请求 · Ask', '¥200，用途与授权类别不同'],
-    ['manual_review', '高额请求 · Manual Review', '¥400，接近单笔上限'],
-    ['over_limit', '超限请求 · Block', '¥2,000，超过授权额度'],
-  ] as const;
-  return scenarios.map(([scenario, title, body]) => confirmation(sessionId, threadId, state,
-    'simulate_agent_request', { scenario }, title, body, `确认发起${title.split(' · ')[1]}`));
+  const options = [
+    { id: 'execute' as const, label: '可直接执行', detail: '交通费 ¥300，符合授权且不影响目标' },
+    { id: 'ask' as const, label: '需要确认', detail: '购物 ¥200，用途与授权类别不同' },
+    { id: 'manual_review' as const, label: '设备验证', detail: '交通费 ¥400，接近单笔限额' },
+    { id: 'block' as const, label: '直接拦截', detail: '交通费 ¥2,000，超过授权额度' },
+  ];
+  const action = createAgentAction(sessionId, threadId, 'simulate_agent_request_batch', state.twinVersion,
+    { allowed: options.map(option => option.id) });
+  return [{ id: componentId(), type: 'agent_request_batch', title: '验证授权是否符合预期',
+    body: '选择要演示的判断结果，NOVA 会为每一项生成独立请求；一项失败不会影响其他项。',
+    options, action: { actionId: action.id, label: '发起所选模拟请求' } }];
 }
 
 export async function createAgentTurn(sessionId: string, threadId: string | null, message: string,
@@ -127,9 +160,11 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
   if (thread.readOnly) throw new Error('THREAD_READ_ONLY');
   if (thread.status === 'archived') throw new Error('THREAD_ARCHIVED');
   const context = getAgentMessages(sessionId, thread.id, 20).map(item => ({ role: item.role, content: item.content }));
+  const previousDraft = getGoalDraft(sessionId, thread.id);
   const understood = await interpretAgentRequest(trimmed, deterministicIntent, { context,
     twin: { version: state.twinVersion, goalStatus: state.goal.status, hasImpact: Boolean(state.pendingImpact), hasMandate: Boolean(state.mandate?.active) } });
-  const intent = understood.intent;
+  const intent = previousDraft?.missingRequiredFields.length && understood.intent === 'clarification'
+    ? 'goal_planning' : understood.intent;
   saveAgentMessage(sessionId, thread.id, { role: 'user', content: trimmed, components: [] });
   let provider: 'deepseek' | 'deterministic' = understood.provider;
   let fallbackReason: string | null = understood.fallbackReason;
@@ -138,23 +173,36 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
   if (intent === 'goal_planning') {
     const parsed = await interpretGoal(trimmed, state.clock);
     provider = parsed.provider; fallbackReason = parsed.fallbackReason ?? fallbackReason;
-    const title = parsed.goal.title && parsed.goal.title !== '我的新目标' ? parsed.goal.title : state.goal.title;
-    const isNewGoal = title !== state.goal.title;
-    const draftId = isNewGoal ? crypto.randomUUID() : state.goal.id;
-    const draft = {
-      title,
-      targetCents: parsed.goal.targetAmount ? Math.round(parsed.goal.targetAmount * 100) : state.goal.targetCents,
-      targetDate: parsed.goal.targetDate ?? state.goal.targetDate,
-      protectedCents: parsed.goal.emergencyFundProtected ? Math.round(parsed.goal.emergencyFundProtected * 100) : state.goal.protectedCents,
-    };
-    const assumptions = assumptionsFromGoal(state, { ...state.goal, ...draft });
-    components = [{ id: componentId(), type: 'goal_input_card', title: 'NOVA 理解的目标', draftId, goal: {
-      title: draft.title, targetCents: draft.targetCents, savedCents: isNewGoal ? 0 : state.goal.savedCents,
-      targetDate: draft.targetDate, protectedCents: draft.protectedCents, status: 'draft',
-    } }, { id: componentId(), type: 'assumption_editor', title: '核对并试算目标假设',
-      assumptions, baseTwinVersion: state.twinVersion }, confirmation(sessionId, thread.id, state, 'upsert_goal', draft,
-      '确认目标草案', `${draft.title} · ${yuan(draft.targetCents)} · 目标日 ${draft.targetDate}。确认后再比较可行方案。`, '确认保存目标草案')];
-    reply = '我把目标整理成了可核对的草案。金额和日期由服务端固定后才会写入。';
+    const draft = mergedGoalDraft(sessionId, thread.id, parsed.goal, state);
+    if (draft.missingRequiredFields.length) {
+      components = [clarificationForDraft(draft)];
+      reply = '我先补齐创建计划必需的信息，再为你计算时间和方案。';
+    } else {
+      const savedCents = draft.savedCents ?? 0;
+      const monthlyContributionCents = draft.monthlyContributionCapCents ?? availableMonthly(state);
+      const protectedCents = draft.protectedCents ?? state.finance.emergencyCents;
+      const flexibilityWeeks = draft.flexibilityWeeks ?? 2;
+      const sources = { ...draft.fieldSources,
+        savedCents: draft.savedCents == null ? 'default_assumption' as const : draft.fieldSources.savedCents,
+        monthlyContributionCents: draft.monthlyContributionCapCents == null
+          ? (state.dataConnections.some(item => item.status === 'connected') ? 'connected_data' as const : 'system_calculated' as const)
+          : 'user_provided' as const,
+        protectedCents: draft.protectedCents == null ? 'connected_data' as const : 'user_provided' as const,
+        flexibilityWeeks: draft.flexibilityWeeks == null ? 'default_assumption' as const : 'user_provided' as const };
+      const assumptions = { targetCents: draft.targetCents!, targetDate: draft.targetDate!, monthlyContributionCents,
+        protectedCents, flexibilityWeeks };
+      const goalDraft = { id: draft.goalId ?? draft.id, title: draft.title!, savedCents };
+      const preview = previewGoalScenario(state, assumptions, goalDraft);
+      const actions = preview.plans.filter(plan => plan.status !== 'infeasible').map(plan => ({ planId: plan.id,
+        actionId: createAgentAction(sessionId, thread.id, 'apply_goal_scenario_plan', state.twinVersion,
+          { assumptions, goalDraft, planId: plan.id }).id }));
+      components = [{ id: componentId(), type: 'goal_input_card', title: 'NOVA 理解的目标', draftId: draft.id, fieldSources: sources,
+        goal: { title: draft.title!, targetCents: draft.targetCents!, savedCents, targetDate: draft.targetDate!, protectedCents, status: 'draft' } },
+      { id: componentId(), type: 'assumption_editor', title: '核对并实时试算', assumptions, baseTwinVersion: state.twinVersion, fieldSources: sources },
+      { id: componentId(), type: 'goal_feasibility_card', title: '目标可行性', assessment: preview.assessment },
+      { id: componentId(), type: 'scenario_compare', title: '方案比较', plans: preview.plans, actions, selectedPlanId: null }];
+      reply = '信息已经完整。我根据你的表达和当前数据计算了可行性，请选择一种节奏后确认启用。';
+    }
   } else if (intent === 'goal_status') {
     components = statusComponents(sessionId, thread.id, state); reply = '这是基于同一份 Financial Twin 计算的进度和方案。';
   } else if (intent === 'goal_impact') {
@@ -198,25 +246,20 @@ export function createScenarioPreview(sessionId: string, threadId: string, input
     savedCents: draftComponent.goal.savedCents,
   } : { id: state.goal.id, title: state.goal.title, savedCents: state.goal.savedCents };
   const preview = previewGoalScenario(state, assumptions, goalDraft);
-  const action = createAgentAction(sessionId, threadId, 'apply_goal_scenario', state.twinVersion,
-    { assumptions, goalDraft });
+  const actions = preview.plans.filter(plan => plan.status !== 'infeasible').map(plan => ({ planId: plan.id,
+    actionId: createAgentAction(sessionId, threadId, 'apply_goal_scenario_plan', state.twinVersion,
+      { assumptions, goalDraft, planId: plan.id }).id }));
   const components: AgentComponent[] = [
-    { id: componentId(), type: 'what_if_simulator', title: 'What-if 试算', assumptions,
-      baseTwinVersion: state.twinVersion },
-    { id: componentId(), type: 'goal_feasibility_card', title: 'What-if 可行性', assessment: preview.assessment },
-    { id: componentId(), type: 'scenario_compare', title: '方案比较', plans: preview.plans },
-    { id: componentId(), type: 'plan_steps', title: '计划步骤', steps: preview.steps },
-    { id: componentId(), type: 'confirmation', title: '应用这组目标假设',
-      body: `目标 ${yuan(assumptions.targetCents)}，每月投入 ${yuan(assumptions.monthlyContributionCents)}，目标日 ${assumptions.targetDate}。`,
-      tone: 'warning', action: { actionId: action.id, label: '确认应用', destructive: false } },
+    { id: componentId(), type: 'assumption_editor', title: '核对并实时试算', assumptions,
+      baseTwinVersion: state.twinVersion, fieldSources: {} },
+    { id: componentId(), type: 'goal_feasibility_card', title: '实时试算结果', assessment: preview.assessment },
+    { id: componentId(), type: 'scenario_compare', title: '方案比较', plans: preview.plans, actions, selectedPlanId: null },
   ];
-  const message = saveAgentMessage(sessionId, threadId, { role: 'assistant',
-    content: '这是基于当前 Financial Twin 的只读试算。确认前不会修改目标或余额。', components });
-  return { preview, components, actionId: action.id, message };
+  return { preview, components, actionId: actions[0]?.actionId ?? null };
 }
 
 export function executeWorkspaceAction(sessionId: string, actionId: string, decision: 'confirm' | 'cancel',
-  state: DemoState): { state: DemoState; replayed: boolean; message: ReturnType<typeof saveAgentMessage>;
+  state: DemoState, selection: string[] = []): { state: DemoState; replayed: boolean; message: ReturnType<typeof saveAgentMessage>;
     nextStep: 'connect_data' | null } {
   const action = getAgentAction(sessionId, actionId);
   if (action.status === 'consumed') {
@@ -225,7 +268,7 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
       ? String((action.result as { messageId: unknown }).messageId) : null;
     const previous = messages.find(message => message.id === messageId) ?? messages.at(-1);
     if (!previous) throw new Error('AGENT_ACTION_RESULT_NOT_FOUND');
-    const requiresConnection = ['upsert_goal', 'apply_goal_scenario'].includes(action.actionType)
+    const requiresConnection = ['upsert_goal', 'apply_goal_scenario', 'apply_goal_scenario_plan'].includes(action.actionType)
       && !state.dataConnections.some(item => item.status === 'connected');
     return { state, replayed: true, message: previous, nextStep: requiresConnection ? 'connect_data' : null };
   }
@@ -250,7 +293,7 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
     next = runBankingTool(state, 'create_goal', { ...action.payload, flexibilityWeeks: state.goal.flexibilityWeeks,
       quote: '由 NOVA 对话工作台创建' }).state;
     detail = '目标草案已保存，请继续选择推进方案。';
-  } else if (action.actionType === 'apply_goal_scenario') {
+  } else if (action.actionType === 'apply_goal_scenario' || action.actionType === 'apply_goal_scenario_plan') {
     const envelope = action.payload.assumptions ? action.payload : { assumptions: action.payload, goalDraft: null };
     const assumptions = GoalAssumptionsSchema.parse(envelope.assumptions);
     const goalDraft = envelope.goalDraft && typeof envelope.goalDraft === 'object'
@@ -262,7 +305,16 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
         monthlyContributionCents: assumptions.monthlyContributionCents,
         quote: '由 NOVA What-if 工作台创建' }).state
       : runBankingTool(state, 'update_goal', assumptions).state;
-    detail = '目标假设已应用，方案需要重新选择后才能激活。';
+    if (action.actionType === 'apply_goal_scenario_plan') {
+      const planId = String(action.payload.planId);
+      const selected = runBankingTool(next, 'select_goal_plan', { planId });
+      const approval = runBankingTool(selected.state, 'create_approval_snapshot', {
+        action: 'activate_goal', parameters: { planId }, expiresInSeconds: 300 });
+      const confirmed = runBankingTool(approval.state, 'confirm_approval', { approvalId: approval.result.approvalId,
+        snapshotHash: approval.result.snapshotHash, confirmed: true }, { userConfirmed: true });
+      next = runBankingTool(confirmed.state, 'activate_goal', { planId, approvalToken: confirmed.result.approvalToken }).state;
+      detail = '目标假设和所选方案已启用，不会自动扣款。';
+    } else detail = '目标假设已应用，方案需要重新选择后才能激活。';
   } else if (action.actionType === 'activate_plan') {
     const planId = String(action.payload.planId);
     const selected = runBankingTool(state, 'select_goal_plan', { planId });
@@ -293,20 +345,37 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
       idempotencyKey: action.idempotencyKey };
     const outcome = evaluateExternalRequest(state, request);
     next = outcome.state; detail = `${outcome.operation.status.toUpperCase()} · ${outcome.operation.reason}`;
+  } else if (action.actionType === 'simulate_agent_request_batch') {
+    const allowed = new Set(Array.isArray(action.payload.allowed) ? action.payload.allowed.map(String) : []);
+    const selected = [...new Set(selection.map(String))];
+    if (!selected.length || selected.some(item => !allowed.has(item))) throw new Error('INVALID_AGENT_BATCH_SELECTION');
+    const scenarioMap: Record<string, { category: string; amountCents: number }> = {
+      execute: { category: 'transport', amountCents: 30000 }, ask: { category: 'shopping', amountCents: 20000 },
+      manual_review: { category: 'transport', amountCents: 40000 }, block: { category: 'transport', amountCents: 200000 },
+    };
+    const outcomes: string[] = [];
+    for (const item of selected) {
+      const scenario = scenarioMap[item];
+      const outcome = evaluateExternalRequest(next, { agentId: 'travel-agent-demo', ...scenario,
+        idempotencyKey: `${action.idempotencyKey}:${item}` });
+      next = outcome.state;
+      outcomes.push(`${item}: ${outcome.operation.status}`);
+    }
+    detail = `已生成 ${selected.length} 个独立请求（${outcomes.join('；')}）`;
   } else throw new Error('UNKNOWN_AGENT_ACTION');
   const receipt: AgentComponent = { id: componentId(), type: 'receipt', title: 'NOVA 操作凭证', body: detail,
     status: 'succeeded', operationId: next.operations.at(-1)?.operationId };
   let followups: AgentComponent[] = [];
-  const requiresConnection = ['upsert_goal', 'apply_goal_scenario'].includes(action.actionType)
+  const requiresConnection = ['upsert_goal', 'apply_goal_scenario', 'apply_goal_scenario_plan'].includes(action.actionType)
     && !next.dataConnections.some(item => item.status === 'connected');
   if (requiresConnection) followups = [{ id: componentId(), type: 'explanation',
     title: '连接模拟数据后再计算',
     body: '先选择要读取的模拟银行卡、微信支付和支付宝来源。NOVA 只读取余额与近 90 天流水，不获得扣款或转账权限。',
     tone: 'neutral' }];
-  else if (action.actionType === 'upsert_goal' || action.actionType === 'apply_goal_scenario')
+  else if (action.actionType === 'upsert_goal' || action.actionType === 'apply_goal_scenario' || action.actionType === 'apply_goal_scenario_plan')
     followups = statusComponents(sessionId, action.threadId, next);
   if (action.actionType === 'create_mandate') followups = externalRequestComponents(sessionId, action.threadId, next);
-  if (action.actionType === 'simulate_agent_request') followups = [{ id: componentId(), type: 'audit_summary',
+  if (action.actionType === 'simulate_agent_request' || action.actionType === 'simulate_agent_request_batch') followups = [{ id: componentId(), type: 'audit_summary',
     title: '治理与审计', body: '请求已按固定安全链路记录，可在执行记录中导出证据。', chainValid: verifyAuditChain(next.audit) }];
   const message = saveAgentMessage(sessionId, action.threadId, { role: 'assistant', content: detail, components: [receipt, ...followups] });
   finishAgentAction(sessionId, actionId, 'consumed', { messageId: message.id });

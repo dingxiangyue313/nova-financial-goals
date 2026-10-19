@@ -1,114 +1,31 @@
-import React from 'react';
-import { Goal } from '../types';
+import type { Goal } from '../../shared/contracts';
 
 interface GoalsListScreenProps {
-  goal: Goal;
+  goals: Goal[];
+  primaryGoalId: string | null;
+  emergencyCents: number;
   hasImpactPending: boolean;
-  onSelectGoal: (g: Goal) => void;
+  onSelectGoal: (id: string) => void | Promise<void>;
   onNavigateToCreate: () => void;
   onNavigateToImpact: () => void;
 }
 
-export const GoalsListScreen: React.FC<GoalsListScreenProps> = ({
-  goal,
-  hasImpactPending,
-  onSelectGoal,
-  onNavigateToCreate,
-  onNavigateToImpact,
-}) => {
-  return (
-    <div className="flex-1 flex flex-col pt-2 pb-safe px-4 overflow-y-auto no-scrollbar space-y-3.5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-[18px] font-bold text-[#1F2329]">所有目标 & 资金池</h2>
-          <p className="text-[12px] text-[#5A616B]">动态追踪进度与隔离保护底线</p>
-        </div>
-        <button
-          onClick={onNavigateToCreate}
-          className="px-3 py-1.5 rounded-lg bg-[#0F6B6D] text-white text-[12px] font-semibold flex items-center gap-1 hover:bg-[#084C4E] transition-all cursor-pointer shadow-sm active:scale-95"
-        >
-          <span className="material-symbols-outlined text-[15px]">add</span>
-          新建
-        </button>
-      </div>
+const yuan = (cents: number) => `¥${(cents / 100).toLocaleString('zh-CN')}`;
 
-      {/* Emergency Fund Protected Card */}
-      <div className="bg-[#EBF7F2] border border-[#276B4E]/30 rounded-xl p-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#276B4E]/15 text-[#276B4E] flex items-center justify-center">
-            <span className="material-symbols-outlined text-[20px]">shield</span>
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[14px] font-bold text-[#1F2329]">核心应急金</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#276B4E] text-white font-semibold">
-                绝对隔离
-              </span>
-            </div>
-            <p className="text-[12px] text-[#5A616B]">不纳入任何消费目标规划</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <span className="text-[16px] font-bold text-[#276B4E] font-editorial">
-            ¥{goal.emergencyFundProtected.toLocaleString()}
-          </span>
-          <p className="text-[11px] text-[#276B4E] font-medium">100% 安全</p>
-        </div>
-      </div>
-
-      {/* Primary Goal Card */}
-      <div
-        onClick={() => onSelectGoal(goal)}
-        className="bg-white border border-[#E5E8EB] rounded-xl p-3.5 shadow-sm space-y-2.5 cursor-pointer hover:border-[#0F6B6D]/50 transition-colors"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#0F6B6D]"></span>
-            <span className="text-[15px] font-bold text-[#1F2329]">{goal.title}</span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] font-medium">
-              专项预算
-            </span>
-          </div>
-          <span className="text-[12px] text-[#5A616B]">
-            {goal.targetDate}
-          </span>
-        </div>
-
-        <div className="flex items-baseline justify-between text-[13px]">
-          <span className="text-[#5A616B]">
-            已存 <strong className="text-[#1F2329]">¥{goal.currentAmount.toLocaleString()}</strong>
-          </span>
-          <span className="text-[#5A616B]">
-            目标 ¥{goal.targetAmount.toLocaleString()}
-          </span>
-        </div>
-
-        <div className="w-full h-2 rounded-full bg-[#F0F2F5] overflow-hidden">
-          <div
-            className="h-full bg-[#0F6B6D] rounded-full"
-            style={{ width: `${goal.progressPercent}%` }}
-          ></div>
-        </div>
-
-        <div className="flex items-center justify-between pt-1 text-[12px]">
-          <span className="text-[#5A616B]">
-            月供计划: ¥{goal.monthlySavings.toLocaleString()}
-          </span>
-          <button
-            disabled={!hasImpactPending}
-            onClick={(e) => {
-              e.stopPropagation();
-              onNavigateToImpact();
-            }}
-            className="text-[#0F6B6D] hover:underline flex items-center gap-0.5 font-medium cursor-pointer"
-          >
-            <span>{hasImpactPending ? '查看影响分析' : '当前无显著影响'}</span>
-            <span className="material-symbols-outlined text-[14px]">trending_up</span>
-          </button>
-        </div>
-      </div>
-
-
-    </div>
-  );
-};
+export function GoalsListScreen({ goals, primaryGoalId, emergencyCents, hasImpactPending,
+  onSelectGoal, onNavigateToCreate, onNavigateToImpact }: GoalsListScreenProps) {
+  return <div className="flex-1 space-y-3.5 overflow-y-auto px-4 pb-safe pt-2 no-scrollbar">
+    <div className="flex items-center justify-between"><div><h2 className="text-[18px] font-bold">我的计划</h2><p className="text-[12px] text-[#5A616B]">首页展示你指定的主目标，其他计划仍持续守护</p></div><button onClick={onNavigateToCreate} className="rounded-lg bg-[#0F6B6D] px-3 py-2 text-[12px] font-semibold text-white">＋ 新建</button></div>
+    <div className="flex items-center justify-between rounded-xl border border-[#A9D0C0] bg-[#EBF7F2] p-3.5"><div><p className="text-[13px] font-bold">核心应急金</p><p className="text-[11px] text-[#5A616B]">所有目标共同遵守，不参与计划投入</p></div><strong className="text-[#276B4E]">{yuan(emergencyCents)}</strong></div>
+    {goals.length === 0 && <div className="rounded-2xl border border-dashed border-[#B8CDCD] bg-white p-8 text-center"><h3 className="font-bold">还没有计划</h3><p className="mt-1 text-[12px] text-[#5A616B]">告诉 NOVA 你想完成什么，它会先补齐信息再试算。</p><button onClick={onNavigateToCreate} className="mt-4 rounded-xl bg-[#0F6B6D] px-4 py-2.5 text-[12px] font-semibold text-white">创建第一个计划</button></div>}
+    {goals.map(goal => {
+      const progress = goal.targetCents ? Math.min(100, goal.savedCents / goal.targetCents * 100) : 0;
+      const primary = goal.id === primaryGoalId;
+      return <article key={goal.id} className={`rounded-xl border bg-white p-3.5 shadow-sm ${primary ? 'border-[#0F6B6D]' : 'border-[#E5E8EB]'}`}>
+        <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="text-[15px] font-bold">{goal.title}</h3>{primary && <span className="rounded-full bg-[#E6F2F2] px-2 py-0.5 text-[10px] font-semibold text-[#0F6B6D]">首页主目标</span>}</div><p className="mt-1 text-[11px] text-[#5A616B]">目标日 {goal.targetDate} · {goal.status === 'active' ? '守护中' : '待启用'}</p></div><strong className="text-[13px]">{yuan(goal.savedCents)} / {yuan(goal.targetCents)}</strong></div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F0F2F5]"><div className="h-full rounded-full bg-[#0F6B6D]" style={{ width: `${progress}%` }}/></div>
+        <div className="mt-3 flex gap-2"><button onClick={() => void onSelectGoal(goal.id)} className={`flex-1 rounded-lg px-3 py-2 text-[11px] font-semibold ${primary ? 'bg-[#F2FAFA] text-[#0F6B6D]' : 'border border-[#0F6B6D] text-[#0F6B6D]'}`}>{primary ? '查看主目标' : '设为主目标并查看'}</button>{primary && hasImpactPending && <button onClick={onNavigateToImpact} className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">查看影响</button>}</div>
+      </article>;
+    })}
+  </div>;
+}

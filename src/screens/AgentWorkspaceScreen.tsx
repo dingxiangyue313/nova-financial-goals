@@ -64,12 +64,12 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
     finally { setBusy(false); }
   }
   async function submit(event: FormEvent) { event.preventDefault(); await send(draft); }
-  async function action(actionId: string) {
+  async function action(actionId: string, selection: string[] = []) {
     if (busy) return;
     setBusy(true); setError(null);
     try {
       const result = await api<{ snapshot: Snapshot; message: AgentMessage; replayed: boolean;
-        nextStep: 'connect_data' | null }>('/api/agent/action', 'POST', { actionId, decision: 'confirm' });
+        nextStep: 'connect_data' | null }>('/api/agent/action', 'POST', { actionId, decision: 'confirm', selection });
       onSnapshot(result.snapshot);
       if (result.nextStep === 'connect_data') { onNavigate('data_connections'); return; }
       if (activeThreadId) await loadMessages(activeThreadId);
@@ -94,7 +94,12 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
         threadId: activeThreadId, twinVersion, assumptions,
       });
       setCanvasComponents(result.components);
-      await loadMessages(activeThreadId);
+      setMessages(current => {
+        const index = current.findLastIndex(message => message.role === 'assistant'
+          && message.components.some(component => component.type === 'assumption_editor' || component.type === 'what_if_simulator'));
+        return index < 0 ? current : current.map((message, itemIndex) => itemIndex === index
+          ? { ...message, components: result.components } : message);
+      });
     } catch (value) { setError(value instanceof Error ? value.message : '试算失败'); }
     finally { setBusy(false); }
   }

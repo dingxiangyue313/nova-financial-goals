@@ -16,6 +16,7 @@ import { BankingDemoScreen } from './screens/BankingDemoScreen';
 import { AgentWorkspaceScreen } from './screens/AgentWorkspaceScreen';
 import { DataConnectionScreen } from './screens/DataConnectionScreen';
 import { OfflineScreen } from './screens/OfflineScreen';
+import { NovaMark } from './components/NovaMark';
 import { clearOfflineSnapshot, createOfflineSnapshot, loadOfflineSnapshot, saveOfflineSnapshot, type OfflineSnapshot } from './offline';
 
 interface InstallPromptEvent extends Event {
@@ -44,6 +45,9 @@ export default function App() {
     || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
   const [showInstallHint, setShowInstallHint] = useState(false);
   const [pwaUpdate, setPwaUpdate] = useState<((reloadPage?: boolean) => Promise<void>) | null>(null);
+  const [welcomeVisible, setWelcomeVisible] = useState(true);
+  const [welcomeLeaving, setWelcomeLeaving] = useState(false);
+  const initiallyRouted = useRef(false);
   const autoSyncing = useRef(false);
   useEffect(() => {
     let active = true;
@@ -63,7 +67,23 @@ export default function App() {
     return () => { active = false; };
   }, []);
   useEffect(() => {
-    if (!snapshot) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const timer = window.setTimeout(() => {
+      if (reduced) setWelcomeVisible(false);
+      else {
+        setWelcomeLeaving(true);
+        window.setTimeout(() => setWelcomeVisible(false), 250);
+      }
+    }, reduced ? 300 : 800);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!snapshot || initiallyRouted.current) return;
+    initiallyRouted.current = true;
+    setCurrentScreen(snapshot.goals.length ? 'home' : 'workspace');
+  }, [snapshot]);
+  useEffect(() => {
+    if (!snapshot || snapshot.goals.length === 0) return;
     const safe = createOfflineSnapshot(snapshot);
     setOfflineSnapshot(safe);
     void saveOfflineSnapshot(safe);
@@ -71,7 +91,7 @@ export default function App() {
   useEffect(() => {
     const onOffline = () => {
       setIsOffline(true);
-      if (snapshot) setOfflineSnapshot(createOfflineSnapshot(snapshot));
+      if (snapshot?.goals.length) setOfflineSnapshot(createOfflineSnapshot(snapshot));
     };
     const onOnline = async () => {
       try {
@@ -139,9 +159,11 @@ export default function App() {
     document.addEventListener('visibilitychange', onVisibility);
     return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibility); };
   }, [hasConnectedData, isOffline]);
-  const goal = snapshot ? displayGoal(snapshot) : null;
-  const scenario = snapshot ? displayImpact(snapshot) : null;
-  const hasImpactPending = Boolean(snapshot?.pendingImpact);
+  const goal = snapshot?.primaryGoal ? displayGoal(snapshot) : null;
+  const activeImpact = snapshot?.pendingImpact?.goalId == null || snapshot.pendingImpact.goalId === snapshot.primaryGoalId
+    ? snapshot?.pendingImpact ?? null : null;
+  const scenario = snapshot && activeImpact ? displayImpact({ ...snapshot, pendingImpact: activeImpact }) : null;
+  const hasImpactPending = Boolean(activeImpact);
 
   const mutate = async (url: string, method: string, body?: unknown) => {
     try {
@@ -163,6 +185,7 @@ export default function App() {
   };
 
   const navigateTo = (screen: ScreenId) => {
+    if (!snapshot?.goals.length && ['home', 'create_goal', 'feasibility', 'impact', 'goals_list', 'activity', 'profile', 'banking_demo'].includes(screen)) screen = 'workspace';
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
   };
@@ -294,6 +317,13 @@ export default function App() {
   const handleResetData = async () => {
     await mutate('/api/demo/reset', 'POST');
     showToast('已重置演示数据');
+    navigateTo('workspace');
+  };
+  const handleLoadJapanDemo = async () => {
+    const next = await mutate('/api/demo/load-japan', 'POST');
+    setShowSimulateModal(false);
+    setCurrentScreen('home');
+    showToast(`${next.primaryGoal?.title ?? '日本旅行'}演示已载入`);
   };
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const installState = isInstalled ? 'installed' as const : installPrompt ? 'available' as const
@@ -342,13 +372,14 @@ export default function App() {
   const isHomeScreen = currentScreen === 'home';
   const showBottomNav =
     currentScreen === 'home' ||
-    currentScreen === 'workspace' ||
+    (currentScreen === 'workspace' && Boolean(snapshot?.goals.length)) ||
     currentScreen === 'goals_list' ||
     currentScreen === 'activity' ||
     currentScreen === 'profile';
 
   if (isOffline && offlineSnapshot) return <OfflineScreen snapshot={offlineSnapshot} onReconnect={() => window.location.reload()} />;
-  if (!snapshot || !goal) return <div className="min-h-screen grid place-items-center bg-[#F5F7F8] px-6 text-center text-[#0F6B6D]">{loadError ? `加载失败：${loadError}。${isOffline ? '当前没有可用的离线摘要。' : '请刷新页面重试。'}` : 'NOVA 正在读取演示数据…'}</div>;
+  if (!snapshot) return <div className="min-h-screen grid place-items-center bg-[#F5F7F8] px-6 text-center text-[#0F6B6D]">{loadError ? `加载失败：${loadError}。${isOffline ? '当前没有可用的离线摘要。' : '请刷新页面重试。'}` : 'NOVA 正在读取数据…'}</div>;
+  if (welcomeVisible) return <div data-testid="nova-welcome" className={`fixed inset-0 z-[100] grid place-items-center bg-white transition-opacity duration-250 ${welcomeLeaving ? 'opacity-0' : 'opacity-100'}`}><div className="flex flex-col items-center px-8 text-center"><NovaMark size={72}/><p className="mt-7 text-[18px] font-bold tracking-tight text-[#1F2329]">不用记账，也知道目标能不能按时实现</p></div></div>;
 
   return (
     <div className="min-h-screen bg-[#E5E8EB] flex flex-col items-center justify-center p-0 md:py-6 text-[#1F2329] selection:bg-[#E6F2F2]">
@@ -358,7 +389,7 @@ export default function App() {
           <span className="font-semibold text-[#5A616B] shrink-0 text-[11px]">快速直达:</span>
           <button
             onClick={() => navigateTo('home')}
-            className={`px-2.5 py-1 rounded-full shrink-0 transition-all cursor-pointer font-medium text-[11px] ${
+            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
               currentScreen === 'home'
                 ? 'bg-[#0F6B6D] text-white shadow-xs'
                 : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
@@ -368,7 +399,7 @@ export default function App() {
           </button>
           <button
             onClick={() => navigateTo('create_goal')}
-            className={`px-2.5 py-1 rounded-full shrink-0 transition-all cursor-pointer font-medium text-[11px] ${
+            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
               currentScreen === 'create_goal'
                 ? 'bg-[#0F6B6D] text-white shadow-xs'
                 : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
@@ -378,7 +409,7 @@ export default function App() {
           </button>
           <button
             onClick={() => navigateTo('feasibility')}
-            className={`px-2.5 py-1 rounded-full shrink-0 transition-all cursor-pointer font-medium text-[11px] ${
+            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
               currentScreen === 'feasibility'
                 ? 'bg-[#0F6B6D] text-white shadow-xs'
                 : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
@@ -388,7 +419,7 @@ export default function App() {
           </button>
           <button
             onClick={() => navigateTo('impact')}
-            className={`px-2.5 py-1 rounded-full shrink-0 transition-all cursor-pointer font-medium text-[11px] ${
+            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
               currentScreen === 'impact'
                 ? 'bg-[#0F6B6D] text-white shadow-xs'
                 : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
@@ -432,7 +463,7 @@ export default function App() {
 
         {/* Content Body */}
         <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar relative w-full bg-[#F5F7F8]">
-          {currentScreen === 'home' && (
+          {currentScreen === 'home' && goal && (
             <HomeScreen
               goal={goal}
               snapshot={snapshot}
@@ -443,7 +474,7 @@ export default function App() {
             />
           )}
 
-          {currentScreen === 'create_goal' && (
+          {currentScreen === 'create_goal' && goal && (
             <CreateGoalScreen
               goal={goal}
               onUpdateGoal={handleUpdateGoal}
@@ -454,7 +485,7 @@ export default function App() {
             />
           )}
 
-          {currentScreen === 'feasibility' && (
+          {currentScreen === 'feasibility' && goal && (
             <FeasibilityScreen
               goal={goal}
               assessment={snapshot.assessment}
@@ -478,7 +509,7 @@ export default function App() {
             />
           )}
 
-          {currentScreen === 'impact' && scenario && (
+          {currentScreen === 'impact' && goal && scenario && (
             <GoalImpactScreen
               goal={goal}
               scenario={scenario}
@@ -493,9 +524,11 @@ export default function App() {
 
           {currentScreen === 'goals_list' && (
             <GoalsListScreen
-              goal={goal}
-              onSelectGoal={() => navigateTo('home')}
-              onNavigateToCreate={() => navigateTo('create_goal')}
+              goals={snapshot.goals}
+              primaryGoalId={snapshot.primaryGoalId}
+              emergencyCents={snapshot.finance.emergencyCents}
+              onSelectGoal={async id => { const next = await mutate(`/api/goals/${id}/set-primary`, 'POST'); setSnapshot(next); navigateTo('home'); }}
+              onNavigateToCreate={() => { setWorkspaceStarter('我想创建一个新的财务目标'); navigateTo('workspace'); }}
               onNavigateToImpact={() => navigateTo('impact')}
               hasImpactPending={hasImpactPending}
             />
@@ -512,7 +545,7 @@ export default function App() {
           {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame}
             starter={workspaceStarter} onSnapshot={setSnapshot} onNavigate={navigateTo} />}
 
-          {currentScreen === 'profile' && (
+          {currentScreen === 'profile' && goal && (
             <ProfileScreen
               goal={goal}
               onNavigate={navigateTo}
@@ -589,6 +622,10 @@ export default function App() {
               <p className="text-[12px] text-[#5A616B]">推进演示日期后，已连接的数据来源会自动出现对应流水；用户无需记账或手动同步。</p>
 
               <div className="space-y-2">
+                <button
+                  onClick={() => void handleLoadJapanDemo()}
+                  className="w-full rounded-xl bg-[#0F6B6D] px-3 py-2.5 text-left text-[13px] font-semibold text-white"
+                >一键载入日本旅行演示</button>
                 <button
                   onClick={() => { void handleAdvanceDemo('2026-09-22'); setShowSimulateModal(false); }}
                   disabled={!hasConnectedData}

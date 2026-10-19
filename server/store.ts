@@ -2,9 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { AgentComponentSchema, AgentMessageSchema, AgentThreadSchema, DemoStateSchema,
-  type AgentComponent, type AgentMessage, type AgentThread, type DemoState } from '../shared/contracts.ts';
-import { createFixture } from './fixtures.ts';
+import { AgentComponentSchema, AgentMessageSchema, AgentThreadSchema, DemoStateSchema, GoalDraftSchema,
+  type AgentComponent, type AgentMessage, type AgentThread, type DemoState, type GoalDraft } from '../shared/contracts.ts';
+import { createFirstUseFixture } from './fixtures.ts';
 
 const dbPath = resolve(process.env.NOVA_DB_PATH || './data/nova.sqlite');
 mkdirSync(dirname(dbPath), { recursive: true });
@@ -90,6 +90,10 @@ CREATE TABLE IF NOT EXISTS agent_actions (
   result_json TEXT, expires_at TEXT NOT NULL, idempotency_key TEXT NOT NULL, created_at TEXT NOT NULL,
   UNIQUE(session_id, idempotency_key)
 );
+CREATE TABLE IF NOT EXISTS goal_drafts (
+  session_id TEXT NOT NULL, thread_id TEXT NOT NULL, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL,
+  PRIMARY KEY(session_id, thread_id)
+);
 CREATE TABLE IF NOT EXISTS passkey_credentials (
   session_id TEXT PRIMARY KEY, credential_id TEXT NOT NULL UNIQUE, public_key BLOB NOT NULL,
   counter INTEGER NOT NULL, transports_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -147,10 +151,22 @@ function syncArtifacts(sessionId: string, state: DemoState) {
     .run(receipt.operationId, sessionId, JSON.stringify(receipt));
 }
 
+export function migrateDemoStateShape(raw: unknown): DemoState {
+  const value = raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>) } : raw;
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const legacyGoal = record.goal;
+    if (!Array.isArray(record.goals)) record.goals = legacyGoal ? [legacyGoal] : [];
+    if (!('primaryGoalId' in record)) record.primaryGoalId = legacyGoal && typeof legacyGoal === 'object'
+      ? String((legacyGoal as { id?: unknown }).id || '') || null : null;
+  }
+  return DemoStateSchema.parse(value);
+}
+
 export function getState(sessionId: string): DemoState {
   const row = db.prepare('SELECT state_json FROM demo_sessions WHERE id = ?').get(sessionId) as { state_json: string } | undefined;
-  if (row) return DemoStateSchema.parse(JSON.parse(row.state_json));
-  const initial = createFixture();
+  if (row) return migrateDemoStateShape(JSON.parse(row.state_json));
+  const initial = createFirstUseFixture();
   db.prepare('INSERT OR IGNORE INTO demo_sessions (id,state_json,version,updated_at) VALUES (?,?,0,?)')
     .run(sessionId, JSON.stringify(initial), new Date().toISOString());
   return initial;
@@ -254,7 +270,7 @@ export function completePasskeyAuthentication(sessionId: string, challenge: stri
 export function resetState(sessionId: string): DemoState {
   db.exec('BEGIN IMMEDIATE');
   try {
-    const state = createFixture();
+    const state = createFirstUseFixture();
     db.prepare('INSERT INTO demo_sessions (id,state_json,version,updated_at) VALUES (?,?,0,?) ON CONFLICT(id) DO UPDATE SET state_json=excluded.state_json, version=version+1, updated_at=excluded.updated_at')
       .run(sessionId, JSON.stringify(state), new Date().toISOString());
     db.prepare('DELETE FROM audit_events WHERE session_id=?').run(sessionId);
@@ -355,7 +371,22 @@ export function deleteAgentThread(sessionId: string, threadId: string) {
   db.prepare('DELETE FROM agent_actions WHERE thread_id=? AND session_id=?').run(threadId, sessionId);
   db.prepare('DELETE FROM agent_components WHERE thread_id=? AND session_id=?').run(threadId, sessionId);
   db.prepare('DELETE FROM agent_turns WHERE thread_id=? AND session_id=?').run(threadId, sessionId);
+  db.prepare('DELETE FROM goal_drafts WHERE thread_id=? AND session_id=?').run(threadId, sessionId);
   db.prepare('DELETE FROM agent_threads WHERE id=? AND session_id=?').run(threadId, sessionId);
+}
+
+export function getGoalDraft(sessionId: string, threadId: string): GoalDraft | null {
+  const row = db.prepare('SELECT payload_json FROM goal_drafts WHERE session_id=? AND thread_id=?')
+    .get(sessionId, threadId) as { payload_json: string } | undefined;
+  return row ? GoalDraftSchema.parse(JSON.parse(row.payload_json)) : null;
+}
+
+export function saveGoalDraft(sessionId: string, draft: GoalDraft): GoalDraft {
+  const parsed = GoalDraftSchema.parse(draft);
+  db.prepare(`INSERT INTO goal_drafts(session_id,thread_id,payload_json,updated_at) VALUES(?,?,?,?)
+    ON CONFLICT(session_id,thread_id) DO UPDATE SET payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
+    .run(sessionId, parsed.threadId, JSON.stringify(parsed), parsed.updatedAt);
+  return parsed;
 }
 
 export function saveAgentTurnRecord(sessionId: string, input: { id: string; threadId: string; intent: string;

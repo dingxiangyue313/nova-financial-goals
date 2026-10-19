@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { createFixture } from './fixtures.ts';
+import { createFirstUseFixture, createFixture } from './fixtures.ts';
 import { activatePlan } from './domain.ts';
 import { applySpendingTrendDemo } from './risk.ts';
 import {
@@ -53,7 +53,37 @@ test('archived conversations reject new turns through the workspace API', async 
   await assert.rejects(() => createAgentTurn(sessionId, thread.id, '继续修改这个目标', createFixture()), /THREAD_ARCHIVED/);
 });
 
-test('a goal message produces governed components and a server-bound confirmation action', async () => {
+test('an incomplete first goal only asks for missing information across turns', async () => {
+  const sessionId = randomUUID();
+  const state = createFirstUseFixture();
+  const first = await createAgentTurn(sessionId, null, '我想去日本旅行', state);
+  assert.deepEqual(first.components.map(item => item.type), ['clarification']);
+  const second = await createAgentTurn(sessionId, first.thread.id, '预算 ¥8,000，12 月 15 日前', state);
+  assert.ok(second.components.some(item => item.type === 'goal_input_card'));
+  assert.ok(second.components.some(item => item.type === 'scenario_compare'));
+  assert.equal(second.components.some(item => item.type === 'confirmation'), false);
+});
+
+test('explicit savings and monthly limits change the goal assumptions', async () => {
+  const state = createFirstUseFixture();
+  const shortTurn = await createAgentTurn(randomUUID(), null,
+    '我想在 12 月 15 日前存够 ¥8,000 去日本旅行', state);
+  const longTurn = await createAgentTurn(randomUUID(), null,
+    '我想在 12 月 15 日前存够 ¥8,000 去日本旅行，现在已经存了 ¥3,500，每月最多存 ¥1,500，¥20,000 应急金不能动。', state);
+  const shortGoal = shortTurn.components.find(item => item.type === 'goal_input_card');
+  const longGoal = longTurn.components.find(item => item.type === 'goal_input_card');
+  const shortEditor = shortTurn.components.find(item => item.type === 'assumption_editor');
+  const longEditor = longTurn.components.find(item => item.type === 'assumption_editor');
+  assert.ok(shortGoal?.type === 'goal_input_card' && longGoal?.type === 'goal_input_card');
+  assert.ok(shortEditor?.type === 'assumption_editor' && longEditor?.type === 'assumption_editor');
+  assert.equal(shortGoal.goal.savedCents, 0);
+  assert.equal(longGoal.goal.savedCents, 350000);
+  assert.notEqual(shortEditor.assumptions.monthlyContributionCents, longEditor.assumptions.monthlyContributionCents);
+  assert.equal(longEditor.assumptions.monthlyContributionCents, 150000);
+  assert.equal(longEditor.fieldSources.monthlyContributionCents, 'user_provided');
+});
+
+test('a complete goal message produces governed components and server-bound plan actions', async () => {
   const sessionId = randomUUID();
   const state = createFixture();
   const turn = await createAgentTurn(sessionId, null, '我想年底去日本旅行，预算 ¥8,000', state);
@@ -61,9 +91,9 @@ test('a goal message produces governed components and a server-bound confirmatio
   assert.equal(turn.provider, 'deterministic');
   assert.ok(turn.components.some(item => item.type === 'goal_input_card'));
   assert.ok(turn.components.some(item => item.type === 'assumption_editor'));
-  const confirmation = turn.components.find(item => item.type === 'confirmation');
-  assert.ok(confirmation && confirmation.type === 'confirmation');
-  assert.equal(confirmation.action.actionId.length > 10, true);
+  const scenarios = turn.components.find(item => item.type === 'scenario_compare');
+  assert.ok(scenarios && scenarios.type === 'scenario_compare');
+  assert.equal(scenarios.actions.every(action => action.actionId.length > 10), true);
   assert.equal(JSON.stringify(turn).includes('targetCents'), true);
   assert.equal(JSON.stringify(turn).includes('DEEPSEEK_API_KEY'), false);
   assert.deepEqual(agentArtifactCounts(sessionId), { turns: 1, components: turn.components.length });
@@ -73,27 +103,28 @@ test('workspace action is idempotent and rejects a changed financial twin', asyn
   const sessionId = randomUUID();
   const state = createFixture();
   const turn = await createAgentTurn(sessionId, null, '我想年底去日本旅行，预算 ¥8,000', state);
-  const confirmation = turn.components.find(item => item.type === 'confirmation');
-  assert.ok(confirmation && confirmation.type === 'confirmation');
-  const first = executeWorkspaceAction(sessionId, confirmation.action.actionId, 'confirm', state);
+  const scenarios = turn.components.find(item => item.type === 'scenario_compare');
+  assert.ok(scenarios && scenarios.type === 'scenario_compare');
+  const actionId = scenarios.actions[0].actionId;
+  const first = executeWorkspaceAction(sessionId, actionId, 'confirm', state);
   assert.equal(first.state.goal.targetCents, 800000);
   assert.equal(first.nextStep, 'connect_data');
   assert.ok(first.message.components.some(component => component.type === 'explanation'
     && component.title === '连接模拟数据后再计算'));
-  const replay = executeWorkspaceAction(sessionId, confirmation.action.actionId, 'confirm', first.state);
+  const replay = executeWorkspaceAction(sessionId, actionId, 'confirm', first.state);
   assert.equal(replay.replayed, true);
   assert.equal(replay.state.twinVersion, first.state.twinVersion);
 
   const later = { ...first.state, twinVersion: 99,
     finance: { ...first.state.finance, checkingCents: 123000 } };
-  const replayAfterLaterWrite = executeWorkspaceAction(sessionId, confirmation.action.actionId, 'confirm', later);
+  const replayAfterLaterWrite = executeWorkspaceAction(sessionId, actionId, 'confirm', later);
   assert.equal(replayAfterLaterWrite.state.twinVersion, 99);
   assert.equal(replayAfterLaterWrite.state.finance.checkingCents, 123000);
 
   const secondTurn = await createAgentTurn(sessionId, turn.thread.id, '把目标改成 ¥9,000', first.state);
-  const secondConfirmation = secondTurn.components.find(item => item.type === 'confirmation');
-  assert.ok(secondConfirmation && secondConfirmation.type === 'confirmation');
-  const stale = executeWorkspaceAction(sessionId, secondConfirmation.action.actionId, 'confirm',
+  const secondScenarios = secondTurn.components.find(item => item.type === 'scenario_compare');
+  assert.ok(secondScenarios && secondScenarios.type === 'scenario_compare');
+  const stale = executeWorkspaceAction(sessionId, secondScenarios.actions[0].actionId, 'confirm',
     { ...first.state, twinVersion: first.state.twinVersion + 1 });
   assert.equal(stale.state.twinVersion, first.state.twinVersion + 1);
   assert.ok(stale.message.components.some(component => component.type === 'error_recovery'));
@@ -129,16 +160,18 @@ test('scenario preview does not write the twin and applies exact assumptions onl
 
   assert.deepEqual(state, before);
   assert.equal(result.preview.baseTwinVersion, state.twinVersion);
-  assert.ok(result.components.some(component => component.type === 'confirmation'));
+  const scenarios = result.components.find(component => component.type === 'scenario_compare');
+  assert.ok(scenarios && scenarios.type === 'scenario_compare' && scenarios.actions.length > 0);
   assert.throws(() => executeWorkspaceAction(stranger, result.actionId, 'confirm', state), /AGENT_ACTION_NOT_FOUND/);
 
   const applied = executeWorkspaceAction(sessionId, result.actionId, 'confirm', state);
   assert.equal(applied.state.goal.targetCents, 900000);
   assert.equal(applied.state.goal.targetDate, '2027-01-15');
-  assert.equal(applied.state.goal.monthlyContributionCents, 160000);
+  assert.equal(applied.state.goal.monthlyContributionCents, result.preview.plans.find(plan => plan.id === scenarios.actions[0].planId)?.monthlyCents);
   assert.equal(applied.state.goal.flexibilityWeeks, 3);
-  assert.equal(applied.state.goal.selectedPlanId, null);
-  assert.equal(applied.state.twinVersion, state.twinVersion + 1);
+  assert.equal(applied.state.goal.selectedPlanId, scenarios.actions[0].planId);
+  assert.equal(applied.state.goal.status, 'active');
+  assert.equal(applied.state.twinVersion > state.twinVersion, true);
 
   const replay = executeWorkspaceAction(sessionId, result.actionId, 'confirm', applied.state);
   assert.equal(replay.replayed, true);
@@ -173,10 +206,29 @@ test('scenario preview action expires and stops when the twin version changes', 
   }
 });
 
+test('mandate confirmation returns one selectable batch and creates independent decisions', async () => {
+  const sessionId = randomUUID();
+  const state = activatePlan(createFixture(), 'balanced');
+  const turn = await createAgentTurn(sessionId, null, '允许旅行 Agent 在 ¥500 内订票', state);
+  const confirmation = turn.components.find(item => item.type === 'confirmation');
+  assert.ok(confirmation?.type === 'confirmation');
+  const mandate = executeWorkspaceAction(sessionId, confirmation.action.actionId, 'confirm', state);
+  const batch = mandate.message.components.find(item => item.type === 'agent_request_batch');
+  assert.ok(batch?.type === 'agent_request_batch');
+  const requested = executeWorkspaceAction(sessionId, batch.action.actionId, 'confirm', mandate.state,
+    ['execute', 'ask', 'manual_review', 'block']);
+  const statuses = requested.state.operations.slice(-4).map(item => item.status);
+  assert.deepEqual(statuses, ['executed', 'ask', 'manual_review', 'blocked']);
+  const replay = executeWorkspaceAction(sessionId, batch.action.actionId, 'confirm', requested.state,
+    ['execute', 'ask', 'manual_review', 'block']);
+  assert.equal(replay.replayed, true);
+  assert.equal(replay.state.operations.length, requested.state.operations.length);
+});
+
 test('significant impact creates one unread proactive thread while duplicate delivery is ignored', () => {
   const sessionId = randomUUID();
   const state = createFixture();
-  const impact = { id: randomUUID(), title: '汽车保养', expenseCents: 90000, detectedAt: state.clock,
+  const impact = { id: randomUUID(), goalId: state.goal.id, title: '汽车保养', expenseCents: 90000, detectedAt: state.clock,
     shortfallCents: 90000, delayDays: 18, optionAContributionCents: 180000,
     optionAAvailable: true, optionBDate: '2027-01-02', dismissed: false };
   ensureImpactThread(sessionId, { ...state, pendingImpact: impact });

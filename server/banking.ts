@@ -147,12 +147,16 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
     case 'compare_scenarios': return { state, result: { scenarios: assessGoal(state).plans } };
     case 'get_goal_progress': return { state, result: { goal: state.goal, assessment: assessGoal(state) } };
     case 'create_goal': {
-      const savedCents = input.title === state.goal.title ? state.goal.savedCents : 0;
+      const existing = state.goals.find(goal => goal.id === input.id)
+        ?? state.goals.find(goal => goal.title === input.title);
+      const savedCents = existing?.savedCents ?? 0;
+      const created = { ...state.goal, id: existing?.id ?? input.id ?? randomUUID(), title: input.title,
+        targetCents: input.targetCents, savedCents, targetDate: input.targetDate, originalDate: input.targetDate,
+        protectedCents: input.protectedCents, flexibilityWeeks: input.flexibilityWeeks, quote: input.quote,
+        status: 'draft' as const, selectedPlanId: null, monthlyContributionCents: input.monthlyContributionCents };
+      const goals = existing ? state.goals.map(goal => goal.id === existing.id ? created : goal) : [...state.goals, created];
       let next: DemoState = { ...state, twinVersion: state.twinVersion + 1,
-        goal: { ...state.goal, id: input.id ?? randomUUID(), title: input.title, targetCents: input.targetCents,
-          savedCents, targetDate: input.targetDate, originalDate: input.targetDate,
-          protectedCents: input.protectedCents, flexibilityWeeks: input.flexibilityWeeks, quote: input.quote,
-          status: 'draft', selectedPlanId: null, monthlyContributionCents: input.monthlyContributionCents },
+        goal: created, goals, primaryGoalId: state.primaryGoalId ?? created.id,
         finance: { ...state.finance, emergencyCents: input.protectedCents }, pendingImpact: null, mandate: null,
         accounts: state.accounts.map(item => item.id === 'emergency' ? { ...item, balanceCents: input.protectedCents }
           : item.id === 'goal-wallet' ? { ...item, balanceCents: savedCents } : item) };
@@ -160,10 +164,11 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       return { state: next, result: { goal: next.goal, twinVersion: next.twinVersion } };
     }
     case 'update_goal': {
+      const updated = { ...state.goal, ...input, originalDate: input.targetDate ?? state.goal.originalDate,
+        status: 'draft' as const, selectedPlanId: null,
+        monthlyContributionCents: input.monthlyContributionCents ?? 0 };
       let next: DemoState = { ...state, twinVersion: state.twinVersion + 1,
-        goal: { ...state.goal, ...input, originalDate: input.targetDate ?? state.goal.originalDate,
-          status: 'draft', selectedPlanId: null,
-          monthlyContributionCents: input.monthlyContributionCents ?? 0 },
+        goal: updated, goals: state.goals.map(goal => goal.id === updated.id ? updated : goal),
         finance: input.protectedCents === undefined ? state.finance : { ...state.finance, emergencyCents: input.protectedCents },
         accounts: input.protectedCents === undefined ? state.accounts : state.accounts.map(item => item.id === 'emergency' ? { ...item, balanceCents: input.protectedCents } : item),
         pendingImpact: null, mandate: null };
@@ -173,8 +178,9 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
     case 'select_goal_plan': {
       const plan = assessGoal(state).plans.find(item => item.id === input.planId);
       if (!plan || plan.status === 'infeasible') throw new Error('PLAN_NOT_AVAILABLE');
+      const updated = { ...state.goal, selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents, status: 'draft' as const };
       let next: DemoState = { ...state, twinVersion: state.twinVersion + 1,
-        goal: { ...state.goal, selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents, status: 'draft' } };
+        goal: updated, goals: state.goals.map(goal => goal.id === updated.id ? updated : goal) };
       next = appendAuditEvent(next, 'select_goal_plan', 'selected', plan.id);
       return { state: next, result: { goal: next.goal, twinVersion: next.twinVersion } };
     }

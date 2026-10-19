@@ -14,6 +14,9 @@ test('首页、工作台、可行性、影响和授权页无严重无障碍问�
   await page.route(/https:\/\/(fonts\.(googleapis|gstatic)\.com|images\.unsplash\.com|lh3\.googleusercontent\.com)\/.*/, route => route.abort());
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ content: '*, *::before, *::after { animation: none !important; transition: none !important; }' });
+  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await page.request.post('/api/demo/load-japan');
+  await page.reload();
   await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
   await expectNoSeriousViolations(page, '首页');
 

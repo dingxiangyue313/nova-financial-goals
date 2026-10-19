@@ -12,6 +12,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
       <div className="h-14 px-2 grid grid-cols-5 items-center">
         {/* Tab 1: 首页 */}
         <button
+          aria-label="首页"
           onClick={() => onNavigate('home')}
           className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'home'
@@ -25,6 +26,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
 
         {/* Tab 2: 目标 */}
         <button
+          aria-label="目标"
           onClick={() => onNavigate('goals_list')}
           className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'goals_list'
@@ -60,6 +62,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
 
         {/* Tab 4: 动态 */}
         <button
+          aria-label="动态"
           onClick={() => onNavigate('activity')}
           className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'activity'
@@ -73,6 +76,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
 
         {/* Tab 5: 我的 */}
         <button
+          aria-label="我的"
           onClick={() => onNavigate('profile')}
           className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'profile'

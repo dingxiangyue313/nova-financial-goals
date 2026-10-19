@@ -5,6 +5,8 @@ import type { ScreenId } from '../types';
 
 const money = (cents: number) => `¥${(cents / 100).toLocaleString('zh-CN')}`;
 const sourceName = { bank: '银行卡', wechat_pay: '微信支付', alipay: '支付宝' } as const;
+const fieldSourceName: Record<string, string> = { user_provided: '用户提供', connected_data: '连接数据',
+  system_calculated: '系统计算', default_assumption: '默认假设' };
 const tone = {
   neutral: 'border-[#E5E8EB] bg-white', good: 'border-emerald-200 bg-emerald-50',
   warning: 'border-amber-200 bg-amber-50', danger: 'border-rose-200 bg-rose-50',
@@ -23,9 +25,31 @@ function AssumptionEditor({ assumptions, twinVersion, onPreview, busy }: {
     <label><span className="mb-1 block text-[#5A616B]">每月投入（元）</span><input aria-label="每月投入" type="number" min="0" value={draft.monthlyContributionCents / 100} onChange={event => amount('monthlyContributionCents', event.target.value)} className="w-full rounded-lg border border-[#D0D5DD] px-2 py-2" /></label>
     <label><span className="mb-1 block text-[#5A616B]">受保护资金（元）</span><input aria-label="受保护资金" type="number" min="0" value={draft.protectedCents / 100} onChange={event => amount('protectedCents', event.target.value)} className="w-full rounded-lg border border-[#D0D5DD] px-2 py-2" /></label>
     <label><span className="mb-1 block text-[#5A616B]">可浮动周数</span><input aria-label="可浮动周数" type="number" min="0" max="52" value={draft.flexibilityWeeks} onChange={event => setDraft(current => ({ ...current, flexibilityWeeks: Math.max(0, Number(event.target.value || 0)) }))} className="w-full rounded-lg border border-[#D0D5DD] px-2 py-2" /></label>
-    <button type="button" disabled={busy || !onPreview} onClick={() => onPreview?.(draft, twinVersion)} className="col-span-2 min-h-11 rounded-xl bg-[#0F6B6D] px-3 py-2 font-semibold text-white disabled:opacity-50">{busy ? '正在试算…' : 'What-if 实时试算'}</button>
+    <button type="button" disabled={busy || !onPreview} onClick={() => onPreview?.(draft, twinVersion)} className="col-span-2 min-h-11 rounded-xl bg-[#0F6B6D] px-3 py-2 font-semibold text-white disabled:opacity-50">{busy ? '正在试算…' : '实时试算'}</button>
     <p className="col-span-2 text-[10px] text-[#727982]">试算不会修改余额、目标或 Financial Twin；确认应用后才写入。</p>
   </div>;
+}
+
+function ScenarioCompare({ component, onAction, busy }: {
+  component: Extract<AgentComponent, { type: 'scenario_compare' }>;
+  onAction: (actionId: string) => void; busy?: boolean;
+}) {
+  const [selected, setSelected] = useState(component.selectedPlanId);
+  const action = component.actions.find(item => item.planId === selected);
+  return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><h4 className="text-[14px] font-bold">{component.title}</h4><div className="mt-2 space-y-2">{component.plans.map(plan => {
+    const disabled = plan.status === 'infeasible' || !component.actions.some(item => item.planId === plan.id);
+    return <button type="button" key={plan.id} disabled={disabled || busy} onClick={() => setSelected(plan.id)} className={`w-full rounded-xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-55 ${selected === plan.id ? 'border-[#0F6B6D] bg-[#F2FAFA] ring-1 ring-[#0F6B6D]' : plan.recommended ? 'border-[#93C7C8] bg-[#F7FBFB]' : 'border-[#E5E8EB]'}`}><div className="flex justify-between text-[12px] font-semibold"><span>{plan.label}{plan.recommended ? ' · 推荐' : ''}</span><span>{money(plan.monthlyCents)}/月</span></div><p className="mt-1 text-[11px] text-[#5A616B]">{plan.explanation}</p></button>;
+  })}</div>{component.actions.length > 0 && <button type="button" disabled={!action || busy} onClick={() => action && onAction(action.actionId)} className="mt-3 min-h-11 w-full rounded-xl bg-[#0F6B6D] px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-40">{busy ? '正在启用…' : selected ? '确认并启用该方案' : '先选择一种方案'}</button>}</article>;
+}
+
+function AgentRequestBatch({ component, onAction, busy }: {
+  component: Extract<AgentComponent, { type: 'agent_request_batch' }>;
+  onAction: (actionId: string, selection?: string[]) => void; busy?: boolean;
+}) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const toggle = (id: string) => setSelected(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  const all = selected.length === component.options.length;
+  return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><h4 className="text-[14px] font-bold">{component.title}</h4><p className="mt-1 text-[11px] text-[#5A616B]">{component.body}</p><label className="mt-3 flex items-center gap-2 border-b border-[#E5E8EB] pb-2 text-[11px] font-semibold"><input type="checkbox" checked={all} onChange={() => setSelected(all ? [] : component.options.map(item => item.id))}/>全选</label><div className="mt-2 space-y-2">{component.options.map(option => <label key={option.id} className="flex items-start gap-2 rounded-xl bg-[#F5F7F8] p-3 text-[11px]"><input type="checkbox" checked={selected.includes(option.id)} onChange={() => toggle(option.id)} className="mt-0.5 accent-[#0F6B6D]"/><span><b className="block">{option.label}</b><span className="text-[#5A616B]">{option.detail}</span></span></label>)}</div><button type="button" disabled={!selected.length || busy} onClick={() => onAction(component.action.actionId, selected)} className="mt-3 min-h-11 w-full rounded-xl bg-[#0F6B6D] px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-40">{busy ? '正在发起…' : component.action.label}</button></article>;
 }
 
 function PreferenceEditor({ preferences, goalId, onUpdate, busy }: {
@@ -71,17 +95,18 @@ function PreferenceEditor({ preferences, goalId, onUpdate, busy }: {
 }
 
 export function AgentComponentRenderer({ value, onAction, onCancel, onNavigate, busy, onPreview, onUpdateRiskPreferences }: {
-  value: unknown; onAction: (actionId: string) => void; onCancel: (actionId: string) => void;
+  value: unknown; onAction: (actionId: string, selection?: string[]) => void; onCancel: (actionId: string) => void;
   onNavigate: (screen: ScreenId) => void; busy?: boolean;
   onPreview?: (assumptions: GoalAssumptions, twinVersion: number) => void;
   onUpdateRiskPreferences?: (changes: Partial<RiskPreferences>) => void;
 }) {
   const component = normalizeAgentComponent(value);
-  if (component.type === 'goal_input_card') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><div className="text-[11px] font-semibold text-[#0F6B6D]">目标输入</div><h4 className="mt-1 text-[16px] font-bold">{component.goal.title}</h4><div className="mt-3 grid grid-cols-2 gap-2 text-[12px]"><div className="rounded-xl bg-[#F5F7F8] p-2">目标 {money(component.goal.targetCents)}</div><div className="rounded-xl bg-[#F5F7F8] p-2">日期 {component.goal.targetDate}</div></div></article>;
+  if (component.type === 'goal_input_card') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><div className="text-[11px] font-semibold text-[#0F6B6D]">目标输入</div><h4 className="mt-1 text-[16px] font-bold">{component.goal.title}</h4><div className="mt-3 grid grid-cols-2 gap-2 text-[12px]"><div className="rounded-xl bg-[#F5F7F8] p-2">目标 {money(component.goal.targetCents)}<span className="mt-1 block text-[9px] text-[#727982]">{fieldSourceName[component.fieldSources.targetCents] || '待核对'}</span></div><div className="rounded-xl bg-[#F5F7F8] p-2">日期 {component.goal.targetDate}<span className="mt-1 block text-[9px] text-[#727982]">{fieldSourceName[component.fieldSources.targetDate] || '待核对'}</span></div><div className="rounded-xl bg-[#F5F7F8] p-2">已存 {money(component.goal.savedCents)}<span className="mt-1 block text-[9px] text-[#727982]">{fieldSourceName[component.fieldSources.savedCents] || '默认假设'}</span></div><div className="rounded-xl bg-[#F5F7F8] p-2">保护资金 {money(component.goal.protectedCents)}<span className="mt-1 block text-[9px] text-[#727982]">{fieldSourceName[component.fieldSources.protectedCents] || '连接数据'}</span></div></div></article>;
   if (component.type === 'assumption_editor' || component.type === 'what_if_simulator') return <article data-testid="assumption-editor" className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><h4 className="text-[14px] font-bold">{component.title}</h4><AssumptionEditor assumptions={component.assumptions} twinVersion={component.baseTwinVersion} onPreview={onPreview} busy={busy} /></article>;
   if (component.type === 'goal_feasibility_card') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><h4 className="text-[14px] font-bold">{component.title}</h4><span className="rounded-full bg-[#EBF7F2] px-2 py-1 text-[10px] text-[#276B4E]">{component.assessment.status}</span></div><p className="mt-2 text-[12px] text-[#5A616B]">预计完成：{component.assessment.projectedDate || '需调整条件'} · 建议月存 {money(component.assessment.requiredMonthlyCents)}</p></article>;
   if (component.type === 'goal_progress_card') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><h4 className="text-[14px] font-bold">{component.title}</h4><p className="mt-2 text-[22px] font-bold text-[#0F6B6D]">{component.progressPercent.toFixed(1)}%</p><p className="text-[11px] text-[#5A616B]">已存 {money(component.goal.savedCents)} / {money(component.goal.targetCents)}</p></article>;
-  if (component.type === 'scenario_compare') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><h4 className="text-[14px] font-bold">{component.title}</h4><div className="mt-2 space-y-2">{component.plans.map(plan => <div key={plan.id} className={`rounded-xl border p-3 ${plan.recommended ? 'border-[#0F6B6D] bg-[#F2FAFA]' : 'border-[#E5E8EB]'}`}><div className="flex justify-between text-[12px] font-semibold"><span>{plan.label}{plan.recommended ? ' · 推荐' : ''}</span><span>{money(plan.monthlyCents)}/月</span></div><p className="mt-1 text-[11px] text-[#5A616B]">{plan.explanation}</p></div>)}</div></article>;
+  if (component.type === 'scenario_compare') return <ScenarioCompare component={component} onAction={onAction} busy={busy}/>;
+  if (component.type === 'agent_request_batch') return <AgentRequestBatch component={component} onAction={onAction} busy={busy}/>;
   if (component.type === 'plan_steps') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><h4 className="text-[14px] font-bold">{component.title}</h4><ol className="mt-3 space-y-2">{component.steps.map((step, index) => <li key={step.id} className="flex gap-2 text-[11px]"><span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${step.status === 'complete' ? 'bg-[#0F6B6D] text-white' : 'bg-[#F0F2F5] text-[#5A616B]'}`}>{index + 1}</span><span><b className="block">{step.label}</b><span className="text-[#5A616B]">{step.detail}</span></span></li>)}</ol></article>;
   if (component.type === 'goal_impact_brief') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><div className="text-[10px] font-semibold text-[#0F6B6D]">每周安静摘要</div><h4 className="mt-1 text-[14px] font-bold">{component.title}</h4><p className="mt-2 text-[12px] leading-relaxed text-[#5A616B]">{component.body}</p>{component.summary && <p className="mt-2 text-[10px] text-[#727982]">{component.summary.weekStart} 至 {component.summary.weekEnd} · 不触发紧急红点</p>}</article>;
   if (component.type === 'notification_preference_card') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-4 shadow-sm"><h4 className="text-[14px] font-bold">{component.title}</h4><p className="mt-1 text-[11px] text-[#5A616B]">流水持续在后台分析；只有目标或安全资金真正受影响时才即时提示。</p><PreferenceEditor preferences={component.preferences} goalId={component.goalId} onUpdate={onUpdateRiskPreferences} busy={busy} /></article>;

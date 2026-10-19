@@ -21,15 +21,17 @@ export const OfflineSnapshotSchema = z.object({
 export type OfflineSnapshot = z.infer<typeof OfflineSnapshotSchema>;
 
 export function createOfflineSnapshot(snapshot: Snapshot, savedAt = new Date().toISOString()): OfflineSnapshot {
+  const goal = snapshot.primaryGoal ?? snapshot.goals.find(item => item.id === snapshot.primaryGoalId);
+  if (!goal) throw new Error('OFFLINE_SNAPSHOT_REQUIRES_GOAL');
   return OfflineSnapshotSchema.parse({
     version: 1,
     savedAt,
     simulated: true,
     goal: {
-      title: snapshot.goal.title,
-      targetCents: snapshot.goal.targetCents,
-      savedCents: snapshot.goal.savedCents,
-      targetDate: snapshot.goal.targetDate,
+      title: goal.title,
+      targetCents: goal.targetCents,
+      savedCents: goal.savedCents,
+      targetDate: goal.targetDate,
       status: snapshot.assessment.status,
     },
     assessment: {

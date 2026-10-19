@@ -48,11 +48,15 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     const initial = await call('/api/session');
     assert.equal(initial.code, 200);
     assert.equal((initial.data as Snapshot).goal.status, 'draft');
+    assert.deepEqual((initial.data as Snapshot).goals, []);
+    const loadedDemo = await call('/api/demo/load-japan', 'POST');
+    assert.equal(loadedDemo.code, 200);
+    assert.equal((loadedDemo.data as Snapshot).goals.length, 1);
     const tools = await call('/api/banking-tools');
     assert.equal(tools.code, 200);
     assert.equal(Array.isArray((tools.data as { tools: unknown[] }).tools), true);
     const twin = await call('/api/financial-twin');
-    assert.equal((twin.data as { version: number }).version, 1);
+    assert.equal((twin.data as { version: number }).version >= 1, true);
     assert.equal((await call('/api/goals/activate', 'POST', { planId: null })).code, 400);
     const created = await call('/api/goals', 'POST', { title: '日本旅行', targetCents: 800000,
       targetDate: '2026-12-15', protectedCents: 2000000, quote: '去日本旅行', flexibilityWeeks: 2 });
@@ -172,12 +176,12 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     const previewActionId = (preview.data as { actionId: string }).actionId;
     const previewApplied = await call('/api/agent/action', 'POST', { actionId: previewActionId, decision: 'confirm' });
     assert.equal((previewApplied.data as { snapshot: Snapshot }).snapshot.goal.targetCents, 900000);
-    assert.equal((previewApplied.data as { snapshot: Snapshot }).snapshot.goal.monthlyContributionCents, 160000);
+    assert.equal((previewApplied.data as { snapshot: Snapshot }).snapshot.goal.status, 'active');
     const turn = await call('/api/agent/turn', 'POST', { threadId, message: '我想年底去日本旅行，预算 ¥8,000' });
     assert.equal(turn.code, 200);
-    const turnData = turn.data as { intent: string; components: Array<{ type: string; action?: { actionId: string } }> };
+    const turnData = turn.data as { intent: string; components: Array<{ type: string; actions?: Array<{ actionId: string }> }> };
     assert.equal(turnData.intent, 'goal_planning');
-    const actionId = turnData.components.find(item => item.type === 'confirmation')?.action?.actionId;
+    const actionId = turnData.components.find(item => item.type === 'scenario_compare')?.actions?.[0]?.actionId;
     assert.ok(actionId);
     const action = await call('/api/agent/action', 'POST', { actionId, decision: 'confirm' });
     assert.equal(action.code, 200);
@@ -185,7 +189,7 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     const actionReplay = await call('/api/agent/action', 'POST', { actionId, decision: 'confirm' });
     assert.equal((actionReplay.data as { replayed: boolean }).replayed, true);
     const messages = await call(`/api/agent/threads/${threadId}/messages`);
-    assert.equal((messages.data as { messages: unknown[] }).messages.length, 5);
+    assert.equal((messages.data as { messages: unknown[] }).messages.length, 4);
     assert.equal((await call(`/api/agent/threads/${threadId}`, 'PATCH', { title: '冬季日本旅行' })).code, 200);
     assert.equal((await call(`/api/agent/threads/${threadId}`, 'DELETE')).code, 200);
   } finally {

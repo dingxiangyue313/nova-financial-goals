@@ -42,8 +42,11 @@ export function generatedCards(state: DemoState, assessment: Assessment): UiCard
 }
 
 export function snapshot(state: DemoState): Snapshot {
-  const assessment = assessGoal(state);
-  return SnapshotSchema.parse({ goal: state.goal, finance: state.finance, assessment,
+  const primaryGoal = state.goals.find(goal => goal.id === state.primaryGoalId) ?? null;
+  const displayState = primaryGoal ? { ...state, goal: primaryGoal } : state;
+  const assessment = assessGoal(displayState);
+  return SnapshotSchema.parse({ goal: primaryGoal ?? state.goal, finance: state.finance, assessment,
+    goals: state.goals, primaryGoalId: state.primaryGoalId, primaryGoal,
     pendingImpact: state.pendingImpact, mandate: state.mandate, audit: state.audit,
     operations: state.operations, receipts: state.receipts,
     approvalSummaries: state.approvals.map(({ token: _token, ...approval }) => approval),

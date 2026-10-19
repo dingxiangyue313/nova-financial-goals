@@ -226,65 +226,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </button>
       </section>
 
-      {/* Three User-Facing Stages (Clean Card) */}
-      <section className="flex flex-col bg-white rounded-xl border border-[#E5E8EB] p-3.5 shadow-sm gap-2.5">
-        <div className="flex items-center justify-between pb-1 border-b border-[#E5E8EB]">
-          <span className="text-[13px] font-bold text-[#1F2329] flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[#0F6B6D] text-[16px]">flowsheet</span>
-            计划阶段与进展
-          </span>
-          <span className="text-[11px] text-[#5A616B]">3 步清晰推进</span>
-        </div>
-        <div className="flex flex-col gap-2">
-          {/* Stage 1 */}
-          <div
-            onClick={onNavigateToFeasibility}
-            className="flex items-start gap-2.5 p-2 rounded-lg bg-[#F5F7F8] border border-[#E5E8EB] hover:border-[#0F6B6D]/40 transition-colors cursor-pointer"
-          >
-            <div className="w-5 h-5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
-              1
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[13px] font-bold text-[#1F2329]">当前进度</span>
-              <span className="text-[12px] text-[#5A616B]">
-                已存 ¥{goal.currentAmount.toLocaleString()}，完成 {percentage}%
-              </span>
-            </div>
-          </div>
-
-          {/* Stage 2 */}
-          <div
-            onClick={onNavigateToFeasibility}
-            className="flex items-start gap-2.5 p-2 rounded-lg bg-[#F5F7F8] border border-[#E5E8EB] hover:border-[#0F6B6D]/40 transition-colors cursor-pointer"
-          >
-            <div className="w-5 h-5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
-              2
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[13px] font-bold text-[#1F2329]">可行方案</span>
-              <span className="text-[12px] text-[#5A616B]">
-                {insight?.body} 建议月存 ¥{goal.monthlySavings.toLocaleString()}
-              </span>
-            </div>
-          </div>
-
-          {/* Stage 3 */}
-          <div
-            onClick={onNavigateToFeasibility}
-            className="flex items-start gap-2.5 p-2 rounded-lg bg-[#F5F7F8] border border-[#E5E8EB] hover:border-[#0F6B6D]/40 transition-colors cursor-pointer"
-          >
-            <div className="w-5 h-5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
-              3
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[13px] font-bold text-[#1F2329]">确认计划</span>
-              <span className="text-[12px] text-[#5A616B]">
-                {snapshot.goal.selectedPlanId ? '已选择并启用计划' : '选择适合你的节奏，再决定是否启用'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 };

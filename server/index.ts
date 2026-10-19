@@ -22,6 +22,7 @@ import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRi
 import { installApiRateLimits, installRequestHardening, setStaticCacheHeaders } from './http-hardening.ts';
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
 import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, failDataSource, recoverDataSource, revokeDataSource } from './data-connections.ts';
+import { createFixture } from './fixtures.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -259,9 +260,10 @@ app.post('/api/agent/preview', route((req, res) => {
   res.json(createScenarioPreview(id, body.threadId, body.assumptions, state));
 }));
 app.post('/api/agent/action', route((req, res) => {
-  const body = z.object({ actionId: z.string(), decision: z.enum(['confirm', 'cancel']) }).parse(req.body);
+  const body = z.object({ actionId: z.string(), decision: z.enum(['confirm', 'cancel']),
+    selection: z.array(z.enum(['execute', 'ask', 'manual_review', 'block'])).max(4).default([]) }).parse(req.body);
   const id = sessionId(req, res); let outcome: ReturnType<typeof executeWorkspaceAction> | undefined;
-  const state = mutateState(id, old => { outcome = executeWorkspaceAction(id, body.actionId, body.decision, old); return outcome.state; });
+  const state = mutateState(id, old => { outcome = executeWorkspaceAction(id, body.actionId, body.decision, old, body.selection); return outcome.state; });
   res.json({ snapshot: snapshot(state), message: outcome!.message, replayed: outcome!.replayed,
     nextStep: outcome!.nextStep });
 }));
@@ -320,6 +322,27 @@ app.post('/api/goals', route((req, res) => {
   const state = mutateState(sessionId(req, res), old => { assertExpectedTwin(old, req.body?.expectedTwinVersion); return runBankingTool(old, 'create_goal', body).state; });
   return respond(res, state);
 }));
+app.get('/api/goals', route((req, res) => {
+  const state = getState(sessionId(req, res));
+  res.json({ goals: state.goals, primaryGoalId: state.primaryGoalId });
+}));
+app.post('/api/goals/:id/set-primary', route((req, res) => {
+  const id = z.string().min(1).parse(req.params.id);
+  const state = mutateState(sessionId(req, res), old => {
+    const goal = old.goals.find(item => item.id === id);
+    if (!goal) throw new Error('GOAL_NOT_FOUND');
+    return audit({ ...old, primaryGoalId: id, goal, twinVersion: old.twinVersion + 1 },
+      'primary_goal_changed', 'changed', `主目标已切换为 ${goal.title}`);
+  });
+  return respond(res, state);
+}));
+app.post('/api/demo/load-japan', route((req, res) => {
+  const state = mutateState(sessionId(req, res), old => {
+    const demo = createFixture();
+    return audit({ ...demo, twinVersion: old.twinVersion + 1 }, 'demo_loaded', 'ready', '已载入日本旅行演示');
+  });
+  return respond(res, state);
+}));
 app.patch('/api/goals/current', route((req, res) => {
   const changes = z.object({ title: z.string().min(1).max(60).optional(), targetCents: z.number().int().positive().optional(),
     targetDate: IsoDateSchema.optional(), protectedCents: z.number().int().nonnegative().optional(),
@@ -363,7 +386,8 @@ app.post('/api/demo/deposit', route((req, res) => {
   const amountCents = z.number().int().positive().parse(req.body?.amountCents);
   const state = mutateState(sessionId(req, res), old => {
     if (amountCents > old.finance.checkingCents) throw new Error('INSUFFICIENT_BALANCE');
-    return audit({ ...old, goal: { ...old.goal, savedCents: old.goal.savedCents + amountCents },
+    const goal = { ...old.goal, savedCents: old.goal.savedCents + amountCents };
+    return audit({ ...old, goal, goals: old.goals.map(item => item.id === goal.id ? goal : item),
       finance: { ...old.finance, checkingCents: old.finance.checkingCents - amountCents },
       transactions: [{ id: randomUUID(), accountId: 'checking', date: old.clock, title: '存入目标钱包',
         category: 'goal_transfer', amountCents: -amountCents }, ...old.transactions] }, 'simulate_deposit', 'executed', '模拟目标存入');

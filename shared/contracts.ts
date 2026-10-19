@@ -177,7 +177,7 @@ export const SubscriptionSchema = z.object({
 export type Subscription = z.infer<typeof SubscriptionSchema>;
 
 export const ImpactSchema = z.object({
-  id: z.string(), title: z.string(), expenseCents: MoneySchema,
+  id: z.string(), goalId: z.string().nullable().default(null), title: z.string(), expenseCents: MoneySchema,
   detectedAt: IsoDateSchema, shortfallCents: MoneySchema,
   delayDays: z.number().int().nonnegative(),
   optionAContributionCents: MoneySchema, optionAAvailable: z.boolean().default(true), optionBDate: IsoDateSchema,
@@ -250,6 +250,7 @@ export type FinancialTwin = z.infer<typeof FinancialTwinSchema>;
 
 export const DemoStateSchema = z.object({
   clock: IsoDateSchema, goal: GoalSchema, finance: FinanceSchema,
+  goals: z.array(GoalSchema).default([]), primaryGoalId: z.string().nullable().default(null),
   pendingImpact: ImpactSchema.nullable(), mandate: MandateSchema.nullable(),
   audit: z.array(AuditSchema), operations: z.array(OperationSchema),
   twinVersion: z.number().int().positive().default(1),
@@ -296,6 +297,23 @@ export const GoalAssumptionsSchema = z.object({
   flexibilityWeeks: z.number().int().min(0).max(52),
 });
 export type GoalAssumptions = z.infer<typeof GoalAssumptionsSchema>;
+
+export const GoalFieldSourceSchema = z.enum(['user_provided', 'connected_data', 'system_calculated', 'default_assumption']);
+export type GoalFieldSource = z.infer<typeof GoalFieldSourceSchema>;
+export const GoalDraftSchema = z.object({
+  id: z.string().min(1), threadId: z.string().min(1), goalId: z.string().nullable().default(null),
+  title: z.string().min(1).max(60).nullable().default(null),
+  targetCents: MoneySchema.positive().nullable().default(null),
+  targetDate: IsoDateSchema.nullable().default(null),
+  savedCents: MoneySchema.nullable().default(null),
+  monthlyContributionCapCents: MoneySchema.nullable().default(null),
+  protectedCents: MoneySchema.nullable().default(null),
+  flexibilityWeeks: z.number().int().min(0).max(52).nullable().default(null),
+  fieldSources: z.record(z.string(), GoalFieldSourceSchema).default({}),
+  missingRequiredFields: z.array(z.enum(['title', 'targetCents', 'targetDate'])),
+  updatedAt: z.string(),
+});
+export type GoalDraft = z.infer<typeof GoalDraftSchema>;
 
 export const PlanStepSchema = z.object({
   id: z.enum(['goal_details', 'assumptions', 'plan_selection', 'activation']),
@@ -360,20 +378,26 @@ export const AgentComponentSchema = z.discriminatedUnion('type', [
   AgentComponentBase.extend({ type: z.literal('error_recovery'), title: z.string(), body: z.string(), code: z.string() }),
   AgentComponentBase.extend({ type: z.literal('goal_input_card'), title: z.string(), goal: GoalSchema.pick({
     title: true, targetCents: true, savedCents: true, targetDate: true, protectedCents: true, status: true,
-  }), draftId: z.string().optional() }),
+  }), draftId: z.string().optional(), fieldSources: z.record(z.string(), GoalFieldSourceSchema).default({}) }),
   AgentComponentBase.extend({ type: z.literal('goal_feasibility_card'), title: z.string(), assessment: AssessmentSchema }),
   AgentComponentBase.extend({ type: z.literal('goal_progress_card'), title: z.string(), goal: GoalSchema,
     progressPercent: z.number().min(0).max(100) }),
   AgentComponentBase.extend({ type: z.literal('assumption_editor'), title: z.string(),
-    assumptions: GoalAssumptionsSchema, baseTwinVersion: z.number().int().positive() }),
+    assumptions: GoalAssumptionsSchema, baseTwinVersion: z.number().int().positive(),
+    fieldSources: z.record(z.string(), GoalFieldSourceSchema).default({}) }),
   AgentComponentBase.extend({ type: z.literal('what_if_simulator'), title: z.string(),
     assumptions: GoalAssumptionsSchema, baseTwinVersion: z.number().int().positive() }),
-  AgentComponentBase.extend({ type: z.literal('scenario_compare'), title: z.string(), plans: z.array(PlanSchema).min(1).max(3) }),
+  AgentComponentBase.extend({ type: z.literal('scenario_compare'), title: z.string(), plans: z.array(PlanSchema).min(1).max(3),
+    actions: z.array(z.object({ planId: z.string(), actionId: z.string().min(10) })).default([]),
+    selectedPlanId: z.string().nullable().default(null) }),
   AgentComponentBase.extend({ type: z.literal('plan_steps'), title: z.string(), steps: z.array(PlanStepSchema) }),
   AgentComponentBase.extend({ type: z.literal('goal_impact_brief'), title: z.string(), body: z.string(),
     summary: WeeklyRiskSummarySchema.optional(), signal: GoalImpactSignalSchema.optional() }),
   AgentComponentBase.extend({ type: z.literal('notification_preference_card'), title: z.string(),
     preferences: RiskPreferencesSchema, goalId: z.string() }),
+  AgentComponentBase.extend({ type: z.literal('agent_request_batch'), title: z.string(), body: z.string(),
+    options: z.array(z.object({ id: z.enum(['execute', 'ask', 'manual_review', 'block']), label: z.string(), detail: z.string() })).length(4),
+    action: z.object({ actionId: z.string().min(10), label: z.string() }) }),
 ]);
 export type AgentComponent = z.infer<typeof AgentComponentSchema>;
 
@@ -401,6 +425,8 @@ export type AgentTurn = z.infer<typeof AgentTurnSchema>;
 
 export const SnapshotSchema = z.object({
   goal: GoalSchema, finance: FinanceSchema, assessment: AssessmentSchema,
+  goals: z.array(GoalSchema).default([]), primaryGoalId: z.string().nullable().default(null),
+  primaryGoal: GoalSchema.nullable().default(null),
   pendingImpact: ImpactSchema.nullable(), mandate: MandateSchema.nullable(),
   audit: z.array(AuditSchema), operations: z.array(OperationSchema),
   receipts: z.array(ReceiptSchema), approvalSummaries: z.array(ApprovalSchema.omit({ token: true })),

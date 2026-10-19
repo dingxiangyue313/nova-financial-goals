@@ -9,6 +9,7 @@ const ParsedGoal = z.object({
   targetAmount: z.number().positive().max(10_000_000).nullable().optional(),
   targetDate: z.string().max(40).nullable().optional(),
   monthlySavings: z.number().nonnegative().max(10_000_000).nullable().optional(),
+  savedAmount: z.number().nonnegative().max(10_000_000).nullable().optional(),
   emergencyFundProtected: z.number().nonnegative().max(10_000_000).nullable().optional(),
   flexibilityWeeks: z.number().int().nonnegative().max(52).nullable().optional(),
 });
@@ -42,8 +43,10 @@ function deterministic(text: string, clock: string): ParsedGoalDraft {
   const amount = target?.[1] || allAmounts[0]?.[1];
   const emergency = text.match(/应急金[^\d¥]{0,8}¥?\s*([\d,]+)/)
     || text.match(/(?:保留|保护|留下)[^\d¥]{0,8}¥?\s*([\d,]+)(?:\.\d{1,2})?\s*元?[^。；，,]{0,8}应急金/);
-  const exactDate = text.match(/(20\d{2})年(\d{1,2})月(\d{1,2})日/);
-  const monthDay = text.match(/(\d{1,2})月(\d{1,2})日/);
+  const saved = text.match(/(?:已经存了|已存|现在有)[^\d¥]{0,8}¥?\s*([\d,]+(?:\.\d{1,2})?)/);
+  const monthly = text.match(/(?:每月最多存|每个月最多存|每月可存|每月存)[^\d¥]{0,8}¥?\s*([\d,]+(?:\.\d{1,2})?)/);
+  const exactDate = text.match(/(20\d{2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+  const monthDay = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
   const relativeMonths = text.match(/([一二三四五六七八九十\d]+)个?月后/);
   const chinese = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 } as Record<string, number>;
   let targetDate: string | null = null;
@@ -53,11 +56,13 @@ function deterministic(text: string, clock: string): ParsedGoalDraft {
     const count = Number(relativeMonths[1]) || chinese[relativeMonths[1]];
     if (count) targetDate = addDays(clock, count * 30);
   }
+  else if (/年底|年末/.test(text)) targetDate = `${clock.slice(0, 4)}-12-31`;
   const title = text.match(/(?:去|到)(日本|冰岛|巴黎|旅行|旅游)/) ? `${text.match(/(?:去|到)(日本|冰岛|巴黎|旅行|旅游)/)![1]}旅行`
-    : text.match(/(相机|学费|开店|买房|旅行)/)?.[1] || '我的新目标';
+    : text.match(/(相机|学费|开店|买房|旅行)/)?.[1] || null;
   return ParsedGoal.parse({ title, targetAmount: amount ? Number(amount.replaceAll(',', '')) : null,
     targetDate, emergencyFundProtected: emergency ? Number(emergency[1].replaceAll(',', '')) : null,
-    monthlySavings: null, flexibilityWeeks: null });
+    monthlySavings: monthly ? Number(monthly[1].replaceAll(',', '')) : null,
+    savedAmount: saved ? Number(saved[1].replaceAll(',', '')) : null, flexibilityWeeks: null });
 }
 
 export async function interpretGoal(text: string, clock: string): Promise<{

@@ -347,7 +347,7 @@ export function applySpendingTrendDemo(state: DemoState): {
   const optionAContributionCents = roundHundredYuan(state.goal.monthlyContributionCents
     + impactData.shortfallCents / Math.max(1, months - 1));
   const impact: Impact = {
-    id: crypto.randomUUID(),
+    id: crypto.randomUUID(), goalId: state.goal.id,
     title: '外卖与打车持续上升',
     expenseCents: pattern.increaseCents,
     detectedAt: state.clock,

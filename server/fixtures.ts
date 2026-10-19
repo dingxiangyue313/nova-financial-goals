@@ -3,16 +3,17 @@ import type { DemoState } from '../shared/contracts.ts';
 export const JAPAN_IMAGE = 'https://lh3.googleusercontent.com/aida/AEtjO1UrwbCWWFERF-Q6qaqJaXETXbphhrx4S6cHkreRUfDf1RmQQM91tfbxSEg6NgOztnIflKRoZqpXV6lf6TP2CDg74qhxuSZ4MnLj4PlVqIo2UirrbkvgYAlEDtm6gLrG710cn4v8VCjgrw0eOEufJdfbyWC66IgTDEtMo6fDswf29rG2NN2CGC0GXpzCDihK6lpa59ywP8FIHxxR19FOlokWcPMrCV82urfygNsMjEgntfouq79dAvkn5ema';
 
 export function createFixture(): DemoState {
+  const goal: DemoState['goal'] = {
+    id: 'goal-japan-2026', title: '日本旅行', targetCents: 800000,
+    savedCents: 350000, targetDate: '2026-12-15', originalDate: '2026-12-15',
+    monthlyContributionCents: 150000, protectedCents: 2000000,
+    flexibilityWeeks: 2, status: 'draft', selectedPlanId: null,
+    imageUrl: JAPAN_IMAGE,
+    quote: '我想三个月后去日本旅行，预算¥8,000，不能动应急金。',
+  };
   return {
     clock: '2026-09-21',
-    goal: {
-      id: 'goal-japan-2026', title: '日本旅行', targetCents: 800000,
-      savedCents: 350000, targetDate: '2026-12-15', originalDate: '2026-12-15',
-      monthlyContributionCents: 150000, protectedCents: 2000000,
-      flexibilityWeeks: 2, status: 'draft', selectedPlanId: null,
-      imageUrl: JAPAN_IMAGE,
-      quote: '我想三个月后去日本旅行，预算¥8,000，不能动应急金。',
-    },
+    goal, goals: [goal], primaryGoalId: goal.id,
     finance: {
       checkingCents: 500000, emergencyCents: 2000000,
       monthlyIncomeCents: 900000, fixedBillsCents: 450000,
@@ -45,4 +46,9 @@ export function createFixture(): DemoState {
     dataConnections: [], dataSyncBatches: [],
     pendingImpact: null, mandate: null, audit: [], operations: [],
   };
+}
+
+export function createFirstUseFixture(): DemoState {
+  const fixture = createFixture();
+  return { ...fixture, goals: [], primaryGoalId: null };
 }

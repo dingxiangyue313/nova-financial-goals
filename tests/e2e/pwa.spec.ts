@@ -1,6 +1,14 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
+async function openDemo(page: Page): Promise<void> {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await page.request.post('/api/demo/load-japan');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
+}
+
 async function hasSavedOfflineSnapshot(page: Page): Promise<boolean> {
   return page.evaluate(() => new Promise<boolean>(resolve => {
     const open = indexedDB.open('nova-offline-cache', 1);
@@ -27,14 +35,13 @@ test('manifest and install entry expose NOVA as a standalone app', async ({ page
   expect(body.display).toBe('standalone');
   expect(body.icons).toEqual(expect.arrayContaining([expect.objectContaining({ sizes: '192x192' }), expect.objectContaining({ sizes: '512x512' })]));
 
-  await page.goto('/');
+  await openDemo(page);
   await page.getByTitle('个人设置').click();
   await expect(page.getByRole('heading', { name: '安装 NOVA' })).toBeVisible();
 });
 
 test('offline reload shows only the sanitized read-only summary', async ({ page, context }) => {
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
+  await openDemo(page);
   await expect.poll(() => hasSavedOfflineSnapshot(page)).toBe(true);
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
@@ -49,8 +56,8 @@ test('offline reload shows only the sanitized read-only summary', async ({ page,
 });
 
 test('going offline stops automatic sync while the read-only snapshot is visible', async ({ page, context }) => {
+  await openDemo(page);
   await page.clock.install();
-  await page.goto('/');
   await page.evaluate(async () => {
     await fetch('/api/data-connections/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sources: ['bank', 'wechat_pay', 'alipay'] }) });
@@ -71,8 +78,7 @@ test('going offline stops automatic sync while the read-only snapshot is visible
 });
 
 test('an unreachable API uses the cached read-only snapshot even when the browser reports online', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
+  await openDemo(page);
   await expect.poll(() => hasSavedOfflineSnapshot(page)).toBe(true);
   await page.addInitScript(() => {
     const liveFetch = window.fetch.bind(window);

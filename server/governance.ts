@@ -29,7 +29,7 @@ export function financialTwin(state: DemoState): FinancialTwin {
     transactions: state.transactions,
     bills: state.bills,
     subscriptions: state.subscriptions,
-    goals: [state.goal],
+    goals: state.goals,
     mandates: state.mandate ? [state.mandate] : [],
     safetyBufferCents: state.finance.emergencyCents,
   });

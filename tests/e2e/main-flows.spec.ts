@@ -6,6 +6,11 @@ async function openApp(page: Page) {
     await route.continue();
   });
   await page.goto('/');
+  await expect(page.getByTestId('nova-welcome')).toBeVisible();
+  await expect(page.getByTestId('nova-welcome')).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await page.request.post('/api/demo/load-japan');
+  await page.reload();
   await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
 }
 
@@ -30,7 +35,7 @@ test('故事一：目标可行性必须先选择方案，再激活计划', async
   await activateBalancedGoal(page);
   await page.reload();
   await expect(page.getByText('进度正常')).toBeVisible();
-  await expect(page.getByText('已选择并启用计划')).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看计划' })).toBeVisible();
 });
 
 test('创建目标后连接三类模拟数据，再进入可行性分析', async ({ page }) => {
@@ -100,7 +105,7 @@ test('微信模拟连接失败时安静提示，恢复后只补齐一次目标�
   await expect(wechat.getByText(/暂时无法连接/)).toBeVisible();
 
   await page.getByRole('button', { name: '返回' }).click();
-  await page.getByRole('button', { name: /首页/ }).last().click();
+  await page.getByRole('button', { name: '首页', exact: true }).click();
   await page.getByTitle('查看模拟时间与自动同步').click();
   await page.getByRole('button', { name: /推进到 9月23日/ }).click();
   await expect(page.getByText('部分数据待更新')).toBeVisible();
@@ -148,15 +153,14 @@ test('人工复核：平台 Passkey 验证成功后才执行', async ({ page, co
     await page.getByRole('button', { name: '确认创建交通类模拟授权' }).click();
     await page.getByRole('button', { name: '高额 Manual Review' }).click();
     await page.getByRole('button', { name: '前往动态页查看完整链路' }).click();
-    await page.getByRole('button', { name: '启用此设备验证' }).click();
-    await expect(page.getByText('已启用', { exact: true })).toBeVisible();
-    const card = page.locator('article').filter({ has: page.getByRole('heading', { name: 'transport · ¥400' }) });
+    const card = page.locator('article').filter({ hasText: '旅行助手请求支付交通费 ¥400' });
     const disclosure = card.locator(':scope > button').first();
     await disclosure.evaluate((element: HTMLButtonElement) => element.click());
     await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-    await card.getByRole('button', { name: '使用设备验证并执行' })
+    await card.getByRole('button', { name: '启用设备验证并继续' })
       .evaluate((element: HTMLButtonElement) => element.click());
     await expect(card.getByText('已执行', { exact: true })).toBeVisible();
+    await card.locator(':scope > button').first().evaluate((element: HTMLButtonElement) => element.click());
     await expect(card.getByText(/校验有效/)).toBeVisible();
   } finally {
     if (!page.isClosed()) await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
