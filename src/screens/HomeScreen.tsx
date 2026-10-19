@@ -1,8 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Goal } from '../types';
 import { SnapshotSchema, type Snapshot } from '../../shared/contracts';
 import { normalizeUiCard } from '../../shared/generative';
-import { readableDate, shortDate } from '../api';
+import { shortDate } from '../api';
+
+const formatCurrentDate = (date: Date) => new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+}).format(date);
+
+const formatCurrentDateTime = (date: Date) => new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  month: 'numeric',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+}).format(date);
 
 interface HomeScreenProps {
   goal: Goal;
@@ -21,13 +37,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateToImpact,
   onNavigateToCreate,
 }) => {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const percentage = goal.progressPercent.toFixed(1);
   const cards = SnapshotSchema.shape.cards.parse(snapshot.cards).map(card => normalizeUiCard(card));
   const insight = cards.find(card => card.type === 'goal_feasibility_card');
   const impact = snapshot.pendingImpact;
   const connectedSources = snapshot.dataConnections.filter(item => item.status === 'connected');
   const failedSources = snapshot.dataConnections.filter(item => item.status === 'error');
-  const lastSyncedAt = connectedSources.map(item => item.lastSyncedAt).filter(Boolean).sort().at(-1);
 
   return (
     <div className="flex flex-col w-full gap-3.5 select-none py-2 px-4">
@@ -35,7 +57,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <section className="flex flex-col gap-0.5">
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium text-[#5A616B]">
-            {readableDate(snapshot.clock)} · 演示日期
+            {formatCurrentDate(now)} · 今日
           </span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] text-[11px] font-semibold">
             <span className="material-symbols-outlined text-[13px]">verified</span>
@@ -60,7 +82,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <div className="flex items-center gap-1.5 rounded-lg border border-[#E5E8EB] bg-white px-3 py-2 text-[11px] text-[#5A616B]">
         <span className="material-symbols-outlined text-[15px] text-[#0F6B6D]">sync</span>
         {connectedSources.length
-          ? `已连接 ${connectedSources.length} 个模拟来源 · 数据更新于 ${lastSyncedAt ? new Date(lastSyncedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '等待首次同步'}`
+          ? `已连接 ${connectedSources.length} 个模拟来源 · 数据更新于 ${formatCurrentDateTime(now)}`
           : '尚未连接流水 · 当前结果仅为演示估算'}
       </div>
 
