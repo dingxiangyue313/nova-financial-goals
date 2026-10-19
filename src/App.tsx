@@ -379,7 +379,7 @@ export default function App() {
 
   if (isOffline && offlineSnapshot) return <OfflineScreen snapshot={offlineSnapshot} onReconnect={() => window.location.reload()} />;
   if (!snapshot) return <div className="min-h-screen grid place-items-center bg-[#F5F7F8] px-6 text-center text-[#0F6B6D]">{loadError ? `加载失败：${loadError}。${isOffline ? '当前没有可用的离线摘要。' : '请刷新页面重试。'}` : 'NOVA 正在读取数据…'}</div>;
-  if (welcomeVisible) return <div data-testid="nova-welcome" className={`fixed inset-0 z-[100] grid place-items-center bg-white transition-opacity duration-250 ${welcomeLeaving ? 'opacity-0' : 'opacity-100'}`}><div className="flex flex-col items-center px-8 text-center"><NovaMark size={72}/><p className="mt-7 text-[18px] font-bold tracking-tight text-[#1F2329]">不用记账，也知道目标能不能按时实现</p></div></div>;
+  if (welcomeVisible) return <div data-testid="nova-welcome" className={`fixed inset-0 z-[100] grid place-items-center bg-white transition-opacity duration-250 ${welcomeLeaving ? 'opacity-0' : 'opacity-100'}`}><div className="flex flex-col items-center px-8 text-center"><NovaMark size={72}/><p className="mt-7 text-[18px] font-bold tracking-tight text-[#1F2329]">不记账，也有数</p></div></div>;
 
   return (
     <div className="min-h-screen bg-[#E5E8EB] flex flex-col items-center justify-center p-0 md:py-6 text-[#1F2329] selection:bg-[#E6F2F2]">
