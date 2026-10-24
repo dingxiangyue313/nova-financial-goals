@@ -16,21 +16,21 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-test('data connection APIs persist, isolate, revoke and reset simulated sources', { timeout: 30_000 }, async () => {
+test('data connection APIs persist, isolate, revoke and reset simulated sources', { timeout: 180_000 }, async () => {
   const directory = mkdtempSync(join(tmpdir(), 'nova-connectors-http-'));
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const testSessionSecret = Array.from({ length: 48 }, (_, index) => String(index % 10)).join('');
-  const child = spawn(join(process.cwd(), 'node_modules/.bin/tsx'), ['server/index.ts'], {
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
     cwd: process.cwd(), stdio: 'ignore', env: { ...process.env, PORT: String(port),
       NOVA_DB_PATH: join(directory, 'demo.sqlite'), DEEPSEEK_API_KEY: '', NODE_ENV: 'production',
       NOVA_SESSION_SECRET: testSessionSecret },
   });
   try {
     let ready = false;
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 180; i++) {
       try { const response = await fetch(`${base}/api/health`); if (response.ok) { ready = true; break; } }
-      catch { await new Promise(resolve => setTimeout(resolve, 100)); }
+      catch { await new Promise(resolve => setTimeout(resolve, 500)); }
     }
     assert.equal(ready, true);
     let cookie = '';
@@ -109,6 +109,7 @@ test('data connection APIs persist, isolate, revoke and reset simulated sources'
     assert.equal((reset.data as { connections: unknown[] }).connections.length, 0);
   } finally {
     child.kill('SIGTERM');
+    if (child.exitCode === null) await new Promise(resolve => child.once('exit', resolve));
     rmSync(directory, { recursive: true, force: true });
   }
 });

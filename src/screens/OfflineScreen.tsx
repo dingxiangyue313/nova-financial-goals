@@ -36,7 +36,7 @@ export function OfflineScreen({ snapshot, onReconnect }: { snapshot: OfflineSnap
           <dl className="mt-5 space-y-3 border-t border-[#E5E8EB] pt-4 text-sm">
             <div className="flex justify-between gap-3"><dt className="text-[#5A616B]">最近判断</dt><dd className="font-semibold">{statusLabel[snapshot.assessment.status] || snapshot.assessment.status}</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-[#5A616B]">目标日期</dt><dd>{snapshot.goal.targetDate}</dd></div>
-            <div className="flex justify-between gap-3"><dt className="text-[#5A616B]">建议月存</dt><dd>{yuan(snapshot.assessment.requiredMonthlyCents)}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-[#5A616B]">每月必要投入</dt><dd>{yuan(snapshot.assessment.requiredMonthlyCents)}</dd></div>
           </dl>
         </section>
         <section className="rounded-xl border border-[#E5E8EB] bg-white p-4 text-xs text-[#5A616B]">

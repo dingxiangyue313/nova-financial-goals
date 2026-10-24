@@ -1,4 +1,4 @@
-import type { Assessment, DemoState, Impact, Plan } from '../shared/contracts.ts';
+import type { Assessment, CandidateAssessment, CandidateInput, DemoState, Impact, Plan } from '../shared/contracts.ts';
 
 const DAY = 86_400_000;
 export function addDays(iso: string, days: number): string {
@@ -7,6 +7,13 @@ export function addDays(iso: string, days: number): string {
 function daysBetween(a: string, b: string): number {
   return Math.max(0, Math.ceil((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / DAY));
 }
+export function calculateMonthlyRequirement(targetCents: number, savedCents: number, today: string, targetDate: string) {
+  const remainingCents = Math.max(0, targetCents - savedCents);
+  const remainingMonths = Math.max(1, Math.ceil(daysBetween(today, targetDate) / 30));
+  // Money is stored in integer cents; round up so the monthly amount covers the goal.
+  const requiredMonthlyCents = Math.ceil(remainingCents / remainingMonths);
+  return { remainingCents, remainingMonths, requiredMonthlyCents };
+}
 function roundHundredYuan(cents: number): number { return Math.ceil(cents / 10000) * 10000; }
 
 export function availableMonthly(state: DemoState): number {
@@ -14,11 +21,95 @@ export function availableMonthly(state: DemoState): number {
   return Math.max(0, f.monthlyIncomeCents - f.fixedBillsCents - f.essentialSpendingCents);
 }
 
+export type CandidateMonth = { monthIndex: number; availableCents: number;
+  capacityCents: number; contributedCents: number; cumulativeCents: number };
+
+export function simulateCandidateMonths(state: DemoState, input: CandidateInput,
+  savedCents: number): { months: CandidateMonth[]; firstMonthCapacityCents: number;
+    availableMonthlyCents: number; futureContributionCents: number } {
+  const count = calculateMonthlyRequirement(input.targetCents, savedCents, state.clock, input.targetDate).remainingMonths;
+  const scenario = input.scenario;
+  const reserveFromChecking = Math.max(0, input.protectedCents - state.finance.emergencyCents);
+  const monthlyAvailable = (index: number) => {
+    const ongoing = index >= (scenario.startMonthIndex ?? 0);
+    const income = scenario.kind === 'monthly_income_reduction' && ongoing
+      ? Math.max(0, state.finance.monthlyIncomeCents - (scenario.amountCents ?? 0))
+      : state.finance.monthlyIncomeCents;
+    const essentials = scenario.kind === 'monthly_essential_spending_increase' && ongoing
+      ? state.finance.essentialSpendingCents + (scenario.amountCents ?? 0)
+      : state.finance.essentialSpendingCents;
+    return Math.max(0, income - state.finance.fixedBillsCents - essentials);
+  };
+  const months: CandidateMonth[] = [];
+  let cumulativeCents = savedCents;
+  for (let monthIndex = 0; monthIndex < count; monthIndex++) {
+    const availableCents = monthlyAvailable(monthIndex);
+    const capacityCents = monthIndex === 0 ? Math.max(0, Math.min(
+      availableCents - state.finance.currentMonthExpenseCents -
+        (scenario.kind === 'current_month_expense' ? scenario.amountCents ?? 0 : 0),
+      state.finance.checkingCents - reserveFromChecking -
+        (scenario.kind === 'current_month_expense' ? scenario.amountCents ?? 0 : 0),
+    )) : availableCents;
+    const skipped = scenario.kind === 'missed_contribution_once' && monthIndex === scenario.monthIndex;
+    const plannedCents = monthIndex === 0
+      ? input.firstMonthContributionCents ?? input.monthlyContributionCents
+      : input.monthlyContributionCents;
+    const contributedCents = skipped ? 0 : Math.min(plannedCents, capacityCents);
+    cumulativeCents += contributedCents;
+    months.push({ monthIndex, availableCents, capacityCents, contributedCents, cumulativeCents });
+  }
+  return { months, firstMonthCapacityCents: months[0].capacityCents,
+    availableMonthlyCents: months[0].availableCents,
+    futureContributionCents: Math.min(input.monthlyContributionCents, monthlyAvailable(count)) };
+}
+
+export function assessCandidateScenario(state: DemoState, input: CandidateInput,
+  savedCents: number, constraintViolations: string[], latestAllowedDate: string): CandidateAssessment {
+  const { remainingCents: remaining, remainingMonths: months, requiredMonthlyCents: required } =
+    calculateMonthlyRequirement(input.targetCents, savedCents, state.clock, input.targetDate);
+  const simulation = simulateCandidateMonths(state, input, savedCents);
+  const available = simulation.availableMonthlyCents;
+  const reserveFromChecking = Math.max(0, input.protectedCents - state.finance.emergencyCents);
+  const firstMonthCapacity = simulation.firstMonthCapacityCents;
+  const fundedByTarget = simulation.months.reduce((sum, month) => sum + month.contributedCents, 0);
+  const shortfall = Math.max(0, remaining - fundedByTarget);
+  const futureContribution = simulation.futureContributionCents;
+  let delayDays = shortfall && futureContribution > 0 ? Math.ceil(shortfall / futureContribution * 30) : 0;
+  const earlyDays = shortfall === 0 && futureContribution > 0
+    ? Math.min(30, Math.floor((fundedByTarget - remaining) / futureContribution * 30)) : 0;
+  let projectedDate = futureContribution <= 0 && remaining > 0 ? null
+    : addDays(input.targetDate, delayDays - earlyDays);
+  if (input.scenario.kind === 'missed_contribution_once' &&
+    simulation.months.some(month => month.monthIndex < (input.scenario.monthIndex ?? 0) &&
+      month.cumulativeCents >= input.targetCents)) {
+    const baseline = assessCandidateScenario(state, { ...input, scenario: { kind: 'baseline' } },
+      savedCents, [], latestAllowedDate);
+    projectedDate = baseline.projectedDate;
+    delayDays = baseline.delayDays;
+  }
+  const dataSufficient = state.finance.historyMonths >= 2;
+  const violations = [...constraintViolations];
+  if (input.monthlyContributionCents > availableMonthly(state) ||
+    (input.firstMonthContributionCents ?? 0) > firstMonthCapacity) violations.push('MONTHLY_CAPACITY_EXCEEDED');
+  if (reserveFromChecking > state.finance.checkingCents) violations.push('PROTECTED_FUNDS_UNAVAILABLE');
+  if (input.scenario.kind === 'baseline' && projectedDate && projectedDate > latestAllowedDate)
+    violations.push('PROJECTED_AFTER_ALLOWED_END');
+  const status: CandidateAssessment['status'] = violations.length ? 'infeasible'
+    : !dataSufficient ? 'insufficient_data'
+      : !projectedDate || projectedDate > input.targetDate ? 'at_risk' : 'on_track';
+  return { status, projectedDate: dataSufficient && !violations.length ? projectedDate : null,
+    requiredMonthlyCents: required, availableMonthlyCents: available,
+    firstMonthCapacityCents: firstMonthCapacity,
+    bufferCents: input.scenario.kind === 'missed_contribution_once' && input.scenario.monthIndex === 0
+      ? firstMonthCapacity : firstMonthCapacity - (input.firstMonthContributionCents ?? input.monthlyContributionCents),
+    fundedByTargetCents: fundedByTarget, shortfallCents: shortfall, delayDays,
+    dataSufficient, constraintViolations: violations };
+}
+
 export function assessGoal(state: DemoState): Assessment {
   const { goal, finance, clock } = state;
-  const months = Math.max(1, Math.ceil(daysBetween(clock, goal.targetDate) / 30));
-  const remaining = Math.max(0, goal.targetCents - goal.savedCents);
-  const required = Math.ceil(remaining / months);
+  const { remainingCents: remaining, remainingMonths: months, requiredMonthlyCents: required } =
+    calculateMonthlyRequirement(goal.targetCents, goal.savedCents, clock, goal.targetDate);
   const available = availableMonthly(state);
   const firstCapacity = Math.max(0, available - finance.currentMonthExpenseCents);
   const projectedFor = (monthly: number) => {
@@ -75,7 +166,8 @@ export function injectExpense(state: DemoState, expenseCents: number, title: str
   if (state.goal.status !== 'active' || shortfall === 0 || (expenseCents < 50000 && expenseCents < (state.goal.targetCents - state.goal.savedCents) * .05)) {
     return { state: next, impact: null };
   }
-  const months = Math.max(1, Math.ceil(daysBetween(state.clock, state.goal.targetDate) / 30));
+  const months = calculateMonthlyRequirement(state.goal.targetCents, state.goal.savedCents,
+    state.clock, state.goal.targetDate).remainingMonths;
   const delayDays = Math.ceil(shortfall / Math.max(1, state.goal.monthlyContributionCents) * 30);
   const optionAContributionCents = roundHundredYuan(state.goal.monthlyContributionCents + shortfall / Math.max(1, months - 1));
   const impact: Impact = { id: crypto.randomUUID(), goalId: state.goal.id, title, expenseCents, detectedAt: state.clock, shortfallCents: shortfall,

@@ -13,6 +13,8 @@
     "test:properties": "tsx --test server/properties.test.ts",
     "test:a11y": "playwright test tests/e2e/accessibility.spec.ts",
     "eval:promptfoo": "node scripts/run-promptfoo-eval.mjs",
+    "eval:agent:real": "tsx scripts/run-agent-model-eval.ts",
+    "eval:agent:explanation": "tsx scripts/run-agent-explanation-eval.ts --real --retry-failed",
     "test:e2e": "playwright test",
     "start": "NODE_ENV=production tsx server/index.ts"
   },

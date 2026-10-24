@@ -140,6 +140,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <span className="material-symbols-outlined text-[16px] text-[#C74242]">psychology</span>
             <span>屏幕 3：目标影响</span>
           </button>
+          <button
+            onClick={() => onNavigate('workspace')}
+            className="col-span-2 p-2.5 rounded-lg bg-white border border-[#E5E8EB] hover:border-[#0F6B6D] text-[#1F2329] font-medium text-left flex items-center gap-1.5 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px] text-[#0F6B6D]">smart_toy</span>
+            <span>NOVA 目标工作台</span>
+          </button>
         </div>
 
         <div className="pt-2 grid grid-cols-1 gap-2">

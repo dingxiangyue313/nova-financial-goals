@@ -1,0 +1,1786 @@
+{
+  "generatedAt": "2026-10-23T02:46:15.504Z",
+  "model": "deepseek-flash",
+  "cases": [
+    {
+      "id": "01",
+      "label": "三方案，偏好低月存",
+      "input": {
+        "goal": {
+          "title": "日本旅行",
+          "targetAmountText": "¥6,000",
+          "savedAmountText": "¥2,000",
+          "targetDate": "2027-03-31"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,000",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": "希望每个月存得轻松一点"
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥10,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥3,000",
+          "firstMonthCapacityText": "¥3,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "01-candidate-1",
+            "monthlyText": "¥600",
+            "projectedDate": "2027-03-21",
+            "firstMonthBufferText": "¥2,400",
+            "status": "on_track"
+          },
+          {
+            "resultId": "01-candidate-2",
+            "monthlyText": "¥1,300",
+            "projectedDate": "2027-03-01",
+            "firstMonthBufferText": "¥1,700",
+            "status": "on_track"
+          },
+          {
+            "resultId": "01-candidate-3",
+            "monthlyText": "¥2,000",
+            "projectedDate": "2027-03-01",
+            "firstMonthBufferText": "¥1,000",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2027-03-31 前完成，其中较低的月存额更贴近你希望轻松的偏好。",
+        "cashFlowBasis": "按当前模拟财务数据，扣除固定账单和必要支出后，每月约有 ¥3,000 可投入目标；这高于你设定的月存上限 ¥2,000。已有 ¥2,000，目标为 ¥6,000，因此候选用不同月存额换来不同的时间提前量和首月缓冲。首月缓冲只是当前条件下的余量，不是可以随意花掉的预算；¥20,000 保护资金不参与试算。",
+        "options": [
+          {
+            "resultId": "01-candidate-1",
+            "positioning": "最轻松、余量最多",
+            "numbersAndMeaning": "每月投入 ¥600，预计 2027-03-21 完成，首月缓冲 ¥2,400。",
+            "everydayLife": "每个月为目标留出的金额最小，日常可调整空间最大，但需要长期保持稳定投入。",
+            "advantage": "月存压力最低，首月缓冲最多，和你的明确偏好最一致。",
+            "tradeoff": "在三个候选中完成相对更晚，留给意外延误的时间余量较少。",
+            "failureConditions": [
+              "若某段时间没有按计划存下 ¥600，预计完成时间可能后移。"
+            ]
+          },
+          {
+            "resultId": "01-candidate-2",
+            "positioning": "轻松与提前之间的折中",
+            "numbersAndMeaning": "每月投入 ¥1,300，预计 2027-03-01 完成，首月缓冲 ¥1,700。",
+            "everydayLife": "每月存额中等，仍有较大的周转空间，同时比最低月存更早准备好资金。",
+            "advantage": "兼顾较低的月存压力和更早的完成时间。",
+            "tradeoff": "月存压力高于 01-candidate-1，首月缓冲相应减少。",
+            "failureConditions": [
+              "若必要支出持续上升，占用可用于目标的现金流，预计时间可能后移。"
+            ]
+          },
+          {
+            "resultId": "01-candidate-3",
+            "positioning": "时间优先但压力最高",
+            "numbersAndMeaning": "每月投入 ¥2,000，预计 2027-03-01 完成，首月缓冲 ¥1,000。",
+            "everydayLife": "每月接近可用金额的较大部分都要留给旅行，日常临时开销的余地更小。",
+            "advantage": "也预计在 2027-03-01 完成，和 01-candidate-2 的时间相同但月存压力更高。",
+            "tradeoff": "首月缓冲最少，长期坚持的难度更大。",
+            "failureConditions": [
+              "若某月无法存足 ¥2,000，提前完成的优势会减弱，时间余量也较少。"
+            ]
+          }
+        ],
+        "comparison": "01-candidate-1 最轻松但时间余量较少；01-candidate-2 和 01-candidate-3 都预计 2027-03-01 完成，前者月存更低、缓冲更多；01-candidate-3 月存压力最高且缓冲最少。",
+        "recommendation": "既然你明确希望每个月存得轻松一点，可以优先考虑 01-candidate-1；如果你更在意比目标日更早完成，可在 01-candidate-1 和 01-candidate-2 之间再权衡。选定后仍需你单独确认。",
+        "recommendedResultId": "01-candidate-1",
+        "uncertainties": [
+          "若未来模拟收入下降或固定账单、必要支出上升，可投入金额减少，现在的完成判断可能改变。",
+          "首月缓冲不是长期储备；若把它当作日常预算花掉，后续月份可能难以按计划投入。"
+        ],
+        "reflectionQuestion": "你更愿意选择月存 ¥600、节奏轻松但余量较少的方案，还是月存 ¥1,300、提前一些完成的折中方案？"
+      },
+      "attempts": 1,
+      "durationMs": 5728
+    },
+    {
+      "id": "02",
+      "label": "三方案，偏好提前完成",
+      "input": {
+        "goal": {
+          "title": "旅行基金",
+          "targetAmountText": "¥6,000",
+          "savedAmountText": "¥1,000",
+          "targetDate": "2027-04-30"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,500",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": "希望尽可能早完成"
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥11,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥4,000",
+          "firstMonthCapacityText": "¥4,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "02-candidate-1",
+            "monthlyText": "¥700",
+            "projectedDate": "2027-04-05",
+            "firstMonthBufferText": "¥3,300",
+            "status": "on_track"
+          },
+          {
+            "resultId": "02-candidate-2",
+            "monthlyText": "¥1,600",
+            "projectedDate": "2027-03-31",
+            "firstMonthBufferText": "¥2,400",
+            "status": "on_track"
+          },
+          {
+            "resultId": "02-candidate-3",
+            "monthlyText": "¥2,500",
+            "projectedDate": "2027-03-31",
+            "firstMonthBufferText": "¥1,500",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2027-04-30 前完成；按你尽早完成的偏好，candidate-2 和 candidate-3 更值得先看。",
+        "cashFlowBasis": "当前模拟数据扣除固定账单和必要支出后，每月约有 ¥4,000 可投入；三个方案都在你的 ¥2,500 月存上限内，首月缓冲都是扣除当月计划投入后的余量，不是可随意花掉的预算。¥20,000 保护资金未参与试算。",
+        "options": [
+          {
+            "resultId": "02-candidate-1",
+            "positioning": "月存最轻松但完成最晚",
+            "numbersAndMeaning": "每月投入 ¥700，预计 2027-04-05 完成，首月缓冲 ¥3,300。",
+            "everydayLife": "每月为旅行基金留出的金额最少，日常周转空间最大。",
+            "advantage": "首月缓冲最多，持续投入的压力最低。",
+            "tradeoff": "三个候选中预计完成最晚，时间余量较少。",
+            "failureConditions": [
+              "若希望更早完成，这个节奏可能不符合你现在的偏好。"
+            ]
+          },
+          {
+            "resultId": "02-candidate-2",
+            "positioning": "兼顾提前与缓冲",
+            "numbersAndMeaning": "每月投入 ¥1,600，预计 2027-03-31 完成，首月缓冲 ¥2,400。",
+            "everydayLife": "每月需要稳定留出中等金额，换来比 candidate-1 更早完成。",
+            "advantage": "完成日期较早，同时保留一部分首月缓冲。",
+            "tradeoff": "月存额高于 candidate-1，日常可调整空间相应变小。",
+            "failureConditions": [
+              "若必要支出上升，按计划投入可能受影响。"
+            ]
+          },
+          {
+            "resultId": "02-candidate-3",
+            "positioning": "用上限换取最早完成",
+            "numbersAndMeaning": "每月投入 ¥2,500，预计 2027-03-31 完成，首月缓冲 ¥1,500。",
+            "everydayLife": "每月按你的上限投入，旅行资金优先级最高。",
+            "advantage": "与 candidate-2 预计同日完成，月存额更高，适合收入很稳定时使用。",
+            "tradeoff": "首月缓冲在三个候选中最少，月存压力最大。",
+            "failureConditions": [
+              "若某月无法按上限投入，提前完成的优势可能消失。"
+            ]
+          }
+        ],
+        "comparison": "candidate-2 与 candidate-3 预计同为 2027-03-31 完成；前者月存更低、缓冲更多，后者月存更高但并未换来更早日期。candidate-1 最轻松但完成最晚。",
+        "recommendation": "你希望尽可能早完成，可以优先比较 candidate-2；若现金流非常稳定，再考虑 candidate-3。选定后仍需你单独确认。",
+        "recommendedResultId": "02-candidate-2",
+        "uncertainties": [
+          "模拟收入或必要支出变化会影响可投入金额和预计日期。"
+        ],
+        "reflectionQuestion": "你更看重 candidate-2 较低月存带来的缓冲，还是愿意用 candidate-3 的高月存换取更高投入？"
+      },
+      "attempts": 1,
+      "durationMs": 4482
+    },
+    {
+      "id": "03",
+      "label": "三方案，偏好高缓冲",
+      "input": {
+        "goal": {
+          "title": "学习计划",
+          "targetAmountText": "¥5,000",
+          "savedAmountText": "¥500",
+          "targetDate": "2027-05-31"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,200",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": "尽量保留日常现金流缓冲"
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥10,500",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥3,500",
+          "firstMonthCapacityText": "¥3,500",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "03-candidate-1",
+            "monthlyText": "¥500",
+            "projectedDate": "2027-05-31",
+            "firstMonthBufferText": "¥3,000",
+            "status": "on_track"
+          },
+          {
+            "resultId": "03-candidate-2",
+            "monthlyText": "¥1,300",
+            "projectedDate": "2027-05-01",
+            "firstMonthBufferText": "¥2,200",
+            "status": "on_track"
+          },
+          {
+            "resultId": "03-candidate-3",
+            "monthlyText": "¥2,200",
+            "projectedDate": "2027-05-01",
+            "firstMonthBufferText": "¥1,300",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2027-05-31 前完成，区别是月存压力、缓冲和是否提前。",
+        "cashFlowBasis": "当前模拟数据下，扣除固定账单和必要支出后，每月可用于目标的金额为 ¥3,500。首月缓冲是投入目标后留下的计算余量，不是可随意花掉的预算；¥20,000 保护资金没有参与试算。",
+        "options": [
+          {
+            "resultId": "03-candidate-1",
+            "positioning": "最优先保留日常现金流缓冲",
+            "numbersAndMeaning": "每月投入 ¥500，预计 2027-05-31 完成，首月缓冲 ¥3,000。",
+            "everydayLife": "每月留给目标的金额最少，日常周转空间最大，但需要长期稳定执行。",
+            "advantage": "月存压力最低，首月缓冲最多，符合你保留日常现金流缓冲的偏好。",
+            "tradeoff": "预计日期在目标日当天附近，时间余量相对少。",
+            "failureConditions": [
+              "若有几个月没有按计划投入，按时完成的判断可能改变。"
+            ]
+          },
+          {
+            "resultId": "03-candidate-2",
+            "positioning": "压力与提前之间折中",
+            "numbersAndMeaning": "每月投入 ¥1,300，预计 2027-05-01 完成，首月缓冲 ¥2,200。",
+            "everydayLife": "每月固定留出较高金额，换取较早完成的可能，同时仍保留一定缓冲。",
+            "advantage": "相较 03-candidate-1 更早预计完成，缓冲仍较充足。",
+            "tradeoff": "月存额增加，日常可调整空间相应减少。",
+            "failureConditions": [
+              "若必要支出上升，导致目标投入中断，预计日期可能后移。"
+            ]
+          },
+          {
+            "resultId": "03-candidate-3",
+            "positioning": "用月存上限争取提前完成",
+            "numbersAndMeaning": "每月投入 ¥2,200，预计 2027-05-01 完成，首月缓冲 ¥1,300。",
+            "everydayLife": "每月接近月存上限，日常需要更谨慎安排支出。",
+            "advantage": "预计完成日期较早，仍在月存上限内。",
+            "tradeoff": "首月缓冲最少，对现金流波动更敏感。",
+            "failureConditions": [
+              "若持续投入 ¥2,200 有困难，提前完成和当前缓冲都可能受影响。"
+            ]
+          }
+        ],
+        "comparison": "03-candidate-1 最贴合你保留日常现金流缓冲的偏好；03-candidate-2 和 03-candidate-3 都预计在 2027-05-01 完成，但缓冲依次减少。",
+        "recommendation": "依据你明确希望尽量保留日常现金流缓冲，可优先比较 03-candidate-1；若更看重提前完成，再比较 03-candidate-2。选择后仍需你单独确认。",
+        "recommendedResultId": "03-candidate-1",
+        "uncertainties": [
+          "未来收入或必要支出变化，可能影响每月可投入金额和预计日期。"
+        ],
+        "reflectionQuestion": "你更希望保留较宽的日常缓冲，还是愿意多存一些来提前完成？"
+      },
+      "durationMs": 4004
+    },
+    {
+      "id": "04",
+      "label": "单方案，月存上限紧",
+      "input": {
+        "goal": {
+          "title": "日本旅行",
+          "targetAmountText": "¥8,000",
+          "savedAmountText": "¥0",
+          "targetDate": "2026-12-31"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,000",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥9,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥2,000",
+          "firstMonthCapacityText": "¥2,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "04-candidate-1",
+            "monthlyText": "¥2,000",
+            "projectedDate": "2026-12-31",
+            "firstMonthBufferText": "¥0",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "唯一已核验候选预计能在 2026-12-31 完成，但首月缓冲为 ¥0。",
+        "cashFlowBasis": "当前模拟财务数据扣除固定账单和必要支出后，每月可投入 ¥2,000；月存额与可投入金额相同，因此扣除计划投入后首月余量为 ¥0。¥20,000 保护资金不参与目标投入。",
+        "options": [
+          {
+            "resultId": "04-candidate-1",
+            "positioning": "按现有上限赶上目标日",
+            "numbersAndMeaning": "每月投入 ¥2,000，预计 2026-12-31 完成，首月缓冲 ¥0。",
+            "everydayLife": "每月需要完整留出计划投入，且没有可依赖的额外周转空间；临时开销会直接影响能否持续存入。",
+            "advantage": "在已检查的限制内预计能按时完成。",
+            "tradeoff": "首月缓冲为零，容错空间小。",
+            "failureConditions": [
+              "若必要支出上升，或某个月无法按计划投入，按时完成的判断可能改变。"
+            ]
+          }
+        ],
+        "comparison": "目前只有一个已核验候选，选择空间有限；首月缓冲是当前条件下的余量，不是可随意花掉的预算。",
+        "recommendation": "由于偏好没有明确，可先用条件式判断：若你更看重按时完成，可考虑此候选但需接受零首月缓冲；若更看重缓冲空间，则需要由你明确调整条件后重新试算。",
+        "recommendedResultId": "04-candidate-1",
+        "uncertainties": [
+          "模拟现金流若出现波动，可能影响按计划投入。"
+        ],
+        "reflectionQuestion": "你更愿意守住 2026-12-31 这个日期，还是优先保留一点首月缓冲？"
+      },
+      "durationMs": 2837
+    },
+    {
+      "id": "05",
+      "label": "现金流上限紧",
+      "input": {
+        "goal": {
+          "title": "相机",
+          "targetAmountText": "¥6,000",
+          "savedAmountText": "¥2,000",
+          "targetDate": "2026-12-31"
+        },
+        "constraints": {
+          "monthlyCapText": "¥3,000",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥8,500",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥1,500",
+          "firstMonthCapacityText": "¥1,500",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "05-candidate-1",
+            "monthlyText": "¥1,000",
+            "projectedDate": "2026-12-31",
+            "firstMonthBufferText": "¥500",
+            "status": "on_track"
+          },
+          {
+            "resultId": "05-candidate-2",
+            "monthlyText": "¥1,200",
+            "projectedDate": "2026-12-11",
+            "firstMonthBufferText": "¥300",
+            "status": "on_track"
+          },
+          {
+            "resultId": "05-candidate-3",
+            "monthlyText": "¥1,500",
+            "projectedDate": "2026-12-01",
+            "firstMonthBufferText": "¥0",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2026-12-31 前完成；没有按时完成的障碍，但月存越高，首月缓冲越少。",
+        "cashFlowBasis": "当前模拟数据扣除固定账单和必要支出后，每月可用于目标的金额为 ¥1,500。¥20,000 保护资金不参与试算。首月缓冲是余量，不是预算。",
+        "options": [
+          {
+            "resultId": "05-candidate-1",
+            "positioning": "月存压力最小",
+            "numbersAndMeaning": "每月投入 ¥1,000，预计 2026-12-31 完成，首月缓冲 ¥500。已有 ¥2,000 的前提下，这个节奏预计刚好赶上目标日。",
+            "everydayLife": "每月留给生活的可调整空间最多，但需要持续按计划存入。",
+            "advantage": "月存最低，首月缓冲最多。",
+            "tradeoff": "预计完成时间最靠近目标日，时间余量最少。",
+            "failureConditions": [
+              "若某月未按计划投入，按时完成的判断可能改变。"
+            ]
+          },
+          {
+            "resultId": "05-candidate-2",
+            "positioning": "在压力与时间之间折中",
+            "numbersAndMeaning": "每月投入 ¥1,200，预计 2026-12-11 完成，首月缓冲 ¥300。",
+            "everydayLife": "每月为相机留出稍多金额，换来提前一点完成。",
+            "advantage": "有一定提前量，缓冲仍在正数。",
+            "tradeoff": "日常可调整空间少于 05-candidate-1。",
+            "failureConditions": [
+              "若必要支出上升或有月份未按计划投入，预计日期可能后移。"
+            ]
+          },
+          {
+            "resultId": "05-candidate-3",
+            "positioning": "优先提前完成",
+            "numbersAndMeaning": "每月投入 ¥1,500，预计 2026-12-01 完成，首月缓冲 ¥0。",
+            "everydayLife": "每月需要先完整留出这项投入，临时开销出现时调整余地最小。",
+            "advantage": "在候选里预计完成最早。",
+            "tradeoff": "首月没有计算余量，现金流变化更容易影响计划。",
+            "failureConditions": [
+              "若某月无法投入 ¥1,500，提前完成的优势可能消失。"
+            ]
+          }
+        ],
+        "comparison": "三个候选都在目标日前；05-candidate-1 最轻松但时间最紧，05-candidate-3 最早但零缓冲，05-candidate-2 居中。",
+        "recommendation": "你没有明确偏好。若更看重轻松，可先考虑 05-candidate-1；若担心刚好赶上，可比较 05-candidate-2。选择后仍需你单独确认。",
+        "recommendedResultId": "05-candidate-1",
+        "uncertainties": [
+          "未来必要支出变动可能影响每月按额存入。"
+        ],
+        "reflectionQuestion": "你更看重每月存得轻松，还是希望比目标日更早完成？"
+      },
+      "durationMs": 3813
+    },
+    {
+      "id": "06",
+      "label": "无方案，期限太近",
+      "input": {
+        "goal": {
+          "title": "相机",
+          "targetAmountText": "¥12,000",
+          "savedAmountText": "¥0",
+          "targetDate": "2026-10-15"
+        },
+        "constraints": {
+          "monthlyCapText": "¥1,000",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥9,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥2,000",
+          "firstMonthCapacityText": "¥2,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [],
+        "dataGaps": [
+          "当前硬限制内没有通过核验的候选"
+        ]
+      },
+      "status": "ok",
+      "output": {
+        "headline": "按当前已检查条件，暂时没有可核验的按时完成方案；这不代表目标永远无法实现。",
+        "cashFlowBasis": "模拟收入扣除固定账单和必要支出后，每月可用金额为 ¥2,000，但你的月存上限是 ¥1,000，实际可投入不超过上限。首月缓冲为 ¥2,000，它反映当前条件下的余量，不是可随意花掉的预算；¥20,000 保护资金未参与试算。",
+        "options": [],
+        "comparison": "当前没有已核验候选可比较；在目标日、月存上限和保护资金不变的前提下，无法从现有数据确认按时完成方案。",
+        "recommendation": "由于你尚未说明偏好，可先判断完成日期和月存上限哪项更有调整空间，再决定是否用新条件重新试算。NOVA 不会自行突破硬限制或动用保护资金。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "若月存上限或目标日期保持不变，仅靠现有现金流可能不足以及时完成。",
+          "当前结论只覆盖已检查条件，调整条件后可能得到不同结果。"
+        ],
+        "reflectionQuestion": "在月存上限和目标日期之间，你更愿意先调整哪一项来重新试算？"
+      },
+      "durationMs": 2160
+    },
+    {
+      "id": "07",
+      "label": "无方案，收入下降",
+      "input": {
+        "goal": {
+          "title": "旅行基金",
+          "targetAmountText": "¥8,000",
+          "savedAmountText": "¥0",
+          "targetDate": "2026-12-31"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,000",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥7,500",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥500",
+          "firstMonthCapacityText": "¥500",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [],
+        "dataGaps": [
+          "当前硬限制内没有通过核验的候选"
+        ]
+      },
+      "status": "ok",
+      "output": {
+        "headline": "按当前已检查条件，暂时没有可核验的按时完成方案；这不代表目标永远无法实现。",
+        "cashFlowBasis": "扣除模拟固定账单 ¥4,500 和必要支出 ¥2,500 后，每月只剩 ¥500 可用于目标；首月缓冲同样是 ¥500。¥20,000 保护资金不参与补足目标。",
+        "options": [],
+        "comparison": "目前没有可比较的已核验候选，也没有足够信息判定哪种调整最合适。NOVA 不会自行延长日期、提高月存上限或动用保护资金。",
+        "recommendation": "可以先看完成日期或旅行基金金额中哪一项更有弹性；若都不愿调整，也可先重新核对模拟支出假设。选择任何调整后，都需要你单独确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "当前结论只覆盖已检查的条件；收入或必要支出假设变化后，判断可能不同。"
+        ],
+        "reflectionQuestion": "保持硬限制不变时，你更愿意先调整目标日期，还是重新考虑旅行基金金额？"
+      },
+      "durationMs": 2008
+    },
+    {
+      "id": "08",
+      "label": "模拟历史不足",
+      "input": {
+        "goal": {
+          "title": "教育储蓄",
+          "targetAmountText": "¥5,000",
+          "savedAmountText": "¥1,000",
+          "targetDate": "2027-04-30"
+        },
+        "constraints": {
+          "monthlyCapText": "¥1,800",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥9,500",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥2,500",
+          "firstMonthCapacityText": "¥2,500",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [],
+        "dataGaps": [
+          "模拟历史不足 2 个月，不能核验完成日期"
+        ]
+      },
+      "status": "ok",
+      "output": {
+        "headline": "按现有模拟数据，暂时无法核验教育储蓄能否按时完成；目前没有可确认的候选方案。",
+        "cashFlowBasis": "扣除模拟固定账单和必要支出后，每月约有 ¥2,500 可用于目标，高于你设定的 ¥1,800 月存上限。首月缓冲 ¥2,500 是当前条件下的余量，不当作可随意花掉的预算；¥20,000 保护资金未参与。",
+        "options": [],
+        "comparison": "没有通过核验的候选，因此无法比较月存节奏或完成日期；这也不代表目标永远不可能完成。",
+        "recommendation": "限制主要来自模拟历史不足 2 个月，暂时不能核验完成日期。可以先积累更多模拟月份后再核验；若你愿意调整条件，也需另行确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "模拟历史达到 2 个月后，完成日期才可能被核验。",
+          "未来收入和必要支出变化会影响可投入金额。"
+        ],
+        "reflectionQuestion": "你希望先积累更多模拟数据再核验，还是考虑把目标日期留得更宽裕一些？"
+      },
+      "durationMs": 2304
+    },
+    {
+      "id": "09",
+      "label": "已存金额较高",
+      "input": {
+        "goal": {
+          "title": "相机",
+          "targetAmountText": "¥9,000",
+          "savedAmountText": "¥7,000",
+          "targetDate": "2027-01-31"
+        },
+        "constraints": {
+          "monthlyCapText": "¥1,800",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥9,500",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥2,500",
+          "firstMonthCapacityText": "¥2,500",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "09-candidate-1",
+            "monthlyText": "¥400",
+            "projectedDate": "2027-01-31",
+            "firstMonthBufferText": "¥2,100",
+            "status": "on_track"
+          },
+          {
+            "resultId": "09-candidate-2",
+            "monthlyText": "¥1,100",
+            "projectedDate": "2027-01-01",
+            "firstMonthBufferText": "¥1,400",
+            "status": "on_track"
+          },
+          {
+            "resultId": "09-candidate-3",
+            "monthlyText": "¥1,800",
+            "projectedDate": "2027-01-01",
+            "firstMonthBufferText": "¥700",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2027-01-31 前完成，选择的重点在月存压力和时间余量。",
+        "cashFlowBasis": "当前模拟数据扣除固定账单和必要支出后，每月可用于目标的金额为 ¥2,500。首月缓冲是扣除计划月存后的余量，不是可随意花掉的预算；¥20,000 保护资金未参与试算。",
+        "options": [
+          {
+            "resultId": "09-candidate-1",
+            "positioning": "月存最轻",
+            "numbersAndMeaning": "每月投入 ¥400，预计 2027-01-31 完成，首月缓冲 ¥2,100。",
+            "everydayLife": "每月为相机留出的金额很少，其他开销的调整空间最大，但需要长期稳定投入。",
+            "advantage": "三个候选中每月压力最小，首月缓冲最多。",
+            "tradeoff": "预计完成日期正落在目标日，时间上没有提前量。",
+            "failureConditions": [
+              "若后来需要提高月存或中断投入，按目标日完成的判断可能改变。"
+            ]
+          },
+          {
+            "resultId": "09-candidate-2",
+            "positioning": "压力和时间较平衡",
+            "numbersAndMeaning": "每月投入 ¥1,100，预计 2027-01-01 完成，首月缓冲 ¥1,400。",
+            "everydayLife": "每月固定留出中等金额，仍保留较充足的首月缓冲，同时比最轻方案更早完成。",
+            "advantage": "完成日期比目标日更早，月存仍在月存上限内。",
+            "tradeoff": "月存压力高于 09-candidate-1，缓冲少于该方案。",
+            "failureConditions": [
+              "若必要支出上升导致某月无法投入 ¥1,100，预计完成日期可能后移。"
+            ]
+          },
+          {
+            "resultId": "09-candidate-3",
+            "positioning": "尽量提前完成",
+            "numbersAndMeaning": "每月投入 ¥1,800，预计 2027-01-01 完成，首月缓冲 ¥700。",
+            "everydayLife": "每月接近月存上限投入，日常可调整空间较小，需要更稳定地安排支出。",
+            "advantage": "在三个候选中用最高月存保留较早完成的空间。",
+            "tradeoff": "首月缓冲最少，承受临时开销变化的能力较弱。",
+            "failureConditions": [
+              "若出现额外必要支出或某月未按计划投入，完成日期的判断可能改变。"
+            ]
+          }
+        ],
+        "comparison": "三个候选都在目标日前完成；月存从 ¥400 到 ¥1,800，首月缓冲从 ¥2,100 降至 ¥700。",
+        "recommendation": "你这次没有明确偏好：若更看重每月轻松，可先比较 09-candidate-1；若希望留一点提前量，可比较 09-candidate-2。选择后仍需你单独确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "未来必要支出变化可能影响月存安排的持续性。",
+          "模拟收入或固定账单变化可能改变预计完成时间。"
+        ],
+        "reflectionQuestion": "你更在意每月只存 ¥400 的轻松节奏，还是愿意用更高月存换取更早完成的余量？"
+      },
+      "durationMs": 4105
+    },
+    {
+      "id": "10",
+      "label": "尚未存款",
+      "input": {
+        "goal": {
+          "title": "旅行基金",
+          "targetAmountText": "¥8,000",
+          "savedAmountText": "¥0",
+          "targetDate": "2027-06-30"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,000",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥10,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥3,000",
+          "firstMonthCapacityText": "¥3,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "10-candidate-1",
+            "monthlyText": "¥800",
+            "projectedDate": "2027-06-30",
+            "firstMonthBufferText": "¥2,200",
+            "status": "on_track"
+          },
+          {
+            "resultId": "10-candidate-2",
+            "monthlyText": "¥1,400",
+            "projectedDate": "2027-05-31",
+            "firstMonthBufferText": "¥1,600",
+            "status": "on_track"
+          },
+          {
+            "resultId": "10-candidate-3",
+            "monthlyText": "¥2,000",
+            "projectedDate": "2027-05-31",
+            "firstMonthBufferText": "¥1,000",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2027-06-30 前完成；其中两个更早，一个刚好赶上。",
+        "cashFlowBasis": "当前模拟数据在扣除固定账单和必要支出后，每月可用于目标约 ¥3,000；月存额低于这个可投入金额，首月缓冲表示动用的月存额之外的余量。¥20,000 保护资金未参与试算，也不能作为可花预算。",
+        "options": [
+          {
+            "resultId": "10-candidate-1",
+            "positioning": "月存最轻，时间刚好",
+            "numbersAndMeaning": "每月 ¥800，预计 2027-06-30 完成，首月缓冲 ¥2,200。",
+            "everydayLife": "每月为旅行留出的金额最少，生活周转空间最大，但要留意不要漏存。",
+            "advantage": "压力最小，首月缓冲最充足。",
+            "tradeoff": "预计完成日期最接近目标日，时间余量较少。",
+            "failureConditions": [
+              "若某几个月未能按计划投入，按时完成的判断可能改变。"
+            ]
+          },
+          {
+            "resultId": "10-candidate-2",
+            "positioning": "压力与时间居中",
+            "numbersAndMeaning": "每月 ¥1,400，预计 2027-05-31 完成，首月缓冲 ¥1,600。",
+            "everydayLife": "每月稳定留出一笔中等金额，换来比最轻方案更早的资金准备。",
+            "advantage": "比候选一更早完成，同时留有较多首月缓冲。",
+            "tradeoff": "月存压力高于候选一。",
+            "failureConditions": [
+              "若必要支出上升，挤压每月投入，预计日期可能后移。"
+            ]
+          },
+          {
+            "resultId": "10-candidate-3",
+            "positioning": "用满月存上限换更早完成",
+            "numbersAndMeaning": "每月 ¥2,000，预计 2027-05-31 完成，首月缓冲 ¥1,000。",
+            "everydayLife": "每月优先留出较高金额，日常临时开销的可调整空间更小。",
+            "advantage": "预计完成日期更早，且未突破月存上限。",
+            "tradeoff": "月存额最高，首月缓冲在三个候选中最少。",
+            "failureConditions": [
+              "若无法持续按 ¥2,000 投入，提前完成的优势可能消失。"
+            ]
+          }
+        ],
+        "comparison": "候选一最轻松但时间刚好；候选二和候选三预计都更早，候选三压力最大、缓冲最少。",
+        "recommendation": "你没有明确偏好，可根据条件选择：若希望每月轻松，考虑 10-candidate-1；若愿意多存一点换取更早完成，10-candidate-2 压力更平衡；若能稳定承担上限，再考虑 10-candidate-3。选择后仍需你单独确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "未来模拟收入或必要支出变化，会改变可投入金额和按时完成的判断。",
+          "若出现连续未按计划存入的月份，缓冲减少也可能影响预计日期。"
+        ],
+        "reflectionQuestion": "你更想优先保住每月轻松，还是愿意提高月存额来换取更早完成？"
+      },
+      "attempts": 1,
+      "durationMs": 4699
+    },
+    {
+      "id": "11",
+      "label": "本月已有额外支出",
+      "input": {
+        "goal": {
+          "title": "装修准备金",
+          "targetAmountText": "¥7,000",
+          "savedAmountText": "¥1,500",
+          "targetDate": "2027-03-31"
+        },
+        "constraints": {
+          "monthlyCapText": "¥1,800",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥10,500",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥3,500",
+          "firstMonthCapacityText": "¥2,500",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "11-candidate-1",
+            "monthlyText": "¥800",
+            "projectedDate": "2027-03-28",
+            "firstMonthBufferText": "¥1,700",
+            "status": "on_track"
+          },
+          {
+            "resultId": "11-candidate-2",
+            "monthlyText": "¥1,300",
+            "projectedDate": "2027-03-01",
+            "firstMonthBufferText": "¥1,200",
+            "status": "on_track"
+          },
+          {
+            "resultId": "11-candidate-3",
+            "monthlyText": "¥1,800",
+            "projectedDate": "2027-03-01",
+            "firstMonthBufferText": "¥700",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2027-03-31 前完成装修准备金目标。",
+        "cashFlowBasis": "模拟收入扣除固定账单和必要支出后，每月可用于目标的金额为 ¥3,500，首月可用余量为 ¥2,500。即使按每个候选的月存额留出后，仍会留下首月缓冲；缓冲是余量，不是可随意花掉的预算。¥20,000 保护资金未参与计算。",
+        "options": [
+          {
+            "resultId": "11-candidate-1",
+            "positioning": "月存最轻，接近于目标日完成",
+            "numbersAndMeaning": "每月投入 ¥800，预计 2027-03-28 完成，首月缓冲 ¥1,700。",
+            "everydayLife": "每月只需留出较低金额，日常安排更宽松，但需要保持较长时间的稳定存入。",
+            "advantage": "月存压力最小，首月缓冲最多。",
+            "tradeoff": "完成时间只比目标日略早，时间余量有限。",
+            "failureConditions": [
+              "若出现数月未按计划投入，预计按时完成的判断可能改变。"
+            ]
+          },
+          {
+            "resultId": "11-candidate-2",
+            "positioning": "兼顾轻松度与提前完成",
+            "numbersAndMeaning": "每月投入 ¥1,300，预计 2027-03-01 完成，首月缓冲 ¥1,200。",
+            "everydayLife": "每月留出中等金额，换取比 c1 更早准备好的可能。",
+            "advantage": "有一定提前时间，同时保留部分首月缓冲。",
+            "tradeoff": "月存压力高于 11-candidate-1。",
+            "failureConditions": [
+              "若必要支出持续上升，挤压目标投入，预计日期可能后移。"
+            ]
+          },
+          {
+            "resultId": "11-candidate-3",
+            "positioning": "尽量提早完成",
+            "numbersAndMeaning": "每月投入 ¥1,800，预计 2027-03-01 完成，首月缓冲 ¥700。",
+            "everydayLife": "每月留出较高金额，日常可调整空间相对更小。",
+            "advantage": "在三个候选中月存最高，且完成时间较早。",
+            "tradeoff": "首月缓冲最少，月存压力最大。",
+            "failureConditions": [
+              "若无法持续投入 ¥1,800，提前完成的优势可能消失。"
+            ]
+          }
+        ],
+        "comparison": "11-candidate-1 最轻但时间最紧；11-candidate-2 比较折中；11-candidate-3 月存最高而首月缓冲最少。三者都被判断为预计按时完成。",
+        "recommendation": "你这次没有说明更看重轻松还是更早完成。若希望轻松，可优先比较 11-candidate-1；若希望留出提前量，可比较 11-candidate-2。选定后仍需你单独确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "未来收入或必要支出的变化可能改变预计日期。"
+        ],
+        "reflectionQuestion": "你更希望每月存得轻松，还是更希望提前一些完成？"
+      },
+      "durationMs": 3820
+    },
+    {
+      "id": "12",
+      "label": "保护金额高于应急金",
+      "input": {
+        "goal": {
+          "title": "学习计划",
+          "targetAmountText": "¥5,000",
+          "savedAmountText": "¥1,000",
+          "targetDate": "2027-05-31"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,000",
+          "protectedAmountText": "¥23,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥10,500",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥3,500",
+          "firstMonthCapacityText": "¥2,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "12-candidate-1",
+            "monthlyText": "¥500",
+            "projectedDate": "2027-05-01",
+            "firstMonthBufferText": "¥1,500",
+            "status": "on_track"
+          },
+          {
+            "resultId": "12-candidate-2",
+            "monthlyText": "¥1,200",
+            "projectedDate": "2027-05-01",
+            "firstMonthBufferText": "¥800",
+            "status": "on_track"
+          },
+          {
+            "resultId": "12-candidate-3",
+            "monthlyText": "¥2,000",
+            "projectedDate": "2027-05-01",
+            "firstMonthBufferText": "¥0",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个候选都预计能在 2027-05-31 前完成，预计日期均为 2027-05-01。",
+        "cashFlowBasis": "扣除模拟固定账单和必要支出后，每月可用 ¥3,500；但按你当前条件计算的首月可投入余量是 ¥2,000。首月缓冲是余量，不是可随意花掉的预算。¥23,000 保护资金不参与计划。",
+        "options": [
+          {
+            "resultId": "12-candidate-1",
+            "positioning": "月存压力最小",
+            "numbersAndMeaning": "每月 ¥500，预计 2027-05-01 完成，首月缓冲 ¥1,500。",
+            "everydayLife": "每月为学习计划留出的钱较少，对日常安排影响最轻。",
+            "advantage": "在你没有明确偏好的情况下，最容易长期坚持。",
+            "tradeoff": "需要更长时间持续存入，中途容易觉得进展慢。",
+            "failureConditions": [
+              "若经常漏存，预计日期可能后移。"
+            ]
+          },
+          {
+            "resultId": "12-candidate-2",
+            "positioning": "月存与时间较均衡",
+            "numbersAndMeaning": "每月 ¥1,200，预计 2027-05-01 完成，首月缓冲 ¥800。",
+            "everydayLife": "每月固定留出中等金额，仍保留一定周转空间。",
+            "advantage": "比 candidate-1 更快积累，又不至于用满首月余量。",
+            "tradeoff": "每月可自由支配的钱会相应减少。",
+            "failureConditions": [
+              "若必要支出上升，固定存入可能被迫中断。"
+            ]
+          },
+          {
+            "resultId": "12-candidate-3",
+            "positioning": "用满月存上限",
+            "numbersAndMeaning": "每月 ¥2,000，预计 2027-05-01 完成，首月缓冲 ¥0。",
+            "everydayLife": "每月要按上限稳定投入，遇到临时开销时调整空间最小。",
+            "advantage": "单月积累最多，且仍在月存上限内。",
+            "tradeoff": "首月没有计算缓冲，现金流波动更容易影响计划。",
+            "failureConditions": [
+              "若有月份未能按上限投入，预计完成情况需重新核验。"
+            ]
+          }
+        ],
+        "comparison": "三者的预计完成日期相同，主要差别是月存额和首月缓冲；candidate-1 最轻松，candidate-3 最紧。",
+        "recommendation": "你没有说明更看重轻松还是更快，因此可以先比较：若希望负担小，candidate-1 更合适；若想让每月积累更明显并能承受较紧节奏，再看 candidate-2。candidate-3 首月缓冲为 ¥0，除非你确认能稳定承担，否则不宜优先。选择后仍需你单独确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "预计日期不是保证；收入或必要支出变化可能改变完成判断。",
+          "首月缓冲会随实际月度节奏变化，不能当作额外预算。"
+        ],
+        "reflectionQuestion": "在预计完成日期相同的情况下，你更希望每月少存一点，还是接受更紧的月存节奏？"
+      },
+      "durationMs": 4055
+    },
+    {
+      "id": "13",
+      "label": "用户上限降低",
+      "input": {
+        "goal": {
+          "title": "日本旅行",
+          "targetAmountText": "¥6,500",
+          "savedAmountText": "¥2,000",
+          "targetDate": "2027-02-28"
+        },
+        "constraints": {
+          "monthlyCapText": "¥1,200",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": "每月最多投入 ¥1,200"
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥11,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥4,000",
+          "firstMonthCapacityText": "¥4,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "13-candidate-1",
+            "monthlyText": "¥800",
+            "projectedDate": "2027-02-17",
+            "firstMonthBufferText": "¥3,200",
+            "status": "on_track"
+          },
+          {
+            "resultId": "13-candidate-2",
+            "monthlyText": "¥1,000",
+            "projectedDate": "2027-01-29",
+            "firstMonthBufferText": "¥3,000",
+            "status": "on_track"
+          },
+          {
+            "resultId": "13-candidate-3",
+            "monthlyText": "¥1,200",
+            "projectedDate": "2027-01-29",
+            "firstMonthBufferText": "¥2,800",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2027-02-28 前完成日本旅行目标，且月投入都没有超过你设定的上限。",
+        "cashFlowBasis": "当前模拟数据中，每月收入 ¥11,000，扣除固定账单 ¥4,500 和必要支出 ¥2,500 后，每月可用于目标的金额为 ¥4,000。你明确要求每月最多投入 ¥1,200，所以候选都按不接近全部余量的节奏安排；首月缓冲从 ¥2,800 到 ¥3,200，是当前条件下留出的余量，不是可以随意花掉的预算，¥20,000 保护资金也没有被动用。",
+        "options": [
+          {
+            "resultId": "13-candidate-1",
+            "positioning": "最轻松的每月节奏",
+            "numbersAndMeaning": "每月投入 ¥800，预计 2027-02-17 完成，比目标日 2027-02-28 更早，首月缓冲 ¥3,200，是三个候选中缓冲最多的。",
+            "everydayLife": "每月只需拿出较低的固定金额，其他月份开销有变化时也更容易维持。",
+            "advantage": "月存压力最小，首月缓冲最多，符合你每月最多投入 ¥1,200 的限制。",
+            "tradeoff": "相比另两个候选，预计完成日期更靠近目标日，时间余量较少。",
+            "failureConditions": [
+              "若某几个月没有按计划投入 ¥800，预计完成日期可能后移。"
+            ]
+          },
+          {
+            "resultId": "13-candidate-2",
+            "positioning": "月存与提前量折中",
+            "numbersAndMeaning": "每月投入 ¥1,000，预计 2027-01-29 完成，比目标日 2027-02-28 更早，首月缓冲 ¥3,000。",
+            "everydayLife": "每月固定留出 ¥1,000，仍低于你的上限，换取比 13-candidate-1 更早的预计完成日期。",
+            "advantage": "在压力可控的前提下，预计完成时间更早，缓冲也比较充足。",
+            "tradeoff": "月投入比 13-candidate-1 多，首月缓冲少一些。",
+            "failureConditions": [
+              "若必要支出上升或收入减少，每月投入 ¥1,000 的持续性可能受影响。"
+            ]
+          },
+          {
+            "resultId": "13-candidate-3",
+            "positioning": "用满上限争取最早完成",
+            "numbersAndMeaning": "每月投入 ¥1,200，正好等于你的月存上限，预计 2027-01-29 完成，首月缓冲 ¥2,800。",
+            "everydayLife": "每月都要优先留出上限金额，日常生活可调整的空间相对更小。",
+            "advantage": "预计完成日期与 13-candidate-2 一样更早，同时没有突破你明确规定的每月最多投入 ¥1,200。",
+            "tradeoff": "月存压力最大，首月缓冲是三个候选中较少的。",
+            "failureConditions": [
+              "若某个月无法投入 ¥1,200，提前完成的预计可能改变。"
+            ]
+          }
+        ],
+        "comparison": "13-candidate-1 最轻松、缓冲最多，但预计完成更靠近目标日；13-candidate-2 在月存和提前量之间较均衡；13-candidate-3 用满上限，压力最大。三者都不会动用保护资金。",
+        "recommendation": "你明确偏好每月最多投入 ¥1,200，三个候选都符合这一硬限制。若更看重每月轻松，可优先考虑 13-candidate-1；若希望在压力可控的同时留出更多时间余量，可比较 13-candidate-2。最终仍需你单独确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "若未来模拟收入下降或必要支出上升，可用于目标的每月金额可能减少，从而影响预计完成日期。",
+          "若某几个月没有按计划投入，首月缓冲和预计完成日期都可能变化。"
+        ],
+        "reflectionQuestion": "在每月最多投入 ¥1,200 的前提下，你更希望每月轻松一些，还是更希望预计完成日期更早一些？"
+      },
+      "attempts": 1,
+      "durationMs": 5396
+    },
+    {
+      "id": "14",
+      "label": "目标金额增加",
+      "input": {
+        "goal": {
+          "title": "家庭旅行",
+          "targetAmountText": "¥15,000",
+          "savedAmountText": "¥2,000",
+          "targetDate": "2027-06-30"
+        },
+        "constraints": {
+          "monthlyCapText": "¥3,000",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥11,500",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥4,500",
+          "firstMonthCapacityText": "¥4,500",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "14-candidate-1",
+            "monthlyText": "¥1,300",
+            "projectedDate": "2027-06-30",
+            "firstMonthBufferText": "¥3,200",
+            "status": "on_track"
+          },
+          {
+            "resultId": "14-candidate-2",
+            "monthlyText": "¥2,100",
+            "projectedDate": "2027-05-31",
+            "firstMonthBufferText": "¥2,400",
+            "status": "on_track"
+          },
+          {
+            "resultId": "14-candidate-3",
+            "monthlyText": "¥3,000",
+            "projectedDate": "2027-05-31",
+            "firstMonthBufferText": "¥1,500",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个候选都预计能在 2027-06-30 前完成；其中两个预计更早，在 2027-05-31。",
+        "cashFlowBasis": "模拟收入扣除固定账单和必要支出后，每月可投入约 ¥4,500，高于你的月存上限 ¥3,000。月存额越高，首月缓冲越少；首月缓冲是当前条件下的余量，不是可随意花掉的预算。¥20,000 保护资金未参与试算。",
+        "options": [
+          {
+            "resultId": "14-candidate-1",
+            "positioning": "月存压力最小",
+            "numbersAndMeaning": "每月投入 ¥1,300，预计 2027-06-30 完成，首月缓冲 ¥3,200。",
+            "everydayLife": "每月为旅行留出的金额较少，日常周转空间最宽裕，但需要长期稳定坚持。",
+            "advantage": "月存额最低，首月缓冲最多，计划结果恰好落在目标日。",
+            "tradeoff": "预计完成时间没有提前余量。",
+            "failureConditions": [
+              "若某些月份未能按计划存入，按时完成的判断可能改变。"
+            ]
+          },
+          {
+            "resultId": "14-candidate-2",
+            "positioning": "压力与提前量折中",
+            "numbersAndMeaning": "每月投入 ¥2,100，预计 2027-05-31 完成，首月缓冲 ¥2,400。",
+            "everydayLife": "每月需要比候选一多留一笔钱给旅行，换来较早完成的可能。",
+            "advantage": "预计比目标日更早完成，同时保留较充足的首月缓冲。",
+            "tradeoff": "月存压力高于候选一。",
+            "failureConditions": [
+              "若必要支出上升，影响计划投入，预计日期可能后移。"
+            ]
+          },
+          {
+            "resultId": "14-candidate-3",
+            "positioning": "争取更早完成，但用满月存上限",
+            "numbersAndMeaning": "每月投入 ¥3,000，预计 2027-05-31 完成，首月缓冲 ¥1,500。",
+            "everydayLife": "每月按上限投入，留给临时开销的空间相对较少。",
+            "advantage": "达到月存上限，仍预计在目标日之前完成。",
+            "tradeoff": "首月缓冲在三个候选中最少，且完成时间与候选二相同。",
+            "failureConditions": [
+              "若无法持续按月投入 ¥3,000，提前完成的判断可能不成立。"
+            ]
+          }
+        ],
+        "comparison": "候选一缓冲最多、压力最小；候选二以适中压力换取较早完成；候选三达到月存上限，缓冲较少而完成时间与候选二相同。",
+        "recommendation": "你没有明确偏好，可先看自己更看重月存压力还是完成时间：想轻松则看候选一，想较早完成且保留缓冲则看候选二；选择后仍需你单独确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "未来模拟收入或必要支出变化，可能改变可投入金额与预计日期。",
+          "若无法持续按计划月存，候选的按时完成判断可能失效。"
+        ],
+        "reflectionQuestion": "你更希望每月存得轻松，还是更希望比 2027-06-30 更早准备好？"
+      },
+      "attempts": 1,
+      "durationMs": 4149
+    },
+    {
+      "id": "15",
+      "label": "较长准备期",
+      "input": {
+        "goal": {
+          "title": "开店准备金",
+          "targetAmountText": "¥18,000",
+          "savedAmountText": "¥3,000",
+          "targetDate": "2028-06-30"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,500",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥10,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥3,000",
+          "firstMonthCapacityText": "¥3,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "15-candidate-1",
+            "monthlyText": "¥700",
+            "projectedDate": "2028-06-13",
+            "firstMonthBufferText": "¥2,300",
+            "status": "on_track"
+          },
+          {
+            "resultId": "15-candidate-2",
+            "monthlyText": "¥1,600",
+            "projectedDate": "2028-05-31",
+            "firstMonthBufferText": "¥1,400",
+            "status": "on_track"
+          },
+          {
+            "resultId": "15-candidate-3",
+            "monthlyText": "¥2,500",
+            "projectedDate": "2028-05-31",
+            "firstMonthBufferText": "¥500",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2028-06-30 前完成，主要区别是每月投入与首月缓冲。",
+        "cashFlowBasis": "模拟收入扣除固定账单和必要支出后，每月约有 ¥3,000 可用于目标，但你的月存上限为 ¥2,500。每月投入越高，首月缓冲越少；缓冲是当前条件下的余量，不是可随意花掉的预算。¥20,000 保护资金未参与试算。",
+        "options": [
+          {
+            "resultId": "15-candidate-1",
+            "positioning": "月存最轻松、缓冲最多",
+            "numbersAndMeaning": "每月投入 ¥700，预计 2028-06-13 完成，首月缓冲 ¥2,300。",
+            "everydayLife": "每月为开店准备金留出的金额较低，日常周转空间较大，但需要长期稳定投入。",
+            "advantage": "月存压力最低，首月缓冲最多。",
+            "tradeoff": "完成日期比另两个候选晚一些，投入周期更长。",
+            "failureConditions": [
+              "若长期出现漏存，2028-06-13 的预计可能后移。"
+            ]
+          },
+          {
+            "resultId": "15-candidate-2",
+            "positioning": "压力与时间较均衡",
+            "numbersAndMeaning": "每月投入 ¥1,600，预计 2028-05-31 完成，首月缓冲 ¥1,400。",
+            "everydayLife": "每月留出中等金额，既可保留一定缓冲，也能比候选一更早准备好资金。",
+            "advantage": "完成较早，首月仍有相对可观的缓冲。",
+            "tradeoff": "月存压力高于 15-candidate-1。",
+            "failureConditions": [
+              "若必要支出上升，持续投入可能受影响。"
+            ]
+          },
+          {
+            "resultId": "15-candidate-3",
+            "positioning": "优先提前完成",
+            "numbersAndMeaning": "每月投入 ¥2,500，接近月存上限，预计 2028-05-31 完成，首月缓冲 ¥500。",
+            "everydayLife": "每月可用于其他调整的空间较小，需要更严格地守住目标投入。",
+            "advantage": "完成日期与候选二相同，投入最高。",
+            "tradeoff": "首月缓冲最少，应对临时开销的能力较弱。",
+            "failureConditions": [
+              "若某月无法投入 ¥2,500，完成时间可能后移。"
+            ]
+          }
+        ],
+        "comparison": "15-candidate-3 以最高的月存压力换来提前完成，却没有比 15-candidate-2 更早；15-candidate-1 最轻松但完成最晚。",
+        "recommendation": "你没有明确月存轻松或尽快完成哪项更重要。若希望保留较多日常余量，可优先比较 15-candidate-1；若更看重较早完成且不想压满上限，可比较 15-candidate-2。选定后仍需你单独确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "未来模拟收入和必要支出的变化可能影响持续投入能力。"
+        ],
+        "reflectionQuestion": "你更愿意每月轻松投入，还是更看重在 2028-05-31 前尽早备齐？"
+      },
+      "durationMs": 4375
+    },
+    {
+      "id": "16",
+      "label": "短准备期但已有存款",
+      "input": {
+        "goal": {
+          "title": "相机",
+          "targetAmountText": "¥5,000",
+          "savedAmountText": "¥4,000",
+          "targetDate": "2026-10-15"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,000",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥10,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥3,000",
+          "firstMonthCapacityText": "¥3,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "16-candidate-1",
+            "monthlyText": "¥1,000",
+            "projectedDate": "2026-10-15",
+            "firstMonthBufferText": "¥2,000",
+            "status": "on_track"
+          },
+          {
+            "resultId": "16-candidate-2",
+            "monthlyText": "¥1,500",
+            "projectedDate": "2026-10-05",
+            "firstMonthBufferText": "¥1,500",
+            "status": "on_track"
+          },
+          {
+            "resultId": "16-candidate-3",
+            "monthlyText": "¥2,000",
+            "projectedDate": "2026-09-30",
+            "firstMonthBufferText": "¥1,000",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个候选都预计能在 2026-10-15 前完成，其中两个还早于目标日。",
+        "cashFlowBasis": "模拟数据中，扣除固定账单和必要支出后每月可投入 ¥3,000，高于你设定的 ¥2,000 月存上限；首月缓冲按当前条件给出，但它是余量，不是可随意花掉的预算。¥20,000 保护资金未参与计算。",
+        "options": [
+          {
+            "resultId": "16-candidate-1",
+            "positioning": "最轻松的节奏",
+            "numbersAndMeaning": "每月存入 ¥1,000，预计 2026-10-15 完成，首月缓冲 ¥2,000。",
+            "everydayLife": "每月只需留下较低金额，日常周转空间最大。",
+            "advantage": "月存压力最小，首月缓冲最多。",
+            "tradeoff": "预计日期刚好卡在目标日，时间上没有提前量。",
+            "failureConditions": [
+              "若某个月未能按计划存入 ¥1,000，按时完成的判断可能改变。"
+            ]
+          },
+          {
+            "resultId": "16-candidate-2",
+            "positioning": "压力与提前量的折中",
+            "numbersAndMeaning": "每月存入 ¥1,500，预计 2026-10-05 完成，首月缓冲 ¥1,500。",
+            "everydayLife": "月存额适中，比候选一多留出一笔目标资金，但仍保留较多缓冲。",
+            "advantage": "预计比目标日提前一些，月存压力仍不算高。",
+            "tradeoff": "每月占用的金额高于候选一，首月缓冲相应减少。",
+            "failureConditions": [
+              "若必要支出上升，影响每月存入 ¥1,500，预计日期可能后移。"
+            ]
+          },
+          {
+            "resultId": "16-candidate-3",
+            "positioning": "更早完成",
+            "numbersAndMeaning": "每月存入 ¥2,000，预计 2026-09-30 完成，首月缓冲 ¥1,000。",
+            "everydayLife": "按月存上限投入，每月留给其他调整的空间最小。",
+            "advantage": "预计完成最早，也仍在你设定的月存上限内。",
+            "tradeoff": "首月缓冲最少，临时开销更容易影响计划投入。",
+            "failureConditions": [
+              "若无法持续每月存入 ¥2,000，提前完成的优势可能减弱。"
+            ]
+          }
+        ],
+        "comparison": "你尚未说明更看重轻松月存还是提前完成。候选一最轻松但无提前量，候选二折中，候选三最快但缓冲最少。",
+        "recommendation": "如果你希望每月压力更低，可优先比较 16-candidate-1；如果希望留出提前量但仍不太紧绷，可比较 16-candidate-2。最终仍需你单独确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "模拟收入和支出发生变化，可能影响预计完成日期。"
+        ],
+        "reflectionQuestion": "你更希望每月存得轻松，还是更看重比 2026-10-15 提前完成？"
+      },
+      "durationMs": 4133
+    },
+    {
+      "id": "17",
+      "label": "必要支出上升",
+      "input": {
+        "goal": {
+          "title": "旅行基金",
+          "targetAmountText": "¥7,500",
+          "savedAmountText": "¥1,500",
+          "targetDate": "2027-04-30"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,200",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥10,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥3,600",
+          "availableMonthlyText": "¥1,900",
+          "firstMonthCapacityText": "¥1,900",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "17-candidate-1",
+            "monthlyText": "¥800",
+            "projectedDate": "2027-04-15",
+            "firstMonthBufferText": "¥1,100",
+            "status": "on_track"
+          },
+          {
+            "resultId": "17-candidate-2",
+            "monthlyText": "¥1,300",
+            "projectedDate": "2027-03-31",
+            "firstMonthBufferText": "¥600",
+            "status": "on_track"
+          },
+          {
+            "resultId": "17-candidate-3",
+            "monthlyText": "¥1,900",
+            "projectedDate": "2027-03-31",
+            "firstMonthBufferText": "¥0",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2027-04-30 前完成，其中前两个预计早于目标日。",
+        "cashFlowBasis": "扣除模拟固定账单和必要支出后，每月可投入 ¥1,900；月存额从这笔可用金额中安排。月存越接近 ¥1,900，首月缓冲越少；缓冲只是当前条件下的余量，不是可以随便花掉的预算。¥20,000 保护资金未参与试算。",
+        "options": [
+          {
+            "resultId": "17-candidate-1",
+            "positioning": "最轻松的月存节奏",
+            "numbersAndMeaning": "每月投入 ¥800，预计 2027-04-15 完成，首月缓冲 ¥1,100。",
+            "everydayLife": "每月为旅行基金留出的金额最低，日常周转空间最大，更适合不想每月被固定存入压紧的节奏。",
+            "advantage": "月存压力最小，首月缓冲最多。",
+            "tradeoff": "月存较少，能比其他两个候选更早完成的空间也较小。",
+            "failureConditions": [
+              "若某些月份未按计划投入，预计完成时间可能后移。"
+            ]
+          },
+          {
+            "resultId": "17-candidate-2",
+            "positioning": "月存与时间较均衡",
+            "numbersAndMeaning": "每月投入 ¥1,300，预计 2027-03-31 完成，首月缓冲 ¥600。",
+            "everydayLife": "每月需要留出比候选一更多的固定金额，但比候选三宽松。",
+            "advantage": "预计明显早于目标日，同时保留部分首月缓冲。",
+            "tradeoff": "月存压力和日常调整空间都比候选一更紧。",
+            "failureConditions": [
+              "若必要支出上升，可投入金额减少，预计日期可能改变。"
+            ]
+          },
+          {
+            "resultId": "17-candidate-3",
+            "positioning": "用全部可投入金额争取提前完成",
+            "numbersAndMeaning": "每月投入 ¥1,900，预计 2027-03-31 完成，首月缓冲 ¥0。",
+            "everydayLife": "每月要先把全部可投入金额留给目标，临时开销没有计算余量。",
+            "advantage": "在已核验方案中月存额最高，预计完成日期也较早。",
+            "tradeoff": "首月缓冲为 ¥0，现金流波动的承受空间最小。",
+            "failureConditions": [
+              "若某月无法投入 ¥1,900，或出现额外必要开销，提前完成的判断可能不成立。"
+            ]
+          }
+        ],
+        "comparison": "候选一月存最轻但完成最早程度较低；候选二兼顾提前和缓冲；候选三月存最高、缓冲为零。三者的预计日期均在目标日之前。",
+        "recommendation": "你没有明确偏好。若更看重每月轻松，可先考虑 17-candidate-1；若希望明显提前且能接受较小缓冲，可比较 17-candidate-2；17-candidate-3 更适合能承受零首月缓冲的情况。选后仍需你单独确认。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "模拟收入或必要支出的变化可能影响可投入金额和预计完成时间。"
+        ],
+        "reflectionQuestion": "你更希望每月轻松一些，还是愿意多存一点来换取更早完成？"
+      },
+      "durationMs": 4667
+    },
+    {
+      "id": "18",
+      "label": "活期余额偏低",
+      "input": {
+        "goal": {
+          "title": "学习计划",
+          "targetAmountText": "¥6,000",
+          "savedAmountText": "¥1,000",
+          "targetDate": "2027-06-30"
+        },
+        "constraints": {
+          "monthlyCapText": "¥1,800",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥11,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥4,000",
+          "firstMonthCapacityText": "¥1,200",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "18-candidate-1",
+            "monthlyText": "¥500",
+            "projectedDate": "2027-06-30",
+            "firstMonthBufferText": "¥700",
+            "status": "on_track"
+          },
+          {
+            "resultId": "18-candidate-2",
+            "monthlyText": "¥1,100",
+            "projectedDate": "2027-05-31",
+            "firstMonthBufferText": "¥100",
+            "status": "on_track"
+          },
+          {
+            "resultId": "18-candidate-3",
+            "monthlyText": "¥1,800",
+            "projectedDate": "2027-05-31",
+            "firstMonthBufferText": "¥-600",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个候选都标记为预计按时，但 c18-candidate-3 的首月缓冲为负，不宜按“轻松执行”来理解。",
+        "cashFlowBasis": "模拟收入扣除固定账单和必要支出后，每月可用于目标的金额为 ¥4,000，高于你的月存上限 ¥1,800。首月可用余量为 ¥1,200，但实际能用于目标的部分受这个余量限制，不能把全部 ¥4,000 都当作可随时投入；¥20,000 保护资金未参与试算。",
+        "options": [
+          {
+            "resultId": "18-candidate-1",
+            "positioning": "最稳妥、月存最轻",
+            "numbersAndMeaning": "每月投入 ¥500，预计 2027-06-30 完成，首月缓冲 ¥700。",
+            "everydayLife": "每月为学习计划留出的金额最小，其他日常安排和临时开销空间最大。",
+            "advantage": "在三个候选中首月余量最多，执行压力最低。",
+            "tradeoff": "预计完成时间靠近目标日，提前余量较少。",
+            "failureConditions": [
+              "若某月未按计划存入，按时完成的判断可能改变。"
+            ]
+          },
+          {
+            "resultId": "18-candidate-2",
+            "positioning": "略早完成、余量偏紧",
+            "numbersAndMeaning": "每月投入 ¥1,100，预计 2027-05-31 完成，首月缓冲 ¥100。",
+            "everydayLife": "每月需要更稳定地留出 ¥1,100，临时支出可调整空间明显变小。",
+            "advantage": "预计比 2027-06-30 更早完成。",
+            "tradeoff": "首月缓冲只剩 ¥100，遇到额外开销容易影响当月存入。",
+            "failureConditions": [
+              "若首月出现额外必要支出，按计划投入可能受阻。"
+            ]
+          },
+          {
+            "resultId": "18-candidate-3",
+            "positioning": "月存最高、首月缓冲为负",
+            "numbersAndMeaning": "每月投入 ¥1,800，预计 2027-05-31 完成，首月缓冲 ¥-600；虽然标记为预计按时，但首月可用余量不足以覆盖这个投入节奏。",
+            "everydayLife": "需要每月投入较高金额，日常可调整空间最小，临时开销会直接挤压计划。",
+            "advantage": "预计完成时间与 c18-candidate-2 一样较早。",
+            "tradeoff": "首月缓冲为负，执行风险明显高于另外两个候选。",
+            "failureConditions": [
+              "若首月无法补足余量或后续月份支出上升，按计划投入可能中断。"
+            ]
+          }
+        ],
+        "comparison": "c18-candidate-1 最轻松、首月余量最多；c18-candidate-2 略早完成但余量偏紧；c18-candidate-3 月存最高且首月缓冲为负，不适合优先考虑。",
+        "recommendation": "你没有明确偏好，若更重视轻松执行，可优先比较 c18-candidate-1；若更看重提前完成，可再权衡 c18-candidate-2，但要接受首月余量较少。选择后仍需你单独确认。",
+        "recommendedResultId": "18-candidate-1",
+        "uncertainties": [
+          "若必要支出上升或某月未按计划存入，当前按时完成的预计可能改变。",
+          "负的首月缓冲意味着该候选对现金流波动更敏感。"
+        ],
+        "reflectionQuestion": "你更希望每月轻松存入，还是愿意接受更紧的首月余量来换取更早完成？"
+      },
+      "attempts": 1,
+      "durationMs": 4970
+    },
+    {
+      "id": "19",
+      "label": "首月支出较高",
+      "input": {
+        "goal": {
+          "title": "家庭旅行",
+          "targetAmountText": "¥8,000",
+          "savedAmountText": "¥2,000",
+          "targetDate": "2027-06-30"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,000",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": null
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥11,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥4,000",
+          "firstMonthCapacityText": "¥2,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "19-candidate-1",
+            "monthlyText": "¥600",
+            "projectedDate": "2027-06-30",
+            "firstMonthBufferText": "¥1,400",
+            "status": "on_track"
+          },
+          {
+            "resultId": "19-candidate-2",
+            "monthlyText": "¥1,300",
+            "projectedDate": "2027-05-31",
+            "firstMonthBufferText": "¥700",
+            "status": "on_track"
+          },
+          {
+            "resultId": "19-candidate-3",
+            "monthlyText": "¥2,000",
+            "projectedDate": "2027-05-31",
+            "firstMonthBufferText": "¥0",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个已核验候选都预计能在 2027-06-30 前完成，主要差别是月存压力和首月缓冲。",
+        "cashFlowBasis": "当前模拟数据显示，扣除固定账单和必要支出后每月可投入 ¥4,000，但你的月存上限是 ¥2,000，因此候选都按上限以内的金额试算。首月可用余量为 ¥2,000；首月缓冲是这个余量扣掉当月计划投入后留下的部分，不是可以随意花掉的预算。¥20,000 保护资金未被使用。",
+        "options": [
+          {
+            "resultId": "19-candidate-1",
+            "positioning": "月存最轻，时间刚刚赶上",
+            "numbersAndMeaning": "每月投入 ¥600，预计 2027-06-30 完成，首月缓冲 ¥1,400。",
+            "everydayLife": "每月留钱压力最小，日常周转空间相对宽裕，但要持续按计划存入。",
+            "advantage": "月存额最低，首月缓冲最多。",
+            "tradeoff": "预计完成日最靠近目标日，时间余量较少。",
+            "failureConditions": [
+              "若某几个月未能按计划投入，按时完成的判断可能改变。"
+            ]
+          },
+          {
+            "resultId": "19-candidate-2",
+            "positioning": "压力与时间较均衡",
+            "numbersAndMeaning": "每月投入 ¥1,300，预计 2027-05-31 完成，首月缓冲 ¥700。",
+            "everydayLife": "每月需要更稳定地留出较多金额，换取比候选 1 更早完成的余量。",
+            "advantage": "预计完成更早，同时保留部分首月缓冲。",
+            "tradeoff": "月存压力高于候选 1，缓冲少于候选 1。",
+            "failureConditions": [
+              "若必要支出上升，占用计划投入的现金流，预计完成时间可能后移。"
+            ]
+          },
+          {
+            "resultId": "19-candidate-3",
+            "positioning": "用满月存上限换取更早完成",
+            "numbersAndMeaning": "每月投入 ¥2,000，预计 2027-05-31 完成，首月缓冲 ¥0。",
+            "everydayLife": "每月要先留出上限金额给旅行，日常调整空间最小，遇到临时开销时需要重新检查当月安排。",
+            "advantage": "在三个候选中月存最高，预计完成时间较早。",
+            "tradeoff": "首月没有缓冲，现金流波动的承受空间最小。",
+            "failureConditions": [
+              "若有月份无法投入 ¥2,000，提前完成的优势可能消失。"
+            ]
+          }
+        ],
+        "comparison": "候选 1 最轻松但时间最紧；候选 3 投入最高、缓冲为零；候选 2 介于两者之间，也预计更早完成。",
+        "recommendation": "你这次没有说明偏好。若能接受完成日靠近目标日、希望每月轻松，可考虑候选 1；若更希望留出提前量又能承受较高月存，可比较候选 2；候选 3 需要先确认首月零缓冲是否可接受。",
+        "recommendedResultId": null,
+        "uncertainties": [
+          "未来模拟收入或必要支出变化可能改变可投入金额。",
+          "首月缓冲较少的候选对临时开销更敏感。"
+        ],
+        "reflectionQuestion": "你更看重每月存得轻松，还是希望比 2027-06-30 更早准备好旅行资金？"
+      },
+      "attempts": 1,
+      "durationMs": 4552
+    },
+    {
+      "id": "20",
+      "label": "保留健身支出偏好",
+      "input": {
+        "goal": {
+          "title": "日本旅行",
+          "targetAmountText": "¥8,000",
+          "savedAmountText": "¥2,500",
+          "targetDate": "2027-05-31"
+        },
+        "constraints": {
+          "monthlyCapText": "¥2,000",
+          "protectedAmountText": "¥20,000",
+          "latestAllowedDate": null,
+          "preference": "不削减健身支出"
+        },
+        "financialOverview": {
+          "monthlyIncomeText": "¥11,000",
+          "fixedBillsText": "¥4,500",
+          "essentialSpendingText": "¥2,500",
+          "availableMonthlyText": "¥4,000",
+          "firstMonthCapacityText": "¥4,000",
+          "source": "当前模拟财务数据"
+        },
+        "candidates": [
+          {
+            "resultId": "20-candidate-1",
+            "monthlyText": "¥700",
+            "projectedDate": "2027-05-01",
+            "firstMonthBufferText": "¥3,300",
+            "status": "on_track"
+          },
+          {
+            "resultId": "20-candidate-2",
+            "monthlyText": "¥1,300",
+            "projectedDate": "2027-05-01",
+            "firstMonthBufferText": "¥2,700",
+            "status": "on_track"
+          },
+          {
+            "resultId": "20-candidate-3",
+            "monthlyText": "¥2,000",
+            "projectedDate": "2027-05-01",
+            "firstMonthBufferText": "¥2,000",
+            "status": "on_track"
+          }
+        ],
+        "dataGaps": []
+      },
+      "status": "ok",
+      "output": {
+        "headline": "三个候选都预计能在 2027-05-31 前完成，其中最早预计日期均为 2027-05-01。",
+        "cashFlowBasis": "模拟收入扣除固定账单和必要支出后，每月可投入金额为 ¥4,000；这些方案分别投入 ¥700、¥1,300、¥2,000，首月缓冲分别为 ¥3,300、¥2,700、¥2,000。缓冲是当前条件下的余量，不是可以随意花掉的预算。保护资金 ¥20,000 未参与计算；你“不削减健身支出”的偏好也不要求为此压缩健身开销。",
+        "options": [
+          {
+            "resultId": "20-candidate-1",
+            "positioning": "月存压力最轻",
+            "numbersAndMeaning": "每月投入 ¥700，预计 2027-05-01 完成，首月缓冲 ¥3,300。",
+            "everydayLife": "每月给旅行留出的金额较少，日常和健身安排更容易保持原样。",
+            "advantage": "月存负担最小，缓冲最多。",
+            "tradeoff": "需要持续较长时间按计划存入；提前量虽大，仍依赖每月不断档。",
+            "failureConditions": [
+              "若某几个月没有按计划投入，预计完成判断可能改变。"
+            ]
+          },
+          {
+            "resultId": "20-candidate-2",
+            "positioning": "压力与进度折中",
+            "numbersAndMeaning": "每月投入 ¥1,300，预计 2027-05-01 完成，首月缓冲 ¥2,700。",
+            "everydayLife": "每月固定留出中等金额，兼顾日常开销与旅行目标。",
+            "advantage": "月存压力适中，缓冲仍较充足。",
+            "tradeoff": "相比 ¥700 方案，每月可自由安排的余量更少。",
+            "failureConditions": [
+              "若必要支出上升，持续按此金额投入可能变得紧张。"
+            ]
+          },
+          {
+            "resultId": "20-candidate-3",
+            "positioning": "接近月存上限",
+            "numbersAndMeaning": "每月投入 ¥2,000，预计 2027-05-01 完成，首月缓冲 ¥2,000；仍在月存上限内。",
+            "everydayLife": "每月要优先留出较高金额，日常安排需要更谨慎。",
+            "advantage": "在不突破上限的条件下集中积累，缓冲仍为正。",
+            "tradeoff": "三个候选中月存负担最大，缓冲最少。",
+            "failureConditions": [
+              "若遇到临时开销需要额外周转，按时投入可能受影响。"
+            ]
+          }
+        ],
+        "comparison": "三个候选的预计完成日期相同；主要差别是每月投入和首月缓冲。你可按自己对每月轻松程度的要求选择。",
+        "recommendation": "你明确希望不削减健身支出，同时没有要求尽量提前完成；若想让日常和健身安排更从容，可优先考虑 20-candidate-1，其次比较 20-candidate-2。选择后仍需你单独确认。",
+        "recommendedResultId": "20-candidate-1",
+        "uncertainties": [
+          "模拟收入或必要支出发生变化时，预计完成判断可能改变。",
+          "保护资金 ¥20,000 不参与本目标，若被要求用于旅行基金，则超出本次可解释范围。"
+        ],
+        "reflectionQuestion": "在预计完成日期相同的情况下，你更看重每月只存 ¥700 的轻松，还是愿意每月投入 ¥1,300 以更快累积？"
+      },
+      "durationMs": 4817
+    }
+  ]
+}

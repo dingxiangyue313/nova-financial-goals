@@ -2,8 +2,12 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { AgentComponentSchema, AgentMessageSchema, AgentThreadSchema, DemoStateSchema, GoalDraftSchema,
-  type AgentComponent, type AgentMessage, type AgentThread, type DemoState, type GoalDraft } from '../shared/contracts.ts';
+import { z } from 'zod';
+import { AgentComponentSchema, AgentMessageSchema, AgentTaskConstraintsSchema, AgentTaskFactsSchema,
+  AgentTaskPhaseSchema, AgentTaskPreferenceSchema, AgentTaskRunRecordSchema, AgentTaskSchema,
+  AgentTaskSourceSchema, AgentThreadSchema, DemoStateSchema, GoalDraftSchema, IsoDateSchema,
+  AgentToolResultSchema, AgentRunSchema, type AgentRun, type AgentToolResult, type AgentComponent, type AgentMessage, type AgentTask, type AgentTaskPhase, type AgentThread,
+  type DemoState, type GoalDraft } from '../shared/contracts.ts';
 import { createFirstUseFixture } from './fixtures.ts';
 
 const dbPath = resolve(process.env.NOVA_DB_PATH || './data/nova.sqlite');
@@ -94,6 +98,47 @@ CREATE TABLE IF NOT EXISTS goal_drafts (
   session_id TEXT NOT NULL, thread_id TEXT NOT NULL, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL,
   PRIMARY KEY(session_id, thread_id)
 );
+CREATE TABLE IF NOT EXISTS agent_tasks (
+  task_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, thread_id TEXT NOT NULL, run_id TEXT NOT NULL,
+  revision INTEGER NOT NULL, phase TEXT NOT NULL, payload_json TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE(session_id, thread_id, run_id)
+);
+CREATE INDEX IF NOT EXISTS agent_tasks_session_run ON agent_tasks(session_id, run_id);
+CREATE TABLE IF NOT EXISTS agent_tool_results (
+  id TEXT PRIMARY KEY, session_id TEXT NOT NULL, thread_id TEXT NOT NULL,
+  task_id TEXT NOT NULL, run_id TEXT NOT NULL, twin_version INTEGER NOT NULL,
+  tool TEXT NOT NULL, dedupe_key TEXT NOT NULL, payload_json TEXT NOT NULL,
+  UNIQUE(session_id, thread_id, run_id, dedupe_key)
+);
+CREATE TABLE IF NOT EXISTS agent_task_runs (
+  run_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, thread_id TEXT NOT NULL,
+  task_id TEXT NOT NULL, demo_run_id TEXT NOT NULL, triggering_message_id TEXT NOT NULL,
+  revision INTEGER NOT NULL, status TEXT NOT NULL, worker_token TEXT, payload_json TEXT NOT NULL,
+  UNIQUE(session_id, thread_id, demo_run_id, triggering_message_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS agent_task_runs_active
+  ON agent_task_runs(session_id,task_id) WHERE status='running';
+CREATE TABLE IF NOT EXISTS monitor_subscriptions (
+  session_id TEXT NOT NULL, task_id TEXT NOT NULL, thread_id TEXT NOT NULL,
+  demo_run_id TEXT NOT NULL, goal_id TEXT NOT NULL, status TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(session_id,task_id)
+);
+CREATE TABLE IF NOT EXISTS monitor_events (
+  id TEXT PRIMARY KEY, session_id TEXT NOT NULL, task_id TEXT NOT NULL,
+  demo_run_id TEXT NOT NULL, goal_id TEXT NOT NULL, twin_version INTEGER NOT NULL,
+  kind TEXT NOT NULL, dedupe_key TEXT NOT NULL, status TEXT NOT NULL,
+  due_demo_date TEXT, available_at TEXT NOT NULL, lease_token TEXT, lease_until TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0, payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL, processed_at TEXT,
+  UNIQUE(session_id,dedupe_key)
+);
+CREATE INDEX IF NOT EXISTS monitor_events_due ON monitor_events(status,available_at,lease_until);
+CREATE TABLE IF NOT EXISTS monitor_notifications (
+  session_id TEXT NOT NULL, event_id TEXT NOT NULL, thread_id TEXT NOT NULL,
+  message_id TEXT NOT NULL, candidate_result_id TEXT, subject_key TEXT,
+  twin_version INTEGER NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY(session_id,event_id), UNIQUE(session_id,message_id), UNIQUE(session_id,subject_key)
+);
 CREATE TABLE IF NOT EXISTS passkey_credentials (
   session_id TEXT PRIMARY KEY, credential_id TEXT NOT NULL UNIQUE, public_key BLOB NOT NULL,
   counter INTEGER NOT NULL, transports_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -112,6 +157,8 @@ for (const [column, definition] of [
   ['request_id', 'TEXT'], ['approval_id', 'TEXT'], ['twin_version', 'INTEGER'], ['sequence', 'INTEGER'],
   ['previous_hash', 'TEXT'], ['event_hash', 'TEXT'],
 ] as const) ensureColumn('audit_events', column, definition);
+ensureColumn('monitor_notifications', 'subject_key', 'TEXT');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS monitor_notifications_subject ON monitor_notifications(session_id,subject_key) WHERE subject_key IS NOT NULL');
 
 function syncArtifacts(sessionId: string, state: DemoState) {
   db.prepare(`INSERT INTO risk_preferences(session_id,payload_json,updated_at) VALUES(?,?,?)
@@ -195,6 +242,43 @@ function persistStateChange(sessionId: string, change: (state: DemoState) => Dem
       event.requestId ?? null, event.approvalId ?? null, event.twinVersion ?? null, event.sequence ?? null,
       event.previousHash ?? null, event.eventHash ?? null);
   syncArtifacts(sessionId, next);
+  if (next.twinVersion !== old.twinVersion) {
+    const subscriptions = db.prepare(`SELECT task_id,demo_run_id,goal_id FROM monitor_subscriptions
+      WHERE session_id=? AND status='active'`).all(sessionId) as Array<{
+        task_id: string; demo_run_id: string; goal_id: string }>;
+    const now = new Date().toISOString();
+    for (const item of subscriptions) {
+      const goal = next.goals.find(entry => entry.id === item.goal_id);
+      if (!goal || goal.status !== 'active' || next.primaryGoalId !== item.goal_id) {
+        db.prepare("UPDATE monitor_subscriptions SET status='cancelled',updated_at=? WHERE session_id=? AND task_id=?")
+          .run(now, sessionId, item.task_id);
+        db.prepare("UPDATE monitor_events SET status='stale',processed_at=? WHERE session_id=? AND task_id=? AND status IN ('pending','leased')")
+          .run(now, sessionId, item.task_id);
+        const row = db.prepare('SELECT payload_json FROM agent_tasks WHERE session_id=? AND task_id=?')
+          .get(sessionId, item.task_id) as { payload_json: string } | undefined;
+        if (row) {
+          const task = AgentTaskSchema.parse(JSON.parse(row.payload_json));
+          if (task.phase !== 'completed' && task.phase !== 'failed') {
+            const done = AgentTaskSchema.parse({ ...task, phase: 'completed', waitingReason: null,
+              terminationReason: goal?.status === 'achieved' ? 'goal_completed' : 'cancelled',
+              pendingActionId: null, nextCheck: null, taskRevision: task.taskRevision + 1,
+              updatedAt: now });
+            db.prepare('UPDATE agent_tasks SET revision=?,phase=?,payload_json=?,updated_at=? WHERE session_id=? AND task_id=?')
+              .run(done.taskRevision, done.phase, JSON.stringify(done), now, sessionId, item.task_id);
+          }
+        }
+        continue;
+      }
+      db.prepare(`INSERT OR IGNORE INTO monitor_events
+      (id,session_id,task_id,demo_run_id,goal_id,twin_version,kind,dedupe_key,status,
+       due_demo_date,available_at,lease_token,lease_until,attempts,payload_json,created_at)
+      VALUES(?,?,?,?,?,?,?,?,'pending',NULL,?,NULL,NULL,0,?,?)`)
+      .run(randomUUID(), sessionId, item.task_id, item.demo_run_id, item.goal_id,
+        next.twinVersion, 'twin_changed', `twin:${item.task_id}:${next.twinVersion}`,
+        now, JSON.stringify({ fromTwinVersion: old.twinVersion, toTwinVersion: next.twinVersion,
+          asOf: next.clock }), now);
+    }
+  }
   return next;
 }
 
@@ -285,9 +369,25 @@ export function resetState(sessionId: string): DemoState {
     db.prepare('DELETE FROM data_connections WHERE session_id=?').run(sessionId);
     db.prepare('DELETE FROM data_sync_batches WHERE session_id=?').run(sessionId);
     db.prepare('DELETE FROM imported_transactions WHERE session_id=?').run(sessionId);
+    db.prepare("UPDATE monitor_subscriptions SET status='cancelled',updated_at=? WHERE session_id=?")
+      .run(new Date().toISOString(), sessionId);
+    db.prepare("UPDATE monitor_events SET status='stale',processed_at=? WHERE session_id=? AND status IN ('pending','leased')")
+      .run(new Date().toISOString(), sessionId);
     const runId = randomUUID();
     db.prepare('UPDATE agent_threads SET read_only=1, status=\'archived\', updated_at=? WHERE session_id=?')
       .run(new Date().toISOString(), sessionId);
+    const oldTasks = db.prepare('SELECT * FROM agent_tasks WHERE session_id=?')
+      .all(sessionId) as Array<Record<string, unknown>>;
+    for (const row of oldTasks) {
+      const old = AgentTaskSchema.parse(JSON.parse(String(row.payload_json)));
+      if (old.phase === 'completed' || old.phase === 'failed') continue;
+      const updatedAt = new Date().toISOString();
+      const next = AgentTaskSchema.parse({ ...old, phase: 'completed', waitingReason: null,
+        terminationReason: 'demo_reset', pendingActionId: null, nextCheck: null,
+        taskRevision: old.taskRevision + 1, updatedAt, readOnly: true });
+      db.prepare('UPDATE agent_tasks SET revision=?,phase=?,payload_json=?,updated_at=? WHERE task_id=? AND session_id=?')
+        .run(next.taskRevision, next.phase, JSON.stringify(next), updatedAt, next.taskId, sessionId);
+    }
     db.prepare(`INSERT INTO agent_runs(session_id,current_run_id) VALUES(?,?)
       ON CONFLICT(session_id) DO UPDATE SET current_run_id=excluded.current_run_id`).run(sessionId, runId);
     db.exec('COMMIT');
@@ -301,6 +401,322 @@ function currentRunId(sessionId: string): string {
   const id = randomUUID();
   db.prepare('INSERT INTO agent_runs(session_id,current_run_id) VALUES(?,?)').run(sessionId, id);
   return id;
+}
+
+const TaskPatchSchema = z.object({
+  phase: AgentTaskPhaseSchema.optional(),
+  waitingReason: AgentTaskSchema.shape.waitingReason.optional(),
+  terminationReason: AgentTaskSchema.shape.terminationReason.optional(),
+  baseTwinVersion: z.number().int().positive().optional(),
+  goalDraftId: z.string().min(1).nullable().optional(),
+  goalId: z.string().min(1).nullable().optional(),
+  facts: AgentTaskFactsSchema.optional(),
+  constraints: AgentTaskConstraintsSchema.optional(),
+  candidateTargetDate: IsoDateSchema.nullable().optional(),
+  fieldSources: z.record(z.string(), AgentTaskSourceSchema).optional(),
+  preferences: z.array(AgentTaskPreferenceSchema).max(30).optional(),
+  unknowns: z.array(z.string().min(1).max(80)).max(30).optional(),
+  evidenceRefs: z.array(z.string().min(1)).max(100).optional(),
+  candidateRefs: z.array(z.string().min(1)).max(30).optional(),
+  pendingActionId: z.string().min(1).nullable().optional(),
+  nextCheck: z.string().datetime({ offset: true }).nullable().optional(),
+  runRecord: AgentTaskRunRecordSchema.optional(),
+}).strict();
+export type AgentTaskPatch = z.input<typeof TaskPatchSchema>;
+
+const taskTransitions: Record<AgentTaskPhase, readonly AgentTaskPhase[]> = {
+  understanding: ['investigating', 'awaiting_user', 'paused', 'completed', 'failed'],
+  investigating: ['understanding', 'simulating', 'awaiting_user', 'paused', 'completed', 'failed'],
+  simulating: ['understanding', 'investigating', 'awaiting_user', 'awaiting_confirmation', 'paused', 'completed', 'failed'],
+  awaiting_user: ['understanding', 'investigating', 'awaiting_confirmation', 'paused', 'completed', 'failed'],
+  awaiting_confirmation: ['understanding', 'simulating', 'awaiting_user', 'verifying', 'monitoring', 'paused', 'completed', 'failed'],
+  verifying: ['monitoring', 'paused', 'completed', 'failed'],
+  monitoring: ['understanding', 'investigating', 'awaiting_confirmation', 'paused', 'completed', 'failed'],
+  paused: ['understanding', 'investigating', 'simulating', 'awaiting_user', 'awaiting_confirmation', 'monitoring', 'completed'],
+  completed: ['monitoring'], failed: [],
+};
+
+function taskFromRow(sessionId: string, row: Record<string, unknown>): AgentTask {
+  const thread = getAgentThread(sessionId, String(row.thread_id));
+  const readOnly = thread.readOnly || thread.status === 'archived' || row.run_id !== currentRunId(sessionId);
+  const task = AgentTaskSchema.parse({ ...JSON.parse(String(row.payload_json)), readOnly });
+  if (task.taskId !== row.task_id || task.threadId !== row.thread_id || task.demoRunId !== row.run_id ||
+    task.taskRevision !== row.revision) throw new Error('TASK_STORE_CORRUPT');
+  return task;
+}
+
+function taskDraftFields(draft: GoalDraft | null, sourceMessageId: string | null = null) {
+  return {
+    facts: { title: draft?.title ?? null, targetCents: draft?.targetCents ?? null,
+      originalTargetDate: draft?.targetDate ?? null, savedCents: draft?.savedCents ?? null },
+    constraints: { latestAllowedDate: null, monthlyContributionCapCents: draft?.monthlyContributionCapCents ?? null,
+      protectedCents: draft?.protectedCents ?? null, preserveEssentialSpending: null },
+    fieldSources: Object.fromEntries(Object.entries(draft?.fieldSources ?? {}).map(([field, kind]) => [field,
+      { kind: kind === 'user_provided' ? 'user_message' : kind,
+        messageId: kind === 'user_provided' ? sourceMessageId : null,
+        confirmation: kind === 'user_provided' ? 'unconfirmed' : 'system_verified' }])),
+    unknowns: draft?.missingRequiredFields ?? ['title', 'targetCents', 'targetDate'],
+  };
+}
+
+function validateTaskSources(sessionId: string, threadId: string, task: AgentTask) {
+  for (const source of [...Object.values(task.fieldSources), ...task.preferences.map(item => item.source)]) {
+    if (source.messageId === null) continue;
+    if (source.kind !== 'user_message') throw new Error('TASK_SOURCE_NOT_FOUND');
+    const row = db.prepare(`SELECT id FROM agent_messages WHERE id=? AND session_id=? AND thread_id=? AND role='user'`)
+      .get(source.messageId, sessionId, threadId);
+    if (!row) throw new Error('TASK_SOURCE_NOT_FOUND');
+  }
+  for (const [kind, refs] of [['evidence', task.evidenceRefs], ['candidate', task.candidateRefs]] as const) {
+    for (const ref of refs) {
+      const result = getAgentToolResult(sessionId, threadId, ref);
+      if (result.taskId !== task.taskId || result.demoRunId !== task.demoRunId ||
+        (kind === 'candidate' && (result.tool !== 'candidate_preview' || result.status !== 'ok')))
+        throw new Error('TASK_TOOL_RESULT_NOT_FOUND');
+    }
+  }
+}
+
+export function getAgentToolResult(sessionId: string, threadId: string, id: string): AgentToolResult {
+  const row = db.prepare(`SELECT payload_json FROM agent_tool_results
+    WHERE id=? AND session_id=? AND thread_id=?`).get(id, sessionId, threadId) as { payload_json: string } | undefined;
+  if (!row) throw new Error('TASK_TOOL_RESULT_NOT_FOUND');
+  return AgentToolResultSchema.parse(JSON.parse(row.payload_json));
+}
+
+function toolSourceExists(sessionId: string, task: AgentTask, state: DemoState,
+  source: AgentToolResult['sourceEntities'][number]): boolean {
+  switch (source.kind) {
+    case 'finance': return source.id === 'finance';
+    case 'task': return source.id === task.taskId;
+    case 'account': return state.accounts.some(item => item.id === source.id);
+    case 'bill': return state.bills.some(item => item.id === source.id);
+    case 'transaction': return state.transactions.some(item => item.id === source.id);
+    case 'connection': return state.dataConnections.some(item => item.id === source.id);
+    case 'tool_result': {
+      try {
+        const evidence = getAgentToolResult(sessionId, task.threadId, source.id);
+        return evidence.taskId === task.taskId && evidence.demoRunId === task.demoRunId &&
+          evidence.twinVersion === state.twinVersion;
+      } catch { return false; }
+    }
+  }
+}
+
+export function saveAgentToolResult(sessionId: string, result: AgentToolResult, dedupeKey: string): AgentToolResult {
+  const parsed = AgentToolResultSchema.parse(result);
+  const task = getAgentTask(sessionId, parsed.taskId);
+  if (task.readOnly || task.threadId !== parsed.threadId || task.demoRunId !== parsed.demoRunId)
+    throw new Error('TASK_TOOL_RESULT_NOT_ALLOWED');
+  const state = getState(sessionId);
+  if (parsed.twinVersion !== state.twinVersion || parsed.dataAsOf !== state.finance.updatedAt)
+    throw new Error('TASK_TWIN_VERSION_MISMATCH');
+  for (const source of parsed.sourceEntities)
+    if (!toolSourceExists(sessionId, task, state, source)) throw new Error('TASK_TOOL_SOURCE_NOT_FOUND');
+  db.prepare(`INSERT OR IGNORE INTO agent_tool_results
+    (id,session_id,thread_id,task_id,run_id,twin_version,tool,dedupe_key,payload_json)
+    VALUES(?,?,?,?,?,?,?,?,?)`).run(parsed.toolResultId, sessionId, parsed.threadId, parsed.taskId,
+    parsed.demoRunId, parsed.twinVersion, parsed.tool, dedupeKey, JSON.stringify(parsed));
+  const row = db.prepare(`SELECT payload_json FROM agent_tool_results
+    WHERE session_id=? AND thread_id=? AND run_id=? AND dedupe_key=?`)
+    .get(sessionId, parsed.threadId, parsed.demoRunId, dedupeKey) as { payload_json: string };
+  return AgentToolResultSchema.parse(JSON.parse(row.payload_json));
+}
+
+export function getAgentRun(sessionId: string, threadId: string, runId: string): AgentRun {
+  const row = db.prepare(`SELECT payload_json FROM agent_task_runs WHERE run_id=? AND session_id=? AND thread_id=?`)
+    .get(runId, sessionId, threadId) as { payload_json: string } | undefined;
+  if (!row) throw new Error('AGENT_RUN_NOT_FOUND');
+  return AgentRunSchema.parse(JSON.parse(row.payload_json));
+}
+
+export function claimAgentRun(sessionId: string, threadId: string, runId: string, workerToken: string): boolean {
+  return Boolean(db.prepare(`UPDATE agent_task_runs SET worker_token=?
+    WHERE run_id=? AND session_id=? AND thread_id=? AND status='running' AND worker_token IS NULL`)
+    .run(workerToken, runId, sessionId, threadId).changes);
+}
+
+export function getLatestAgentRunForThread(sessionId: string, threadId: string): AgentRun | null {
+  const task = getAgentTaskForThread(sessionId, threadId);
+  if (!task) return null;
+  const row = db.prepare(`SELECT payload_json FROM agent_task_runs
+    WHERE session_id=? AND thread_id=? AND demo_run_id=? ORDER BY rowid DESC LIMIT 1`)
+    .get(sessionId, threadId, task.demoRunId) as { payload_json: string } | undefined;
+  return row ? AgentRunSchema.parse(JSON.parse(row.payload_json)) : null;
+}
+
+export function createAgentRun(sessionId: string, threadId: string, triggeringMessageId: string,
+  deadlineMs = 75_000): AgentRun {
+  const task = getAgentTaskForThread(sessionId, threadId);
+  if (!task || task.readOnly || task.phase === 'completed' || task.phase === 'failed' || task.phase === 'paused' ||
+    !task.facts.title || task.facts.targetCents === null || !task.facts.originalTargetDate)
+    throw new Error('AGENT_RUN_TASK_NOT_READY');
+  const message = db.prepare(`SELECT id FROM agent_messages
+    WHERE id=? AND session_id=? AND thread_id=? AND role='user'`)
+    .get(triggeringMessageId, sessionId, threadId);
+  if (!message) throw new Error('AGENT_RUN_MESSAGE_NOT_FOUND');
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const previous = db.prepare(`SELECT payload_json FROM agent_task_runs WHERE session_id=? AND thread_id=?
+      AND demo_run_id=? AND triggering_message_id=?`)
+      .get(sessionId, threadId, task.demoRunId, triggeringMessageId) as { payload_json: string } | undefined;
+    if (previous) { db.exec('COMMIT'); return AgentRunSchema.parse(JSON.parse(previous.payload_json)); }
+    const active = db.prepare(`SELECT payload_json FROM agent_task_runs
+      WHERE session_id=? AND task_id=? AND status='running'`)
+      .get(sessionId, task.taskId) as { payload_json: string } | undefined;
+    if (active) { db.exec('COMMIT'); return AgentRunSchema.parse(JSON.parse(active.payload_json)); }
+    const now = new Date().toISOString();
+    const run = AgentRunSchema.parse({ runId: randomUUID(), taskId: task.taskId, threadId,
+      demoRunId: task.demoRunId, triggeringMessageId, status: 'running', revision: 0,
+      provider: null, startedAt: now, updatedAt: now,
+      deadlineAt: new Date(Date.now() + deadlineMs).toISOString(), decisionCount: 0, toolCallCount: 0,
+      reasonCode: null, recommendedResultIds: [], question: null,
+      steps: [{ kind: 'started', summary: '开始读取当前模拟数据', at: now, toolResultId: null }] });
+    db.prepare(`INSERT INTO agent_task_runs
+      (run_id,session_id,thread_id,task_id,demo_run_id,triggering_message_id,revision,status,payload_json)
+      VALUES(?,?,?,?,?,?,?,?,?)`).run(run.runId, sessionId, threadId, task.taskId, task.demoRunId,
+      triggeringMessageId, 0, run.status, JSON.stringify(run));
+    db.exec('COMMIT');
+    return run;
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+export function updateAgentRun(sessionId: string, threadId: string, runId: string,
+  expectedRevision: number, patch: Partial<AgentRun>): AgentRun {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const old = getAgentRun(sessionId, threadId, runId);
+    if (old.revision !== expectedRevision) throw new Error('AGENT_RUN_REVISION_CONFLICT');
+    if (old.status !== 'running') throw new Error('AGENT_RUN_NOT_RUNNING');
+    const next = AgentRunSchema.parse({ ...old, ...patch, runId: old.runId, taskId: old.taskId,
+      threadId: old.threadId, demoRunId: old.demoRunId, triggeringMessageId: old.triggeringMessageId,
+      revision: old.revision + 1, updatedAt: new Date().toISOString() });
+    const changed = db.prepare(`UPDATE agent_task_runs SET revision=?,status=?,payload_json=?
+      WHERE run_id=? AND session_id=? AND thread_id=? AND revision=? AND status='running'`)
+      .run(next.revision, next.status, JSON.stringify(next), runId, sessionId, threadId, expectedRevision);
+    if (!changed.changes) throw new Error('AGENT_RUN_REVISION_CONFLICT');
+    db.exec('COMMIT');
+    return next;
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+export function cancelAgentRun(sessionId: string, threadId: string, runId: string,
+  reasonCode = 'USER_CANCELLED'): AgentRun {
+  const run = getAgentRun(sessionId, threadId, runId);
+  if (run.status !== 'running') return run;
+  const at = new Date().toISOString();
+  return updateAgentRun(sessionId, threadId, runId, run.revision, { status: 'cancelled', reasonCode,
+    steps: [...run.steps.slice(-99), { kind: 'stopped', summary: reasonCode === 'SUPERSEDED'
+      ? '收到新的任务条件，旧调查已停止' : '用户停止了本次调查', at, toolResultId: null }] });
+}
+
+export function cancelActiveAgentRunForThread(sessionId: string, threadId: string,
+  reasonCode = 'SUPERSEDED'): AgentRun | null {
+  const run = getLatestAgentRunForThread(sessionId, threadId);
+  return run?.status === 'running' ? cancelAgentRun(sessionId, threadId, run.runId, reasonCode) : null;
+}
+
+export function createAgentTask(sessionId: string, threadId: string): AgentTask {
+  const thread = getAgentThread(sessionId, threadId);
+  if (thread.kind !== 'task' || thread.readOnly || thread.status !== 'active') throw new Error('TASK_THREAD_NOT_WRITABLE');
+  const runId = currentRunId(sessionId);
+  const existing = db.prepare('SELECT * FROM agent_tasks WHERE session_id=? AND thread_id=? AND run_id=?')
+    .get(sessionId, threadId, runId) as Record<string, unknown> | undefined;
+  if (existing) return taskFromRow(sessionId, existing);
+  const draft = getGoalDraft(sessionId, threadId);
+  const latestUser = db.prepare(`SELECT id FROM agent_messages WHERE session_id=? AND thread_id=? AND role='user'
+    ORDER BY rowid DESC LIMIT 1`).get(sessionId, threadId) as { id: string } | undefined;
+  const now = new Date().toISOString();
+  const task = AgentTaskSchema.parse({ taskId: randomUUID(), threadId, demoRunId: runId,
+    goalDraftId: draft?.id ?? null, goalId: draft?.goalId ?? null, phase: 'understanding', waitingReason: null,
+    taskRevision: 0, baseTwinVersion: getState(sessionId).twinVersion,
+    ...taskDraftFields(draft, latestUser?.id ?? null),
+    candidateTargetDate: null, preferences: [],
+    evidenceRefs: [], candidateRefs: [], runRecords: [], pendingActionId: null, nextCheck: null,
+    createdAt: now, updatedAt: now, terminationReason: null, readOnly: false });
+  db.prepare(`INSERT OR IGNORE INTO agent_tasks(task_id,session_id,thread_id,run_id,revision,phase,payload_json,updated_at)
+    VALUES(?,?,?,?,?,?,?,?)`).run(task.taskId, sessionId, threadId, runId, 0, task.phase, JSON.stringify(task), now);
+  return getAgentTaskForThread(sessionId, threadId)!;
+}
+
+export function getAgentTask(sessionId: string, taskId: string): AgentTask {
+  const row = db.prepare('SELECT * FROM agent_tasks WHERE task_id=? AND session_id=?')
+    .get(taskId, sessionId) as Record<string, unknown> | undefined;
+  if (!row) throw new Error('TASK_NOT_FOUND');
+  return taskFromRow(sessionId, row);
+}
+
+export function getAgentTaskForThread(sessionId: string, threadId: string): AgentTask | null {
+  getAgentThread(sessionId, threadId);
+  const row = db.prepare('SELECT * FROM agent_tasks WHERE session_id=? AND thread_id=? AND run_id=?')
+    .get(sessionId, threadId, currentRunId(sessionId)) as Record<string, unknown> | undefined;
+  return row ? taskFromRow(sessionId, row) : null;
+}
+
+export function updateAgentTask(sessionId: string, taskId: string, expectedRevision: number,
+  input: AgentTaskPatch): AgentTask {
+  const patch = TaskPatchSchema.parse(input);
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const old = getAgentTask(sessionId, taskId);
+    if (old.readOnly) throw new Error('TASK_READ_ONLY');
+    if (old.taskRevision !== expectedRevision) throw new Error('TASK_REVISION_CONFLICT');
+    const phase = patch.phase ?? old.phase;
+    if (phase !== old.phase && !taskTransitions[old.phase].includes(phase)) throw new Error('TASK_INVALID_TRANSITION');
+    if (patch.goalDraftId !== undefined && patch.goalDraftId !== null &&
+      getGoalDraft(sessionId, old.threadId)?.id !== patch.goalDraftId) throw new Error('TASK_DRAFT_NOT_FOUND');
+    if (patch.goalId !== undefined && patch.goalId !== null) {
+      const state = getState(sessionId);
+      if (!state.goals.some(goal => goal.id === patch.goalId) && state.goal.id !== patch.goalId)
+        throw new Error('TASK_GOAL_NOT_FOUND');
+    }
+    if (patch.baseTwinVersion !== undefined && patch.baseTwinVersion !== getState(sessionId).twinVersion)
+      throw new Error('TASK_TWIN_VERSION_MISMATCH');
+    const { runRecord, ...fields } = patch;
+    const invalidatesCandidates = Boolean(
+      patch.facts && JSON.stringify(patch.facts) !== JSON.stringify(old.facts) ||
+      patch.constraints && JSON.stringify(patch.constraints) !== JSON.stringify(old.constraints) ||
+      patch.preferences && JSON.stringify(patch.preferences) !== JSON.stringify(old.preferences) ||
+      patch.baseTwinVersion !== undefined && patch.baseTwinVersion !== old.baseTwinVersion,
+    );
+    const updatedAt = new Date().toISOString();
+    const next = AgentTaskSchema.parse({ ...old, ...fields, phase,
+      candidateRefs: invalidatesCandidates ? [] : fields.candidateRefs ?? old.candidateRefs,
+      candidateTargetDate: invalidatesCandidates ? null
+        : fields.candidateTargetDate !== undefined ? fields.candidateTargetDate : old.candidateTargetDate,
+      pendingActionId: invalidatesCandidates ? null
+        : fields.pendingActionId !== undefined ? fields.pendingActionId : old.pendingActionId,
+      runRecords: runRecord ? [...old.runRecords.slice(-99), runRecord] : old.runRecords,
+      taskRevision: old.taskRevision + 1, updatedAt, readOnly: false });
+    validateTaskSources(sessionId, old.threadId, next);
+    const result = db.prepare(`UPDATE agent_tasks SET revision=?,phase=?,payload_json=?,updated_at=?
+      WHERE task_id=? AND session_id=? AND run_id=? AND revision=?`).run(next.taskRevision, next.phase,
+      JSON.stringify(next), updatedAt, taskId, sessionId, old.demoRunId, expectedRevision);
+    if (!result.changes) throw new Error('TASK_REVISION_CONFLICT');
+    if (next.phase === 'paused' || next.phase === 'completed' || next.phase === 'failed' ||
+      (['monitoring', 'awaiting_confirmation'].includes(old.phase) &&
+        !['monitoring', 'awaiting_confirmation'].includes(next.phase)))
+      db.prepare(`UPDATE monitor_subscriptions SET status=?,updated_at=? WHERE session_id=? AND task_id=? AND status='active'`)
+        .run(next.phase === 'completed' || next.phase === 'failed' ? 'cancelled' : 'paused',
+          updatedAt, sessionId, taskId);
+    db.exec('COMMIT');
+    return next;
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+export function pauseAgentTask(sessionId: string, taskId: string, expectedRevision: number): AgentTask {
+  return updateAgentTask(sessionId, taskId, expectedRevision, { phase: 'paused', waitingReason: 'user_paused' });
+}
+
+export function resumeAgentTask(sessionId: string, taskId: string, expectedRevision: number,
+  phase: 'understanding' | 'investigating' | 'simulating' | 'monitoring' = 'understanding'): AgentTask {
+  if (getAgentTask(sessionId, taskId).phase !== 'paused') throw new Error('TASK_NOT_PAUSED');
+  return updateAgentTask(sessionId, taskId, expectedRevision, { phase, waitingReason: null });
+}
+
+export function cancelAgentTask(sessionId: string, taskId: string, expectedRevision: number): AgentTask {
+  return updateAgentTask(sessionId, taskId, expectedRevision,
+    { phase: 'completed', waitingReason: null, terminationReason: 'cancelled', pendingActionId: null, nextCheck: null });
 }
 
 function threadFromRow(row: Record<string, unknown>): AgentThread {
@@ -348,8 +764,27 @@ export function renameAgentThread(sessionId: string, threadId: string, title: st
 
 export function setAgentThreadStatus(sessionId: string, threadId: string, status: 'active' | 'archived') {
   getAgentThread(sessionId, threadId);
-  db.prepare('UPDATE agent_threads SET status=?,updated_at=? WHERE id=? AND session_id=?')
-    .run(status, new Date().toISOString(), threadId, sessionId);
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const updatedAt = new Date().toISOString();
+    db.prepare('UPDATE agent_threads SET status=?,updated_at=? WHERE id=? AND session_id=?')
+      .run(status, updatedAt, threadId, sessionId);
+    if (status === 'archived') {
+      db.prepare("UPDATE monitor_subscriptions SET status='paused',updated_at=? WHERE session_id=? AND thread_id=? AND status='active'")
+        .run(updatedAt, sessionId, threadId);
+      const rows = db.prepare('SELECT * FROM agent_tasks WHERE session_id=? AND thread_id=? AND run_id=?')
+        .all(sessionId, threadId, currentRunId(sessionId)) as Array<Record<string, unknown>>;
+      for (const row of rows) {
+        const old = AgentTaskSchema.parse(JSON.parse(String(row.payload_json)));
+        if (old.phase === 'completed' || old.phase === 'failed' || old.phase === 'paused') continue;
+        const next = AgentTaskSchema.parse({ ...old, phase: 'paused', waitingReason: 'thread_archived',
+          taskRevision: old.taskRevision + 1, updatedAt, readOnly: true });
+        db.prepare('UPDATE agent_tasks SET revision=?,phase=?,payload_json=?,updated_at=? WHERE task_id=? AND session_id=?')
+          .run(next.taskRevision, next.phase, JSON.stringify(next), updatedAt, next.taskId, sessionId);
+      }
+    }
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
   return getAgentThread(sessionId, threadId);
 }
 
@@ -367,12 +802,16 @@ export function markAgentThreadUnread(sessionId: string, threadId: string) {
 
 export function deleteAgentThread(sessionId: string, threadId: string) {
   getAgentThread(sessionId, threadId);
-  db.prepare('DELETE FROM agent_messages WHERE thread_id=? AND session_id=?').run(threadId, sessionId);
-  db.prepare('DELETE FROM agent_actions WHERE thread_id=? AND session_id=?').run(threadId, sessionId);
-  db.prepare('DELETE FROM agent_components WHERE thread_id=? AND session_id=?').run(threadId, sessionId);
-  db.prepare('DELETE FROM agent_turns WHERE thread_id=? AND session_id=?').run(threadId, sessionId);
-  db.prepare('DELETE FROM goal_drafts WHERE thread_id=? AND session_id=?').run(threadId, sessionId);
-  db.prepare('DELETE FROM agent_threads WHERE id=? AND session_id=?').run(threadId, sessionId);
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.prepare("UPDATE monitor_events SET status='stale',processed_at=? WHERE session_id=? AND task_id IN (SELECT task_id FROM monitor_subscriptions WHERE session_id=? AND thread_id=?) AND status IN ('pending','leased')")
+      .run(new Date().toISOString(), sessionId, sessionId, threadId);
+    db.prepare('DELETE FROM monitor_subscriptions WHERE session_id=? AND thread_id=?').run(sessionId, threadId);
+    for (const table of ['agent_messages', 'agent_actions', 'agent_components', 'agent_turns', 'goal_drafts', 'agent_tasks', 'agent_tool_results', 'agent_task_runs'])
+      db.prepare(`DELETE FROM ${table} WHERE thread_id=? AND session_id=?`).run(threadId, sessionId);
+    db.prepare('DELETE FROM agent_threads WHERE id=? AND session_id=?').run(threadId, sessionId);
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
 }
 
 export function getGoalDraft(sessionId: string, threadId: string): GoalDraft | null {
@@ -383,9 +822,59 @@ export function getGoalDraft(sessionId: string, threadId: string): GoalDraft | n
 
 export function saveGoalDraft(sessionId: string, draft: GoalDraft): GoalDraft {
   const parsed = GoalDraftSchema.parse(draft);
-  db.prepare(`INSERT INTO goal_drafts(session_id,thread_id,payload_json,updated_at) VALUES(?,?,?,?)
-    ON CONFLICT(session_id,thread_id) DO UPDATE SET payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
-    .run(sessionId, parsed.threadId, JSON.stringify(parsed), parsed.updatedAt);
+  const thread = getAgentThread(sessionId, parsed.threadId);
+  if (thread.readOnly || thread.status !== 'active') throw new Error('THREAD_READ_ONLY');
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const previous = getGoalDraft(sessionId, parsed.threadId);
+    db.prepare(`INSERT INTO goal_drafts(session_id,thread_id,payload_json,updated_at) VALUES(?,?,?,?)
+      ON CONFLICT(session_id,thread_id) DO UPDATE SET payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
+      .run(sessionId, parsed.threadId, JSON.stringify(parsed), parsed.updatedAt);
+    const task = getAgentTaskForThread(sessionId, parsed.threadId);
+    if (!task) createAgentTask(sessionId, parsed.threadId);
+    else if (task.phase !== 'completed' && task.phase !== 'failed') {
+      const fields = taskDraftFields(parsed);
+      const latestUser = db.prepare(`SELECT id FROM agent_messages WHERE session_id=? AND thread_id=? AND role='user'
+        ORDER BY rowid DESC LIMIT 1`).get(sessionId, parsed.threadId) as { id: string } | undefined;
+      const sourceFields = { ...task.fieldSources };
+      const changes: Record<string, [unknown, unknown]> = {
+        title: [previous?.title, parsed.title], targetCents: [previous?.targetCents, parsed.targetCents],
+        targetDate: [previous?.targetDate, parsed.targetDate], savedCents: [previous?.savedCents, parsed.savedCents],
+        monthlyContributionCents: [previous?.monthlyContributionCapCents, parsed.monthlyContributionCapCents],
+        protectedCents: [previous?.protectedCents, parsed.protectedCents],
+      };
+      const changed = Object.values(changes).some(([before, after]) => before !== after);
+      for (const [key, [before, after]] of Object.entries(changes)) if (before !== after) {
+        if (after === null) { delete sourceFields[key]; continue; }
+        const kind = parsed.fieldSources[key] ?? 'user_provided';
+        sourceFields[key] = { kind: kind === 'user_provided' ? 'user_message' : kind,
+          messageId: kind === 'user_provided' ? latestUser?.id ?? null : null,
+          confirmation: kind === 'user_provided' ? 'unconfirmed' : 'system_verified' };
+      }
+      if (changed || task.goalDraftId !== parsed.id || task.goalId !== parsed.goalId) {
+        const updatedAt = new Date().toISOString();
+        const phase = changed && task.phase !== 'paused' ? 'understanding' : task.phase;
+        const next = AgentTaskSchema.parse({ ...task, goalDraftId: parsed.id, goalId: parsed.goalId ?? task.goalId,
+        phase, waitingReason: phase === 'understanding' ? null : task.waitingReason,
+        facts: fields.facts, constraints: { ...task.constraints,
+          latestAllowedDate: task.facts.originalTargetDate === fields.facts.originalTargetDate
+            ? task.constraints.latestAllowedDate : null,
+          monthlyContributionCapCents: fields.constraints.monthlyContributionCapCents,
+          protectedCents: fields.constraints.protectedCents },
+        candidateTargetDate: changed ? null : task.candidateTargetDate,
+        candidateRefs: changed ? [] : task.candidateRefs,
+        pendingActionId: changed ? null : task.pendingActionId,
+        nextCheck: changed ? null : task.nextCheck,
+        fieldSources: sourceFields,
+        unknowns: [...new Set([...task.unknowns.filter(key => !['title', 'targetCents', 'targetDate'].includes(key)),
+          ...parsed.missingRequiredFields])], taskRevision: task.taskRevision + 1, updatedAt });
+      validateTaskSources(sessionId, parsed.threadId, next);
+      db.prepare('UPDATE agent_tasks SET revision=?,phase=?,payload_json=?,updated_at=? WHERE task_id=? AND session_id=?')
+        .run(next.taskRevision, next.phase, JSON.stringify(next), updatedAt, next.taskId, sessionId);
+      }
+    }
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
   return parsed;
 }
 
@@ -405,6 +894,11 @@ export function agentArtifactCounts(sessionId: string) {
   const count = (table: string) => Number((db.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE session_id=?`)
     .get(sessionId) as { count: number }).count);
   return { turns: count('agent_turns'), components: count('agent_components') };
+}
+
+export function agentActionCount(sessionId: string): number {
+  return (db.prepare('SELECT COUNT(*) AS count FROM agent_actions WHERE session_id=?')
+    .get(sessionId) as { count: number }).count;
 }
 
 export function saveAgentMessage(sessionId: string, threadId: string, input: {
@@ -458,6 +952,175 @@ export function finishAgentAction(sessionId: string, actionId: string, status: '
   db.prepare('UPDATE agent_actions SET status=?,result_json=? WHERE id=? AND session_id=?')
     .run(status, JSON.stringify(result), actionId, sessionId);
   return getAgentAction(sessionId, actionId);
+}
+
+export interface MonitorEvent {
+  id: string; sessionId: string; taskId: string; demoRunId: string; goalId: string;
+  twinVersion: number; kind: 'twin_changed' | 'bonus_followup'; status: string;
+  dueDemoDate: string | null; attempts: number; leaseToken: string; payload: Record<string, unknown>;
+}
+
+export function monitorStatus(sessionId: string, threadId: string) {
+  const task = getAgentTaskForThread(sessionId, threadId);
+  if (!task) return { enabled: false, goalId: null, status: null, pendingEvents: 0 };
+  const row = db.prepare(`SELECT status,goal_id FROM monitor_subscriptions WHERE session_id=? AND task_id=?`)
+    .get(sessionId, task.taskId) as { status: 'active' | 'paused' | 'cancelled'; goal_id: string } | undefined;
+  const pending = db.prepare(`SELECT COUNT(*) AS count FROM monitor_events WHERE session_id=? AND task_id=?
+    AND status IN ('pending','leased')`).get(sessionId, task.taskId) as { count: number };
+  return { enabled: row?.status === 'active', goalId: row?.goal_id ?? null,
+    status: row?.status ?? null, pendingEvents: pending.count };
+}
+
+export function setMonitorSubscription(sessionId: string, threadId: string, enabled: boolean) {
+  const thread = getAgentThread(sessionId, threadId);
+  const task = getAgentTaskForThread(sessionId, threadId);
+  const state = getState(sessionId);
+  if (!task || task.readOnly || thread.readOnly || thread.status !== 'active' ||
+    task.demoRunId !== currentRunId(sessionId)) throw new Error('MONITOR_TASK_UNAVAILABLE');
+  const goal = state.goals.find(item => item.id === task.goalId);
+  if (enabled && (!goal || goal.status !== 'active' || state.primaryGoalId !== goal.id))
+    throw new Error('MONITOR_GOAL_NOT_ACTIVE');
+  const existing = monitorStatus(sessionId, threadId);
+  const goalId = goal?.id ?? existing.goalId;
+  if (!goalId) throw new Error('MONITOR_GOAL_NOT_FOUND');
+  if (enabled && existing.enabled || !enabled && existing.status !== 'active') return existing;
+  if (enabled && !['completed', 'paused', 'monitoring'].includes(task.phase))
+    throw new Error('MONITOR_TASK_NOT_READY');
+  if (enabled) updateAgentTask(sessionId, task.taskId, task.taskRevision,
+    { phase: 'monitoring', waitingReason: null, terminationReason: null, goalId });
+  else if (task.phase === 'monitoring') updateAgentTask(sessionId, task.taskId, task.taskRevision,
+    { phase: 'paused', waitingReason: 'user_paused' });
+  const now = new Date().toISOString();
+  db.prepare(`INSERT INTO monitor_subscriptions(session_id,task_id,thread_id,demo_run_id,goal_id,status,created_at,updated_at)
+    VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(session_id,task_id) DO UPDATE SET status=excluded.status,
+    goal_id=excluded.goal_id,updated_at=excluded.updated_at`)
+    .run(sessionId, task.taskId, threadId, task.demoRunId, goalId, enabled ? 'active' : 'paused', now, now);
+  if (enabled) db.prepare(`INSERT OR IGNORE INTO monitor_events(id,session_id,task_id,demo_run_id,goal_id,
+    twin_version,kind,dedupe_key,status,due_demo_date,available_at,lease_token,lease_until,attempts,payload_json,created_at)
+    VALUES(?,?,?,?,?,?,'twin_changed',?,'pending',NULL,?,NULL,NULL,0,?,?)`)
+    .run(randomUUID(), sessionId, task.taskId, task.demoRunId, goalId, state.twinVersion,
+      `twin:${task.taskId}:${state.twinVersion}`, now, JSON.stringify({ initial: true, asOf: state.clock }), now);
+  return monitorStatus(sessionId, threadId);
+}
+
+export function claimMonitorEvent(now = new Date()): MonitorEvent | null {
+  const timestamp = now.toISOString();
+  const row = db.prepare(`SELECT e.* FROM monitor_events e JOIN demo_sessions d ON d.id=e.session_id
+    WHERE (e.status='pending' OR (e.status='leased' AND e.lease_until<=?))
+    AND e.available_at<=? AND (e.due_demo_date IS NULL OR json_extract(d.state_json,'$.clock')>=e.due_demo_date)
+    ORDER BY e.available_at,e.created_at LIMIT 1`).get(timestamp, timestamp) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  const leaseToken = randomUUID();
+  const changed = db.prepare(`UPDATE monitor_events SET status='leased',lease_token=?,lease_until=?,attempts=attempts+1
+    WHERE id=? AND (status='pending' OR (status='leased' AND lease_until<=?))`)
+    .run(leaseToken, new Date(now.getTime() + 30_000).toISOString(), String(row.id), timestamp);
+  if (!changed.changes) return null;
+  return { id: String(row.id), sessionId: String(row.session_id), taskId: String(row.task_id),
+    demoRunId: String(row.demo_run_id), goalId: String(row.goal_id), twinVersion: Number(row.twin_version),
+    kind: String(row.kind) as MonitorEvent['kind'], status: 'leased', dueDemoDate: row.due_demo_date as string | null,
+    attempts: Number(row.attempts) + 1, leaseToken, payload: JSON.parse(String(row.payload_json)) };
+}
+
+export function finishMonitorEvent(event: MonitorEvent, status: 'done' | 'stale' | 'dead' | 'pending',
+  now = new Date()): void {
+  const next = status === 'pending' ? new Date(now.getTime() + Math.min(60_000, 1_000 * 2 ** event.attempts)).toISOString()
+    : now.toISOString();
+  db.prepare(`UPDATE monitor_events SET status=?,available_at=?,lease_token=NULL,lease_until=NULL,processed_at=?
+    WHERE id=? AND session_id=? AND status='leased' AND lease_token=?`)
+    .run(status, next, status === 'pending' ? null : now.toISOString(), event.id, event.sessionId, event.leaseToken);
+}
+
+export function deferMonitorEvent(event: MonitorEvent, availableAt: string): void {
+  db.prepare(`UPDATE monitor_events SET status='pending',available_at=?,lease_token=NULL,lease_until=NULL,
+    attempts=MAX(0,attempts-1)
+    WHERE id=? AND session_id=? AND status='leased' AND lease_token=?`)
+    .run(availableAt, event.id, event.sessionId, event.leaseToken);
+}
+
+export function monitorEventIsCurrent(event: MonitorEvent): boolean {
+  const subscription = db.prepare(`SELECT * FROM monitor_subscriptions WHERE session_id=? AND task_id=?`)
+    .get(event.sessionId, event.taskId) as Record<string, unknown> | undefined;
+  if (!subscription || subscription.status !== 'active' || subscription.demo_run_id !== event.demoRunId ||
+    subscription.goal_id !== event.goalId || currentRunId(event.sessionId) !== event.demoRunId) return false;
+  const task = getAgentTaskForThread(event.sessionId, String(subscription.thread_id));
+  const thread = getAgentThread(event.sessionId, String(subscription.thread_id));
+  const state = getState(event.sessionId);
+  return Boolean(task && task.taskId === event.taskId &&
+    ['monitoring', 'awaiting_confirmation'].includes(task.phase) &&
+    !task.readOnly && thread.status === 'active' && !thread.readOnly &&
+    (event.kind === 'bonus_followup' || state.twinVersion === event.twinVersion) &&
+    state.primaryGoalId === event.goalId &&
+    state.goals.some(item => item.id === event.goalId && item.status === 'active'));
+}
+
+export function scheduleBonusFollowup(sessionId: string, threadId: string): string {
+  if (!monitorStatus(sessionId, threadId).enabled) throw new Error('MONITOR_NOT_ENABLED');
+  const task = getAgentTaskForThread(sessionId, threadId)!;
+  const state = getState(sessionId);
+  const [year, month] = state.clock.split('-').map(Number);
+  const dueDemoDate = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  const now = new Date().toISOString();
+  db.prepare(`INSERT OR IGNORE INTO monitor_events(id,session_id,task_id,demo_run_id,goal_id,
+    twin_version,kind,dedupe_key,status,due_demo_date,available_at,lease_token,lease_until,attempts,payload_json,created_at)
+    VALUES(?,?,?,?,?,?,'bonus_followup',?,'pending',?,?,NULL,NULL,0,?,?)`)
+    .run(randomUUID(), sessionId, task.taskId, task.demoRunId, task.goalId,
+      state.twinVersion, `bonus:${task.taskId}:${dueDemoDate}`, dueDemoDate, now,
+      JSON.stringify({ question: '奖金是否到账', plannedAsOf: state.clock }), now);
+  return dueDemoDate;
+}
+
+export function monitorThreadId(event: MonitorEvent): string {
+  const row = db.prepare(`SELECT thread_id FROM monitor_subscriptions WHERE session_id=? AND task_id=?`)
+    .get(event.sessionId, event.taskId) as { thread_id: string } | undefined;
+  if (!row) throw new Error('MONITOR_SUBSCRIPTION_NOT_FOUND');
+  return row.thread_id;
+}
+
+export function monitorSubjectAlreadyDelivered(sessionId: string, subjectKey: string): boolean {
+  return Boolean(db.prepare('SELECT 1 FROM monitor_notifications WHERE session_id=? AND subject_key=?')
+    .get(sessionId, subjectKey));
+}
+
+export function deliverMonitorNotification(event: MonitorEvent, threadId: string,
+  content: string, components: AgentComponent[], candidateResultId: string | null,
+  subjectKey: string): AgentMessage | null {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    if (!monitorEventIsCurrent(event)) { finishMonitorEvent(event, 'stale'); db.exec('COMMIT'); return null; }
+    const prior = db.prepare(`SELECT message_id FROM monitor_notifications
+      WHERE session_id=? AND (event_id=? OR subject_key=?)`)
+      .get(event.sessionId, event.id, subjectKey) as { message_id: string } | undefined;
+    if (prior) { finishMonitorEvent(event, 'done'); db.exec('COMMIT'); return null; }
+    const message = saveAgentMessage(event.sessionId, threadId, { role: 'assistant', content, components });
+    const now = new Date().toISOString();
+    db.prepare(`INSERT INTO monitor_notifications(session_id,event_id,thread_id,message_id,candidate_result_id,
+      subject_key,twin_version,created_at) VALUES(?,?,?,?,?,?,?,?)`)
+      .run(event.sessionId, event.id, threadId, message.id, candidateResultId, subjectKey, event.twinVersion, now);
+    markAgentThreadUnread(event.sessionId, threadId);
+    finishMonitorEvent(event, 'done');
+    db.exec('COMMIT');
+    return message;
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+export function monitorRecommendationIsCurrent(sessionId: string, threadId: string, resultId: string,
+  twinVersion: number): boolean {
+  const row = db.prepare(`SELECT n.event_id FROM monitor_notifications n
+    JOIN monitor_events e ON e.id=n.event_id AND e.session_id=n.session_id
+    JOIN monitor_subscriptions s ON s.session_id=e.session_id AND s.task_id=e.task_id
+    WHERE n.session_id=? AND s.thread_id=? AND n.candidate_result_id=? AND n.twin_version=?
+      AND s.status='active' AND e.status='done' ORDER BY n.created_at DESC LIMIT 1`)
+    .get(sessionId, threadId, resultId, twinVersion) as { event_id: string } | undefined;
+  return Boolean(row);
+}
+
+export function listMonitorEvents(sessionId: string): Array<{ id: string; kind: string; status: string;
+  twinVersion: number; attempts: number; dueDemoDate: string | null }> {
+  const rows = db.prepare(`SELECT id,kind,status,twin_version,attempts,due_demo_date
+    FROM monitor_events WHERE session_id=? ORDER BY created_at,rowid`).all(sessionId) as Array<Record<string, unknown>>;
+  return rows.map(row => ({ id: String(row.id), kind: String(row.kind), status: String(row.status),
+    twinVersion: Number(row.twin_version), attempts: Number(row.attempts),
+    dueDemoDate: row.due_demo_date as string | null }));
 }
 
 export function artifactCounts(sessionId: string) {

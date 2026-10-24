@@ -107,9 +107,9 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
                   <span className="text-[11px] font-semibold text-[#276B4E]">可行方案</span>
                 </div>
                 <p className="text-[12px] mt-0.5 leading-relaxed text-[#1F2329]">
-                  建议月存{' '}
+                  每月必要投入{' '}
                   <span className="font-semibold text-[#0F6B6D]">
-                    ¥{(assessment.plans.find(p => p.recommended)?.monthlyCents || assessment.requiredMonthlyCents) / 100}
+                    ¥{(assessment.requiredMonthlyCents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </span>
                   ，{assessment.status === 'on_track' ? '预计按时完成' : '请比较下方方案'}
                 </p>

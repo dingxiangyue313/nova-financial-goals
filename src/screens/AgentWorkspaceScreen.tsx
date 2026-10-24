@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import type { AgentComponent, AgentMessage, AgentThread, AgentTurn, GoalAssumptions, RiskPreferences, Snapshot } from '../../shared/contracts';
+import { AgentRunStatusResponseSchema, type AgentRun, type AgentComponent, type AgentMessage,
+  type AgentThread, type AgentTurnWithRun, type GoalAssumptions, type RiskPreferences, type Snapshot } from '../../shared/contracts';
 import { api } from '../api';
 import type { ScreenId } from '../types';
 import { AgentComponentRenderer } from '../components/AgentComponentRenderer';
@@ -9,8 +10,9 @@ const suggestions = ['我想年底去日本旅行，预算 ¥8,000', '这笔 ¥9
 const currentPreferences = (components: AgentComponent[], preferences: RiskPreferences) => components.map(component =>
   component.type === 'notification_preference_card' ? { ...component, preferences } : component);
 
-export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, onNavigate }: {
-  snapshot: Snapshot; compact: boolean; starter?: string; onSnapshot: (snapshot: Snapshot) => void; onNavigate: (screen: ScreenId) => void;
+export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, onNavigate, onConnectData }: {
+  snapshot: Snapshot; compact: boolean; starter?: string; onSnapshot: (snapshot: Snapshot) => void;
+  onNavigate: (screen: ScreenId) => void; onConnectData: (threadId: string) => void;
 }) {
   const [threads, setThreads] = useState<AgentThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -20,6 +22,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(compact);
   const [canvasComponents, setCanvasComponents] = useState<AgentComponent[]>([]);
+  const [run, setRun] = useState<AgentRun | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
   async function refreshThreads(preferred?: string | null) {
@@ -32,19 +35,38 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
       || null;
     const next = preferred === null ? (defaultThread?.id || result.threads[0]?.id || null)
       : preferred || activeThreadId || defaultThread?.id || null;
-    if (next) { setActiveThreadId(next); await loadMessages(next); }
+    if (next) { setActiveThreadId(next); await loadMessages(next); await loadRun(next); }
   }
   async function loadMessages(threadId: string) {
-    const result = await api<{ messages: AgentMessage[] }>(`/api/agent/threads/${threadId}/messages`);
+    const result = await api<{ messages: AgentMessage[]; monitor: { enabled: boolean } }>(
+      `/api/agent/threads/${threadId}/messages`);
     const hydrated = result.messages.map(message => ({ ...message,
-      components: currentPreferences(message.components, snapshot.riskPreferences) }));
+      components: currentPreferences(message.components, snapshot.riskPreferences).map(component =>
+        component.type === 'monitoring_opt_in' ? { ...component, enabled: result.monitor.enabled } : component) }));
     setMessages(hydrated); setActiveThreadId(threadId);
     setCanvasComponents(hydrated.slice().reverse().find(message => message.role === 'assistant'
       && message.components.length > 0)?.components || []);
     setThreads(current => current.map(thread => thread.id === threadId ? { ...thread, unread: false } : thread));
   }
-  useEffect(() => { void api('/api/risk/summaries/ensure', 'POST').then(() => refreshThreads())
+  async function loadRun(threadId: string, refreshOnFinish = false) {
+    const value = AgentRunStatusResponseSchema.parse(await api(`/api/agent/threads/${threadId}/run`));
+    if (threadId !== activeThreadId && activeThreadId !== null && refreshOnFinish) return;
+    setRun(value.run);
+    if (refreshOnFinish && value.run?.status !== 'running') await loadMessages(threadId);
+  }
+  useEffect(() => { void api('/api/risk/summaries/ensure', 'POST').then(() => refreshThreads()).then(() => setError(null))
     .catch(value => setError(value.message)); }, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => { void api<{ threads: AgentThread[] }>(
+      '/api/agent/threads?includeArchived=true').then(value => setThreads(value.threads)).catch(() => undefined); }, 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (!activeThreadId || run?.status !== 'running') return;
+    const timer = window.setInterval(() => { void loadRun(activeThreadId, true).catch(value =>
+      setError(value instanceof Error ? value.message : '读取调查状态失败')); }, 1500);
+    return () => window.clearInterval(timer);
+  }, [activeThreadId, run?.runId, run?.status]);
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, busy]);
 
   async function send(message: string) {
@@ -52,14 +74,16 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
     setBusy(true); setError(null); setDraft('');
     try {
       const writableThreadId = activeThread && activeThread.status === 'active' && !activeThread.readOnly ? activeThread.id : null;
-      const turn = await api<AgentTurn>('/api/agent/turn', 'POST', { threadId: writableThreadId, message: message.trim() });
+      const turn = await api<AgentTurnWithRun>('/api/agent/turn', 'POST', { threadId: writableThreadId, message: message.trim() });
+      setRun(turn.run);
       setCanvasComponents(turn.canvasComponents.length ? turn.canvasComponents : turn.components);
       await refreshThreads(turn.thread.id);
     } catch (value) {
       if (value instanceof Error && value.message === 'THREAD_ARCHIVED') {
-        const turn = await api<AgentTurn>('/api/agent/turn', 'POST', { threadId: null, message: message.trim() });
+        const turn = await api<AgentTurnWithRun>('/api/agent/turn', 'POST', { threadId: null, message: message.trim() });
+        setRun(turn.run);
         await refreshThreads(turn.thread.id);
-      } else setError(value instanceof Error ? value.message : '发送失败');
+      } else { setDraft(message); setError(value instanceof Error ? value.message : '发送失败'); }
     }
     finally { setBusy(false); }
   }
@@ -85,6 +109,42 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
       if (activeThreadId) await loadMessages(activeThreadId);
     } catch (value) { setError(value instanceof Error ? value.message : '取消失败'); }
     finally { setBusy(false); }
+  }
+  async function selectCandidate(resultId: string, threadId?: string) {
+    const target = threadId ?? activeThreadId;
+    if (!target || busy) return;
+    setBusy(true); setError(null);
+    try {
+      await api('/api/agent/candidate/select', 'POST', { threadId: target, resultId });
+      await refreshThreads(target);
+    } catch (value) { setError(value instanceof Error ? value.message : '候选已失效，请重新试算'); }
+    finally { setBusy(false); }
+  }
+  async function monitoring(threadId: string, enabled: boolean) {
+    if (busy) return;
+    setBusy(true); setError(null);
+    try {
+      await api('/api/agent/monitoring', 'POST', { threadId, enabled });
+      await refreshThreads(threadId);
+    } catch (value) { setError(value instanceof Error ? value.message : '监测设置失败'); }
+    finally { setBusy(false); }
+  }
+  async function followup(threadId: string) {
+    if (busy) return;
+    setBusy(true); setError(null);
+    try {
+      await api('/api/agent/followup', 'POST', { threadId, kind: 'bonus_review' });
+      await refreshThreads(threadId);
+    } catch (value) { setError(value instanceof Error ? value.message : '跟进安排失败'); }
+    finally { setBusy(false); }
+  }
+  async function stopRun() {
+    if (!activeThreadId || !run || run.status !== 'running') return;
+    try {
+      const value = AgentRunStatusResponseSchema.parse(await api(
+        `/api/agent/threads/${activeThreadId}/run/cancel`, 'POST', { runId: run.runId }));
+      setRun(value.run);
+    } catch (value) { setError(value instanceof Error ? value.message : '停止调查失败'); }
   }
   async function preview(assumptions: GoalAssumptions, twinVersion: number) {
     if (!activeThreadId || busy) return;
@@ -118,7 +178,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
   }
   async function createThread() {
     const result = await api<{ thread: AgentThread }>('/api/agent/threads', 'POST', { title: '新的目标任务' });
-    setMessages([]); setActiveThreadId(result.thread.id); await refreshThreads(result.thread.id);
+    setMessages([]); setRun(null); setActiveThreadId(result.thread.id); await refreshThreads(result.thread.id);
   }
   async function updateThread(update: { title?: string; status?: 'active' | 'archived' }) {
     if (!activeThreadId) return;
@@ -134,7 +194,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
   async function removeThread() {
     if (!activeThreadId) return;
     await api(`/api/agent/threads/${activeThreadId}`, 'DELETE');
-    setActiveThreadId(null); setMessages([]); await refreshThreads(null);
+    setActiveThreadId(null); setMessages([]); setRun(null); await refreshThreads(null);
   }
   const activeThread = threads.find(item => item.id === activeThreadId);
 
@@ -148,10 +208,14 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
       {activeThread && <div className="mt-2 flex items-center gap-2 text-[10px] text-[#5A616B]"><button onClick={renameThread}>重命名</button><button disabled={activeThread.readOnly} onClick={() => void updateThread({ status: activeThread.status === 'active' ? 'archived' : 'active' })}>{activeThread.status === 'active' ? '归档' : '恢复'}</button><button onClick={removeThread} className="text-rose-600">删除</button>{activeThread.readOnly && <span className="ml-auto rounded-full bg-[#F0F2F5] px-2 py-1">旧演示 · 只读</span>}</div>}
     </header>
     <div className="flex-1 overflow-y-auto px-3 py-4 no-scrollbar">
+      {run?.status === 'running' && <div className="mx-auto mb-3 max-w-xl rounded-2xl border border-[#D8E7E7] bg-white p-3 text-[11px] text-[#5A616B]" aria-live="polite">
+        <div className="flex items-center justify-between gap-2"><b className="text-[#1F2329]">{run.status === 'running' ? '正在调查模拟数据' : run.status === 'completed' ? '调查已完成' : run.status === 'fallback' ? '规则试算已完成' : run.status === 'awaiting_user' ? '等待补充信息' : '调查已停止'}</b>{run.status === 'running' && <button type="button" onClick={() => void stopRun()} className="rounded-lg border border-[#D0D5DD] px-2 py-1 text-[#5A616B]">停止调查</button>}</div>
+        <p className="mt-1">正在核对目标金额、可用现金和完成日期…</p>
+      </div>}
       {!messages.length && <div className="mx-auto max-w-md pt-6 text-center"><div className="mx-auto flex h-16 items-center justify-center"><NovaMark size={64} /></div><h2 className="mt-4 text-[16px] font-bold">你想完成什么财务目标？</h2><p className="mt-1 text-[12px] text-[#5A616B]">NOVA 会把理解结果变成可以核对和确认的界面。</p></div>}
       <div className="mx-auto max-w-xl space-y-4">{messages.map(message => <div key={message.id} className={message.role === 'user' ? 'ml-10' : 'mr-5'}>
         <div className={`rounded-2xl px-3 py-2 text-[12px] leading-relaxed ${message.role === 'user' ? 'rounded-br-md bg-[#0F6B6D] text-white' : 'rounded-bl-md border border-[#E5E8EB] bg-white text-[#1F2329]'}`}>{message.content}</div>
-        {message.components.length > 0 && <div className={`mt-2 space-y-2 ${compact ? '' : 'lg:hidden'}`}>{message.components.map(component => <AgentComponentRenderer key={component.id} value={component} onAction={action} onCancel={cancelAction} onNavigate={onNavigate} onPreview={preview} onUpdateRiskPreferences={updateRiskPreferences} busy={busy} />)}</div>}
+        {message.components.length > 0 && <div className={`mt-2 space-y-2 ${compact ? '' : 'lg:hidden'}`}>{message.components.map(component => <AgentComponentRenderer key={component.id} value={component} onAction={action} onCancel={cancelAction} onSelectCandidate={selectCandidate} onConnectData={onConnectData} onMonitoring={monitoring} onFollowup={followup} onNavigate={onNavigate} onPreview={preview} onUpdateRiskPreferences={updateRiskPreferences} busy={busy} />)}</div>}
       </div>)}{busy && <div className="mr-20 rounded-2xl rounded-bl-md border border-[#E5E8EB] bg-white px-3 py-2 text-[12px] text-[#5A616B]">NOVA 正在理解任务并组合安全界面…</div>}<div ref={bottom} /></div>
     </div>
     <footer className="border-t border-[#E5E8EB] bg-white p-3">
@@ -166,7 +230,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
     {conversation}
     <aside data-testid="governed-canvas" className="hidden min-h-0 overflow-y-auto border-l border-[#E5E8EB] bg-[#F5F7F8] p-5 no-scrollbar lg:block">
       <div className="mx-auto max-w-3xl"><div className="mb-4 flex items-start justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0F6B6D]">Governed Canvas</p><h2 className="mt-1 text-xl font-bold">当前任务画布</h2><p className="mt-1 text-xs text-[#5A616B]">所有金额和状态来自确定性 Financial Twin；操作确认后才写入。</p></div><div className="rounded-xl bg-[#EBF7F2] px-3 py-2 text-right text-[10px] text-[#276B4E]"><b className="block">应急金严格隔离</b>¥{(snapshot.finance.emergencyCents / 100).toLocaleString()}</div></div>
-      {canvasComponents.length ? <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{canvasComponents.map(component => <AgentComponentRenderer key={component.id} value={component} onAction={action} onCancel={cancelAction} onNavigate={onNavigate} onPreview={preview} onUpdateRiskPreferences={updateRiskPreferences} busy={busy} />)}</div> : <div className="rounded-2xl border border-dashed border-[#B8CDCD] bg-white p-10 text-center"><NovaMark size={64}/><h3 className="mt-4 font-bold">从左侧描述一个目标</h3><p className="mt-1 text-xs text-[#5A616B]">目标输入、假设、方案和确认步骤会在这里组合。</p></div>}</div>
+      {canvasComponents.length ? <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{canvasComponents.map(component => <AgentComponentRenderer key={component.id} value={component} onAction={action} onCancel={cancelAction} onSelectCandidate={selectCandidate} onConnectData={onConnectData} onMonitoring={monitoring} onFollowup={followup} onNavigate={onNavigate} onPreview={preview} onUpdateRiskPreferences={updateRiskPreferences} busy={busy} />)}</div> : <div className="rounded-2xl border border-dashed border-[#B8CDCD] bg-white p-10 text-center"><NovaMark size={64}/><h3 className="mt-4 font-bold">从左侧描述一个目标</h3><p className="mt-1 text-xs text-[#5A616B]">目标输入、假设、方案和确认步骤会在这里组合。</p></div>}</div>
     </aside>
   </div>;
 }

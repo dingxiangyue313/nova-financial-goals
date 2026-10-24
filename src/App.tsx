@@ -37,6 +37,7 @@ export default function App() {
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
   const [workspaceStarter, setWorkspaceStarter] = useState('');
+  const [pendingConnectionThreadId, setPendingConnectionThreadId] = useState<string | null>(null);
   const [connectionBusy, setConnectionBusy] = useState(false);
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
   const [offlineSnapshot, setOfflineSnapshot] = useState<OfflineSnapshot | null>(null);
@@ -185,7 +186,6 @@ export default function App() {
   };
 
   const navigateTo = (screen: ScreenId) => {
-    if (!snapshot?.goals.length && ['home', 'create_goal', 'feasibility', 'impact', 'goals_list', 'activity', 'profile', 'banking_demo'].includes(screen)) screen = 'workspace';
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
   };
@@ -248,7 +248,14 @@ export default function App() {
       const outcome = await api<{ snapshot: Snapshot; result: DataSyncResult }>('/api/data-connections/connect', 'POST', { sources });
       setSnapshot(outcome.snapshot);
       showToast(`已读取近 90 天模拟流水（${outcome.result.importedCount} 笔）`);
-      if (previousScreen !== 'profile') navigateTo('feasibility');
+      if (pendingConnectionThreadId) {
+        const threadId = pendingConnectionThreadId;
+        setPendingConnectionThreadId(null);
+        try { await api('/api/agent/turn', 'POST', { threadId, message: '模拟数据已连接，请继续核算刚才的目标' }); }
+        catch (error) { showToast(error instanceof Error ? error.message : '连接成功，请在工作台回复“继续核算”'); }
+        setCurrentScreen('workspace');
+      } else if (previousScreen === 'workspace') navigateTo('workspace');
+      else if (previousScreen !== 'profile') navigateTo('feasibility');
     } catch (error) { showToast(error instanceof Error ? error.message : '连接失败'); }
     finally { setConnectionBusy(false); }
   };
@@ -283,6 +290,16 @@ export default function App() {
       showToast('自动守护发现目标受到影响');
       navigateTo('workspace');
     } else showToast('自动同步完成；本次变化保持安静');
+  };
+  const handleUnexpectedExpenseDemo = async () => {
+    try {
+      const next = await mutate('/api/demo/expense', 'POST', { amountCents: 90000, title: '意外支出' });
+      setShowSimulateModal(false);
+      if (next.pendingImpact) {
+        setCurrentScreen('impact');
+        showToast('发现意外支出对目标的影响');
+      } else showToast('已记录模拟支出；当前未达到提醒条件');
+    } catch (error) { showToast(error instanceof Error ? error.message : '模拟支出失败'); }
   };
   const handleConfirmPlan = async (planId: string) => {
     await mutate('/api/goals/activate', 'POST', { planId });
@@ -372,7 +389,7 @@ export default function App() {
   const isHomeScreen = currentScreen === 'home';
   const showBottomNav =
     currentScreen === 'home' ||
-    (currentScreen === 'workspace' && Boolean(snapshot?.goals.length)) ||
+    currentScreen === 'workspace' ||
     currentScreen === 'goals_list' ||
     currentScreen === 'activity' ||
     currentScreen === 'profile';
@@ -427,6 +444,16 @@ export default function App() {
           >
             3. 目标影响
           </button>
+          <button
+            onClick={() => navigateTo('workspace')}
+            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
+              currentScreen === 'workspace'
+                ? 'bg-[#0F6B6D] text-white shadow-xs'
+                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
+            }`}
+          >
+            NOVA 工作台
+          </button>
         </div>
 
         <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -446,7 +473,7 @@ export default function App() {
       <div
         className={`bg-[#F5F7F8] relative flex flex-col overflow-hidden transition-all duration-300 ${
           deviceFrame
-            ? 'w-[390px] max-w-[390px] h-[844px] max-h-[844px] min-h-[844px] rounded-[38px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border-[8px] border-[#1F2329]'
+            ? 'w-[390px] max-w-[calc(100vw-16px)] h-[844px] max-h-[844px] min-h-[844px] rounded-[38px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border-[8px] border-[#1F2329]'
             : currentScreen === 'workspace'
               ? 'w-full max-w-[1120px] min-h-screen md:min-h-[760px] md:max-h-[90vh] md:rounded-2xl md:shadow-xl md:border border-[#E5E8EB]'
               : 'w-full max-w-[420px] min-h-screen md:min-h-[844px] md:max-h-[90vh] md:rounded-2xl md:shadow-xl md:border border-[#E5E8EB]'
@@ -463,6 +490,14 @@ export default function App() {
 
         {/* Content Body */}
         <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar relative w-full bg-[#F5F7F8]">
+          {!goal && ['home', 'create_goal', 'feasibility', 'profile'].includes(currentScreen) && (
+            <section className="m-4 rounded-2xl border border-[#D8E7E7] bg-white p-5 shadow-sm">
+              <h1 className="text-[17px] font-bold text-[#1F2329]">还没有财务目标</h1>
+              <p className="mt-2 text-[13px] leading-relaxed text-[#5A616B]">创建目标后，这里会显示首页进度、可行性分析和智能守护提醒。你也可以载入日本旅行模拟数据，查看完整的原版页面。</p>
+              <button onClick={() => navigateTo('workspace')} className="mt-4 w-full rounded-xl bg-[#0F6B6D] px-4 py-3 text-[13px] font-semibold text-white">和 NOVA 创建目标</button>
+              <button onClick={() => setShowSimulateModal(true)} className="mt-2 w-full rounded-xl border border-[#B9D9D8] px-4 py-3 text-[13px] font-semibold text-[#0F6B6D]">查看日本旅行演示</button>
+            </section>
+          )}
           {currentScreen === 'home' && goal && (
             <HomeScreen
               goal={goal}
@@ -543,7 +578,8 @@ export default function App() {
             onNavigateActivity={() => navigateTo('activity')} />}
 
           {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame}
-            starter={workspaceStarter} onSnapshot={setSnapshot} onNavigate={navigateTo} />}
+            starter={workspaceStarter} onSnapshot={setSnapshot} onNavigate={navigateTo}
+            onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} />}
 
           {currentScreen === 'profile' && goal && (
             <ProfileScreen
@@ -641,6 +677,14 @@ export default function App() {
                 >
                   <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">insights</span><span>推进到 9月23日 · 目标风险</span></div>
                   <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                </button>
+                <button
+                  onClick={() => { void handleUnexpectedExpenseDemo(); }}
+                  disabled={!goal || snapshot.goal.status !== 'active'}
+                  className="w-full py-2.5 px-3 rounded-xl bg-[#FFF7E6] text-[#8A5A00] font-semibold text-[13px] text-left flex items-center gap-2 disabled:opacity-40"
+                >
+                  <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                  模拟一笔 ¥900 意外支出并查看提醒
                 </button>
                 {!hasConnectedData && <p className="rounded-lg bg-[#FFF7E6] p-2 text-[11px] text-[#8A5A00]">请先在创建目标流程或“我的 → 数据连接与自动守护”连接模拟来源。</p>}
 

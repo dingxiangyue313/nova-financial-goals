@@ -2,10 +2,10 @@ import { test, expect, type Page } from '@playwright/test';
 
 async function openApp(page: Page) {
   await page.goto('/');
-  await expect(page.getByTestId('nova-welcome')).toBeVisible();
-  await expect(page.getByTestId('nova-welcome')).toBeHidden();
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
   await page.request.post('/api/demo/load-japan');
+  await page.request.post('/api/data-connections/connect',
+    { data: { sources: ['bank', 'wechat_pay', 'alipay'] } });
   await page.reload();
   await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
 }
@@ -19,11 +19,26 @@ test('首次使用先展示品牌欢迎页，再进入空白目标工作台', as
   await page.goto('/');
   const welcome = page.getByTestId('nova-welcome');
   await expect(welcome).toBeVisible();
-  await expect(welcome.getByText('不用记账，也知道目标能不能按时实现')).toBeVisible();
+  await expect(welcome.getByText('不记账，也有数')).toBeVisible();
   await expect(welcome).toBeHidden();
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
   await expect(page.getByText('你想完成什么财务目标？')).toBeVisible();
   await expect(page.getByText('日本旅行', { exact: true })).not.toBeVisible();
+});
+
+test('首次目标先提示连接模拟数据，连接后回到同一任务核算方案', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await page.getByPlaceholder('描述目标、风险或授权范围…')
+    .fill('我想年底去日本旅行，预算 ¥8,000，已存 0 元');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect(page.getByRole('heading', { name: '连接模拟数据后再核算' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: '选择此候选并核对确认' })).toHaveCount(0);
+  await page.getByRole('button', { name: '选择模拟数据来源' }).first().click();
+  await expect(page.getByRole('heading', { name: '连接模拟数据' })).toBeVisible();
+  await page.getByRole('button', { name: '连接并开始智能守护' }).click();
+  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '选择此候选并核对确认' }).first()).toBeVisible();
 });
 
 async function activateGoalFromWorkspace(page: Page) {
@@ -31,11 +46,15 @@ async function activateGoalFromWorkspace(page: Page) {
   const composer = page.getByPlaceholder('描述目标、风险或授权范围…');
   await composer.fill('我想在 12 月 15 日前存够 ¥8,000 去日本旅行，现在已经存了 ¥3,500，每月最多存 ¥1,500，¥20,000 应急金不能动。');
   await page.getByRole('button', { name: '发送' }).click();
-  await expect(page.getByText('方案比较').first()).toBeVisible();
-  await page.getByRole('button', { name: /平衡方案/ }).first().click();
-  await page.getByRole('button', { name: '确认并启用该方案' }).first().click();
-  await expect(page.getByRole('heading', { name: '连接模拟数据' })).toBeVisible();
-  await page.getByRole('button', { name: '连接并开始智能守护' }).click();
+  const choose = page.getByRole('button', { name: '选择此候选并核对确认' }).first();
+  await expect(choose).toBeVisible();
+  await choose.click();
+  await page.getByRole('button', { name: '确认激活' }).first().click();
+  await expect(page.getByText('自定义候选已激活', { exact: false }).first()).toBeVisible();
+  const connected = await page.request.post('/api/data-connections/connect',
+    { data: { sources: ['bank', 'wechat_pay', 'alipay'] } });
+  expect(connected.ok()).toBeTruthy();
+  await page.reload();
   await page.getByRole('button', { name: '1. 首页' }).click();
   await expect(page.getByRole('button', { name: '查看计划' })).toBeVisible();
 }
@@ -47,7 +66,7 @@ test('对话故事一：自然语言生成目标卡，明确确认后激活并�
   await expect(page.getByRole('button', { name: '查看计划' })).toBeVisible();
   await openWorkspace(page);
   await page.getByRole('button', { name: /我想在 12 月 15 日前/ }).click();
-  await expect(page.getByText(/信息已经完整/).first()).toBeVisible();
+  await expect(page.getByText(/正在核算不同月存节奏/).first()).toBeVisible();
 });
 
 test('对话故事二：显著支出自动创建未读风险会话', async ({ page }) => {
@@ -65,6 +84,21 @@ test('对话故事二：显著支出自动创建未读风险会话', async ({ pa
   await expect(page.getByText('增加目标投入')).toBeVisible();
   await expect(page.getByText('3. 调整目标日期', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '确认方案 B' })).toBeVisible();
+});
+
+test('主动询问支出时展示只读对比，不新增模拟流水', async ({ page }) => {
+  await openApp(page);
+  await activateGoalFromWorkspace(page);
+  await openWorkspace(page);
+  const before = await page.request.get('/api/session');
+  const transactionsBefore = (await before.json()).transactions.length;
+  await page.getByPlaceholder('描述目标、风险或授权范围…').fill('这笔¥900支出会影响目标吗？');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect(page.getByRole('heading', { name: '这笔支出对目标的影响' }).first()).toBeVisible();
+  await expect(page.getByText(/支出前.*支出后/).first()).toBeVisible();
+  await expect(page.getByText('查看计算依据').first()).toBeVisible();
+  const after = await page.request.get('/api/session');
+  expect((await after.json()).transactions.length).toBe(transactionsBefore);
 });
 
 test('对话故事三：创建限定授权并运行受治理的外部 Agent 请求', async ({ page }) => {
@@ -90,7 +124,7 @@ test('历史会话继续提问时自动创建可写会话，不暴露归档错�
   await expect(composer).toBeEnabled();
   await composer.fill('我想年底去日本旅行，预算 ¥8,000');
   await page.getByRole('button', { name: '发送' }).click();
-  await expect(page.getByText('方案比较').first()).toBeVisible();
+  await expect(page.getByText('请确认已存金额').first()).toBeVisible();
   await expect(page.getByText('THREAD_ARCHIVED')).not.toBeVisible();
 });
 
@@ -108,23 +142,19 @@ test('首页与空工作台使用同一透明 NOVA 标志', async ({ page }) => 
   await expect(workspaceMark).toHaveAttribute('data-transparent', 'true');
 });
 
-test('目标画布支持修改假设、只读试算和确认应用', async ({ page }) => {
+test('目标画布由 NOVA 核算多个候选并逐项解释', async ({ page }) => {
   await openApp(page);
   await openWorkspace(page);
-  await page.getByRole('button', { name: '我想年底去日本旅行，预算 ¥8,000' }).click();
-  const editor = page.getByTestId('assumption-editor').first();
-  await editor.getByLabel('目标金额').fill('9000');
-  await editor.getByLabel('每月投入').fill('1600');
-  await editor.getByLabel('目标日期').fill('2027-01-15');
-  await editor.getByRole('button', { name: '实时试算' }).click();
-  await expect(page.getByText('实时试算结果').first()).toBeVisible();
-  await expect(page.getByText('计划步骤')).not.toBeVisible();
-  await page.locator('article').filter({ hasText: '方案比较' }).locator('button:not([disabled])').first().click();
-  await page.getByRole('button', { name: '确认并启用该方案' }).first().click();
-  await expect(page.getByRole('heading', { name: '连接模拟数据' })).toBeVisible();
-  await page.getByRole('button', { name: '连接并开始智能守护' }).click();
-  await expect(page.getByText('选择适合你的节奏', { exact: true })).toBeVisible();
-  await expect(page.getByText(/选择适合你的节奏/).first()).toBeVisible();
+  await page.getByPlaceholder('描述目标、风险或授权范围…')
+    .fill('我想年底去日本旅行，预算 ¥4,000，已存 0 元');
+  await page.getByRole('button', { name: '发送' }).click();
+  const card = page.locator('article').filter({ hasText: '已核验的参考方案' }).first();
+  await expect(card).toBeVisible();
+  await expect(card.getByRole('button', { name: '选择此候选并核对确认' })).toHaveCount(3);
+  await expect(card.getByText(/首月可动用额度/).first()).toBeVisible();
+  await expect(page.getByTestId('assumption-editor')).toHaveCount(0);
+  await card.getByRole('button', { name: '选择此候选并核对确认' }).first().click();
+  await expect(page.getByText('核对并激活候选方案').first()).toBeVisible();
 });
 
 test('自适应桌面工作台使用 32/68 Governed Canvas', async ({ page }, testInfo) => {
@@ -140,7 +170,68 @@ test('自适应桌面工作台使用 32/68 Governed Canvas', async ({ page }, te
   await expect(canvas.getByRole('heading', { name: '当前任务画布' })).toBeVisible();
   await page.getByPlaceholder('描述目标、风险或授权范围…').fill('我想年底去日本旅行，预算 ¥8,000');
   await page.getByRole('button', { name: '发送' }).click();
-  await expect(canvas.getByText('核对并实时试算')).toBeVisible();
+  await expect(canvas.getByText('请确认已存金额')).toBeVisible();
+});
+
+test('只读调查在刷新后保留真实步骤，并适配工作台宽度', async ({ page }) => {
+  await openApp(page);
+  await openWorkspace(page);
+  await page.getByPlaceholder('描述目标、风险或授权范围…')
+    .fill('我想年底去日本旅行，预算 ¥8,000，已经存了 ¥0，每月最多存 ¥2,000');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect(page.getByText('规则试算已完成')).toBeVisible();
+  await expect(page.getByText('candidate_preview：ok').first()).toBeVisible();
+  await page.reload();
+  await openWorkspace(page);
+  await expect(page.getByText('规则试算已完成')).toBeVisible();
+  await expect(page.getByText('candidate_preview：ok').first()).toBeVisible();
+  const overflow = await page.evaluate(() => ({ amount: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    elements: [...document.querySelectorAll('*')].filter(element => element.getBoundingClientRect().right > window.innerWidth + 1)
+      .slice(0, 8).map(element => ({ tag: element.tagName, className: element.className, text: element.textContent?.slice(0, 35) })) }));
+  expect(overflow.amount, JSON.stringify(overflow.elements)).toBeLessThanOrEqual(1);
+});
+
+test('未确认已存金额时先追问，补充后再开始只读调查', async ({ page }) => {
+  await openApp(page);
+  await openWorkspace(page);
+  const composer = page.getByPlaceholder('描述目标、风险或授权范围…');
+  await composer.fill('我想年底去日本旅行，预算 ¥8,000');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect(page.getByText('请确认已存金额')).toBeVisible();
+  await expect(page.getByText('规则试算已完成')).not.toBeVisible();
+  await composer.fill('已存 0 元');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect(page.getByText('规则试算已完成')).toBeVisible();
+  await expect(page.getByText('candidate_preview：ok').first()).toBeVisible();
+});
+
+test('已验证候选单独确认后才能启用目标监测与奖金跟进', async ({ page }) => {
+  await openApp(page);
+  await openWorkspace(page);
+  await page.getByPlaceholder('描述目标、风险或授权范围…')
+    .fill('我想年底去日本旅行，预算 ¥8,000，已经存了 ¥0，每月最多存 ¥2,000');
+  await page.getByRole('button', { name: '发送' }).click();
+  const choose = page.getByRole('button', { name: '选择此候选并核对确认' }).first();
+  await expect(choose).toBeVisible();
+  await choose.click();
+  await expect(page.getByText('核对并激活候选方案').first()).toBeVisible();
+  const before = await page.evaluate(async () => (await (await fetch('/api/session')).json()).goal.status);
+  expect(before).not.toBe('active');
+  await page.getByRole('button', { name: '确认激活' }).first().click();
+  await expect(page.getByText('自定义候选已激活', { exact: false }).first()).toBeVisible();
+  const after = await page.evaluate(async () => (await (await fetch('/api/session')).json()).goal);
+  expect(after.status).toBe('active');
+  expect(after.selectedPlanId).toBe('custom');
+  expect(after.targetCents).toBe(800000);
+  expect(after.monthlyContributionCents).toBe(200000);
+  await page.getByRole('button', { name: '启用目标监测' }).first().click();
+  await expect(page.getByText('已启用应用内目标监测', { exact: false }).first()).toBeVisible();
+  await page.getByRole('button', { name: '安排下个月跟进' }).first().click();
+  await expect(page.getByText('已安排在模拟日期 2026-10-01 核对奖金', { exact: false }).first()).toBeVisible();
+  await page.reload();
+  await openWorkspace(page);
+  await page.getByRole('button', { name: /我想年底去日本旅行，预算 ¥8,000，已经/ }).click();
+  await expect(page.getByRole('button', { name: '暂停监测' }).first()).toBeVisible();
 });
 
 test('每周摘要安静呈现并可配置完整通知偏好', async ({ page }) => {

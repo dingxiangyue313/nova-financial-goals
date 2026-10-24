@@ -27,12 +27,22 @@ export async function requestDeepSeekJson<T>(schema: z.ZodType<T>, options: {
       }),
       signal: AbortSignal.timeout(options.timeoutMs ?? 12_000),
     });
-    if (!response.ok) return { ok: false, reason: 'DEEPSEEK_HTTP_ERROR' };
+    if (!response.ok) {
+      if (process.env.NOVA_EVAL_MODEL_DIAGNOSTICS === '1') console.error('DeepSeek HTTP status', response.status);
+      return { ok: false, reason: 'DEEPSEEK_HTTP_ERROR' };
+    }
     const raw = await response.json();
     const content = raw?.choices?.[0]?.message?.content;
     if (typeof content !== 'string') return { ok: false, reason: 'DEEPSEEK_INVALID_OR_TIMEOUT' };
-    return { ok: true, data: schema.parse(JSON.parse(content)) };
-  } catch {
+    try { return { ok: true, data: schema.parse(JSON.parse(content)) }; }
+    catch (error) {
+      if (process.env.NOVA_EVAL_MODEL_DIAGNOSTICS === '1') console.error('DeepSeek JSON validation',
+        error instanceof z.ZodError ? error.issues.map(issue => `${issue.path.join('.')}:${issue.code}`) : 'parse_error');
+      return { ok: false, reason: 'DEEPSEEK_INVALID_OR_TIMEOUT' };
+    }
+  } catch (error) {
+    if (process.env.NOVA_EVAL_MODEL_DIAGNOSTICS === '1') console.error('DeepSeek request failure',
+      error instanceof Error ? error.name : 'unknown');
     return { ok: false, reason: 'DEEPSEEK_INVALID_OR_TIMEOUT' };
   }
 }

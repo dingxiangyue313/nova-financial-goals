@@ -90,6 +90,7 @@ export function installApiRateLimits(app: express.Express): void {
   const sensitive = rateLimit({
     ...common,
     limit: positiveInteger(process.env.NOVA_SENSITIVE_RATE_LIMIT, 30),
+    skip: req => req.method === 'GET' || req.method === 'HEAD',
   });
   app.use('/api', general);
   app.use(['/api/agent', '/api/goal/interpret', '/api/external-agent/request'], sensitive);
