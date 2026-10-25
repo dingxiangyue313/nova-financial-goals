@@ -10,6 +10,14 @@ npm run dev
 
 在 `.env` 中可不填 DeepSeek Key；默认演示地址是 `http://localhost:3000`。服务与前端同源，`data/` 下 SQLite 会话持久化。执行 `npm run lint && npm test && npm run build` 检查可交付版本。
 
+### 目标监测 worker
+
+用户明确启用目标监测后，服务端会把每次相关财务版本变化与模拟日期到期的跟进写入同一 SQLite 数据库。状态更新和事件入队在一个事务中提交。内置 worker 每 5 秒扫描一次到期事件；它通过数据库租约领取任务，失败最多重试 3 次，重启后可接管过期租约。通知与事件完成状态一起提交，重复投递不会重复发消息。
+
+财务日期和“下个月再看奖金”使用 Demo Clock；运行时限、租约和静默时段使用真实时间，静默时段按 Asia/Shanghai 判断。奖金跟进只在用户单独点击安排后创建，到期只询问实际到账情况，不把未知收入计入计划。模型不可用时使用确定性证据和试算，不会自动修改目标。
+
+worker 与 Express 服务在同一进程运行。浏览器关闭后，只要服务进程仍运行，它会继续检查；服务停止期间不处理事件，重启后从 SQLite 恢复仍有效的积压任务。当前默认仅在应用内触达，没有邮件或短信。部署时须持久化 `NOVA_DB_PATH` 所在目录；若以后改为多实例，应保留共享 SQLite 事务语义或迁移到等效的共享队列。停服备份与回滚应把监测表和会话状态一起处理。
+
 ## 发布前准备
 
 ### 阿里云账号与服务器权限
@@ -70,5 +78,9 @@ PWA 在公网必须通过 HTTPS 访问。Nginx 需要让 `/sw.js` 与 `/manifest
 - 可用性：服务器断网或 DeepSeek 不可用时，确定性演示仍可完成；外部图片与字体可能缺失。
 
 ## 部署验收
+
+阶段 7 本地验收先运行 `npm run lint`、`npm test`、`npm run test:properties`、`npm run build`、`npm run test:e2e`；真实模型评测只在授权的服务端评测环境中设置 `NOVA_RUN_REAL_MODEL_EVAL=1` 后运行 `npm run eval:agent:real`，默认跳过且最多 24 次模型决策。验收矩阵与限制见 `docs/AGENT_EVALUATION_REPORT.md`。生产部署不应自动运行真实模型评测。
+
+### 上线验收
 
 访问 `https://<域名>/api/health` 返回 `{"status":"ok","mode":"simulated"}`；手机与桌面打开应用，完成三条链路，刷新页面确认当前会话保存，另一浏览器确认会话隔离。浏览器网络响应、容器日志和 GitHub 不得出现真实 API Key。

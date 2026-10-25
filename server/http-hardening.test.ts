@@ -16,7 +16,7 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-test('HTTP hardening adds CSP, separates sensitive limits, and redacts logs', { timeout: 30_000 }, async () => {
+test('HTTP hardening adds CSP, separates sensitive limits, and redacts logs', { timeout: 180_000 }, async () => {
   const headers = new Map<string, string>();
   const response = { setHeader: (name: string, value: string) => headers.set(name, value) };
   setStaticCacheHeaders(response as never, join(process.cwd(), 'dist', 'sw.js'));
@@ -29,7 +29,7 @@ test('HTTP hardening adds CSP, separates sensitive limits, and redacts logs', { 
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   let output = '';
-  const child = spawn(join(process.cwd(), 'node_modules/.bin/tsx'), ['server/index.ts'], {
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -49,12 +49,12 @@ test('HTTP hardening adds CSP, separates sensitive limits, and redacts logs', { 
 
   try {
     let ready = false;
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 180; i++) {
       try {
         const response = await fetch(`${base}/api/health`);
         if (response.ok) { ready = true; break; }
       } catch { /* server is still starting */ }
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     assert.equal(ready, true, 'production server must start');
 

@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
+test.setTimeout(90_000);
+
 async function openDemo(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
@@ -43,7 +45,8 @@ test('manifest and install entry expose NOVA as a standalone app', async ({ page
 test('offline reload shows only the sanitized read-only summary', async ({ page, context }) => {
   await openDemo(page);
   await expect.poll(() => hasSavedOfflineSnapshot(page)).toBe(true);
-  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await expect.poll(() => page.evaluate(async () => Boolean((await navigator.serviceWorker.getRegistration())?.active)),
+    { timeout: 30_000 }).toBe(true);
   await page.reload();
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
 

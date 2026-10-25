@@ -22,7 +22,7 @@ server.stdout.on('data', (chunk) => { serverOutput += String(chunk); });
 server.stderr.on('data', (chunk) => { serverOutput += String(chunk); });
 
 async function ready() {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  for (let attempt = 0; attempt < 240; attempt += 1) {
     if (server.exitCode !== null) throw new Error(`NOVA eval server exited early:\n${serverOutput}`);
     try {
       const response = await fetch('http://127.0.0.1:3199/api/health');
@@ -35,19 +35,35 @@ async function ready() {
 
 try {
   await ready();
-  const executable = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const evaluator = spawn(executable, ['--yes', 'promptfoo@0.124.1', 'eval',
-    '--config', 'promptfooconfig.yaml', '--no-cache', '--no-progress-bar'], {
+  const evaluatorArgs = ['--yes', 'promptfoo@0.124.1', 'eval',
+    '--config', 'promptfooconfig.yaml', '--no-cache', '--no-progress-bar'];
+  const windows = process.platform === 'win32';
+  const executable = windows ? process.execPath : 'npx';
+  const args = windows ? [process.env.npm_execpath, 'exec', '--yes',
+    '--package=promptfoo@0.124.1', '--', 'promptfoo', 'eval',
+    '--config', 'promptfooconfig.yaml', '--no-cache', '--no-progress-bar'].filter(Boolean) : evaluatorArgs;
+  const evaluator = spawn(executable, args, {
     cwd: root,
     env: { ...process.env, PROMPTFOO_SAFE_MODE: 'true', PROMPTFOO_DISABLE_TELEMETRY: 'true' },
     stdio: 'inherit',
   });
   const exitCode = await new Promise((resolve, reject) => {
-    evaluator.once('error', reject);
-    evaluator.once('exit', resolve);
+    const timer = setTimeout(() => {
+      evaluator.kill('SIGTERM');
+      reject(new Error('Promptfoo evaluator exceeded 300 seconds; check package availability or network access.'));
+    }, 300_000);
+    evaluator.once('error', error => { clearTimeout(timer); reject(error); });
+    evaluator.once('exit', code => { clearTimeout(timer); resolve(code); });
   });
   if (exitCode !== 0) process.exitCode = Number(exitCode ?? 1);
 } finally {
-  server.kill('SIGTERM');
-  await rm(temporary, { recursive: true, force: true });
+  if (server.exitCode === null && server.signalCode === null) {
+    await new Promise(resolve => {
+      const timeout = setTimeout(resolve, 5_000);
+      server.once('exit', () => { clearTimeout(timeout); resolve(); });
+      server.kill('SIGTERM');
+    });
+    if (server.exitCode === null && server.signalCode === null) server.kill('SIGKILL');
+  }
+  await rm(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }

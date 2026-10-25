@@ -5,10 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer as createViteServer } from 'vite';
 import { z } from 'zod';
-import { artifactCounts, createAgentThread, deleteAgentThread, getAgentMessages, getState, listAgentThreads,
-  markAgentThreadRead, mutateState, renameAgentThread, resetState, setAgentThreadStatus } from './store.ts';
+import { artifactCounts, createAgentThread, deleteAgentThread, getAgentAction, getAgentMessages,
+  getAgentTaskForThread, getLatestAgentRunForThread, getState, listAgentThreads, markAgentThreadRead, mutateState,
+  monitorStatus, renameAgentThread, resetState, saveAgentMessage, scheduleBonusFollowup,
+  setAgentThreadStatus, setMonitorSubscription, updateAgentRun, updateAgentTask } from './store.ts';
 import { snapshot } from './presentation.ts';
-import { assessGoal, injectExpense, resolveImpact } from './domain.ts';
+import { assessCandidateScenario, assessGoal, injectExpense, resolveImpact } from './domain.ts';
+import { runAgentReadTool } from './agent-read-tools.ts';
 import { composeUiCards, interpretGoal } from './agent.ts';
 import { quickConfirmOperation, retryOperation, verifyOperation } from './tools.ts';
 import { registerMcp } from './mcp.ts';
@@ -17,12 +20,17 @@ import { DataSourceKindSchema, GoalAssumptionsSchema, IsoDateSchema, RiskPrefere
 import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './banking.ts';
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
 import { containsPromptInjection, signExternalRequest, verifyExternalRequest } from './security.ts';
-import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary, executeWorkspaceAction } from './workspace.ts';
+import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary,
+  executeWorkspaceAction, prepareCandidateConfirmation } from './workspace.ts';
 import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
 import { installApiRateLimits, installRequestHardening, setStaticCacheHeaders } from './http-hardening.ts';
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
 import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, failDataSource, recoverDataSource, revokeDataSource } from './data-connections.ts';
 import { createFixture } from './fixtures.ts';
+import { AgentRunCancelRequestSchema, AgentRunStatusResponseSchema, AgentTurnWithRunSchema,
+  MonitorStatusSchema } from '../shared/contracts.ts';
+import { getAgentRunStatus, startAgentRun, stopAgentRun } from './agent-runner.ts';
+import { tickMonitorWorker } from './monitor-worker.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -37,6 +45,7 @@ installRequestHardening(app);
 app.use(express.json({ limit: '16kb' }));
 installApiRateLimits(app);
 app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/agent')) res.setHeader('Cache-Control', 'no-store');
   const origin = req.get('origin');
   try { if (origin && new URL(origin).host !== req.get('host')) return res.status(403).json({ error: 'INVALID_ORIGIN' }); }
   catch { return res.status(403).json({ error: 'INVALID_ORIGIN' }); }
@@ -244,12 +253,25 @@ app.delete('/api/agent/threads/:id', route((req, res) => {
 }));
 app.get('/api/agent/threads/:id/messages', route((req, res) => {
   const id = sessionId(req, res); const messages = getAgentMessages(id, req.params.id);
-  markAgentThreadRead(id, req.params.id); res.json({ messages });
+  markAgentThreadRead(id, req.params.id); res.json({ messages,
+    monitor: MonitorStatusSchema.parse(monitorStatus(id, req.params.id)) });
 }));
 app.post('/api/agent/turn', route(async (req, res) => {
   const body = z.object({ threadId: z.string().nullable().default(null), message: z.string().min(1).max(500) }).parse(req.body);
   const id = sessionId(req, res);
-  res.json(await createAgentTurn(id, body.threadId, body.message, getState(id)));
+  const turn = await createAgentTurn(id, body.threadId, body.message, getState(id));
+  const latestUser = getAgentMessages(id, turn.thread.id).filter(item => item.role === 'user').at(-1);
+  const run = turn.intent === 'goal_planning' && turn.components.some(item => item.type === 'goal_input_card') &&
+    !turn.components.some(item => item.type === 'clarification' || item.type === 'data_connection_prompt') && latestUser
+    ? startAgentRun(id, turn.thread.id, latestUser.id) : null;
+  res.json(AgentTurnWithRunSchema.parse({ ...turn, run }));
+}));
+app.get('/api/agent/threads/:id/run', route((req, res) => {
+  res.json(AgentRunStatusResponseSchema.parse({ run: getAgentRunStatus(sessionId(req, res), req.params.id) }));
+}));
+app.post('/api/agent/threads/:id/run/cancel', route((req, res) => {
+  const body = AgentRunCancelRequestSchema.parse(req.body);
+  res.json(AgentRunStatusResponseSchema.parse({ run: stopAgentRun(sessionId(req, res), req.params.id, body.runId) }));
 }));
 app.post('/api/agent/preview', route((req, res) => {
   const body = z.object({ threadId: z.string(), twinVersion: z.number().int().positive(),
@@ -259,11 +281,86 @@ app.post('/api/agent/preview', route((req, res) => {
   if (state.twinVersion !== body.twinVersion) throw new Error('TWIN_VERSION_CHANGED');
   res.json(createScenarioPreview(id, body.threadId, body.assumptions, state));
 }));
+app.post('/api/agent/candidate/select', route((req, res) => {
+  const body = z.object({ threadId: z.string(), resultId: z.string().uuid() }).parse(req.body);
+  const id = sessionId(req, res);
+  const prepared = prepareCandidateConfirmation(id, body.threadId, body.resultId, getState(id));
+  res.json({ message: prepared.message, actionId: prepared.action.id });
+}));
+app.post('/api/agent/candidate/custom', route((req, res) => {
+  const body = z.object({ threadId: z.string(), monthlyContributionCents: z.number().int().positive() }).parse(req.body);
+  const id = sessionId(req, res);
+  const state = getState(id);
+  const task = getAgentTaskForThread(id, body.threadId);
+  const run = getLatestAgentRunForThread(id, body.threadId);
+  if (!task || task.readOnly || !run || !['completed', 'fallback'].includes(run.status) ||
+    !task.facts.targetCents || !task.facts.originalTargetDate || task.facts.savedCents === null ||
+    body.monthlyContributionCents > 10_000_000_00) throw new Error('CUSTOM_PLAN_NOT_AVAILABLE');
+  const input = { targetCents: task.facts.targetCents, targetDate: task.facts.originalTargetDate,
+    monthlyContributionCents: body.monthlyContributionCents,
+    protectedCents: Math.max(task.constraints.protectedCents ?? 0, state.finance.emergencyCents),
+    scenario: { kind: 'baseline' as const }, evidenceResultIds: [] };
+  const forecast = assessCandidateScenario(state, input, task.facts.savedCents, [], '9999-12-31');
+  const withinCap = body.monthlyContributionCents <= (task.constraints.monthlyContributionCapCents ?? Number.MAX_SAFE_INTEGER);
+  const selectable = forecast.dataSufficient && forecast.status === 'on_track' && withinCap &&
+    forecast.bufferCents >= 0 && !!forecast.projectedDate &&
+    forecast.projectedDate <= (task.constraints.latestAllowedDate ?? task.facts.originalTargetDate);
+  let resultId: string | null = null;
+  if (selectable) {
+    const verified = runAgentReadTool(id, body.threadId, 'candidate_preview', input);
+    if (verified.status === 'ok') {
+      resultId = verified.toolResultId;
+      const latest = getLatestAgentRunForThread(id, body.threadId)!;
+      if (!latest.recommendedResultIds.includes(resultId)) updateAgentRun(id, body.threadId,
+        latest.runId, latest.revision, { recommendedResultIds: [...latest.recommendedResultIds.slice(-2), resultId] });
+    }
+  }
+  res.json({ projectedDate: forecast.projectedDate, firstMonthBufferCents: forecast.bufferCents,
+    availableMonthlyCents: forecast.availableMonthlyCents, withinCap, selectable: !!resultId, resultId,
+    targetDate: task.facts.originalTargetDate });
+}));
+app.get('/api/agent/threads/:id/monitoring', route((req, res) => {
+  res.json(MonitorStatusSchema.parse(monitorStatus(sessionId(req, res), req.params.id)));
+}));
+app.post('/api/agent/monitoring', route((req, res) => {
+  const body = z.object({ threadId: z.string(), enabled: z.boolean() }).parse(req.body);
+  const id = sessionId(req, res);
+  const status = MonitorStatusSchema.parse(setMonitorSubscription(id, body.threadId, body.enabled));
+  const message = saveAgentMessage(id, body.threadId, { role: 'assistant',
+    content: body.enabled ? '已启用应用内目标监测。服务运行时会检查模拟数据变化。'
+      : '已暂停目标监测。', components: body.enabled ? [{ id: randomUUID(),
+      type: 'monitor_followup_offer', title: '下个月再看奖金',
+      body: '奖金未确认前不会计入基础计划。只有点击安排后才会创建跟进。',
+      taskThreadId: body.threadId }] : [] });
+  res.json({ status, message });
+}));
+app.post('/api/agent/followup', route((req, res) => {
+  const body = z.object({ threadId: z.string(), kind: z.literal('bonus_review') }).parse(req.body);
+  const id = sessionId(req, res);
+  const dueDemoDate = scheduleBonusFollowup(id, body.threadId);
+  const message = saveAgentMessage(id, body.threadId, { role: 'assistant',
+    content: `已安排在模拟日期 ${dueDemoDate} 核对奖金。到账与金额仍需你确认。`, components: [] });
+  res.json({ dueDemoDate, message });
+}));
 app.post('/api/agent/action', route((req, res) => {
   const body = z.object({ actionId: z.string(), decision: z.enum(['confirm', 'cancel']),
     selection: z.array(z.enum(['execute', 'ask', 'manual_review', 'block'])).max(4).default([]) }).parse(req.body);
   const id = sessionId(req, res); let outcome: ReturnType<typeof executeWorkspaceAction> | undefined;
   const state = mutateState(id, old => { outcome = executeWorkspaceAction(id, body.actionId, body.decision, old, body.selection); return outcome.state; });
+  const action = getAgentAction(id, body.actionId);
+  if (action.actionType === 'apply_verified_candidate') {
+    const task = getAgentTaskForThread(id, action.threadId);
+    if (task && task.pendingActionId === action.id && action.status !== 'pending')
+      updateAgentTask(id, task.taskId, task.taskRevision, action.status === 'consumed'
+        ? monitorStatus(id, action.threadId).enabled
+          ? { phase: 'monitoring', waitingReason: null, terminationReason: null,
+            pendingActionId: null, goalId: state.goal.id }
+          : { phase: 'completed', waitingReason: null, terminationReason: 'applied',
+            pendingActionId: null, goalId: state.goal.id }
+        : monitorStatus(id, action.threadId).enabled
+          ? { phase: 'monitoring', waitingReason: null, pendingActionId: null }
+          : { phase: 'awaiting_user', waitingReason: 'user_choice', pendingActionId: null });
+  }
   res.json({ snapshot: snapshot(state), message: outcome!.message, replayed: outcome!.replayed,
     nextStep: outcome!.nextStep });
 }));
@@ -501,4 +598,12 @@ if (production) {
   const vite = await createViteServer({ root: rootDir, server: { middlewareMode: true, hmr: false }, appType: 'spa' });
   app.use(vite.middlewares);
 }
-app.listen(port, '0.0.0.0', () => console.log(`NOVA original UI + new simulated backend: http://localhost:${port}`));
+const server = app.listen(port, '0.0.0.0', () => console.log(`NOVA original UI + new simulated backend: http://localhost:${port}`));
+function runMonitorTick() { try { tickMonitorWorker(); } catch { console.error('Monitor worker tick failed'); } }
+const monitorTimer = setInterval(runMonitorTick, 5_000);
+monitorTimer.unref();
+setImmediate(runMonitorTick);
+for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => {
+  clearInterval(monitorTimer);
+  server.close(() => process.exit(0));
+});

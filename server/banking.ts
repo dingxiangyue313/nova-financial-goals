@@ -36,6 +36,12 @@ const schemas = {
     flexibilityWeeks: z.number().int().min(0).max(52).optional() }),
   select_goal_plan: z.object({ planId: z.enum(['conservative', 'balanced', 'accelerated']) }),
   activate_goal: z.object({ planId: z.enum(['conservative', 'balanced', 'accelerated']), approvalToken: z.string() }),
+  apply_goal_candidate: z.object({ goalId: z.string().min(1), title: z.string().min(1).max(60),
+    savedCents: z.number().int().nonnegative(), targetCents: money, targetDate: z.iso.date(),
+    originalDate: z.iso.date(), monthlyContributionCents: z.number().int().nonnegative(),
+    firstMonthContributionCents: z.number().int().nonnegative().optional(),
+    protectedCents: z.number().int().nonnegative(), approvalParameters: z.record(z.string(), z.unknown()),
+    approvalToken: z.string() }),
   create_approval_snapshot: z.object({ action: z.string().min(1), parameters: z.record(z.string(), z.unknown()), expiresInSeconds: z.number().int().min(60).max(1800).default(300) }),
   confirm_approval: z.object({ approvalId: z.string(), snapshotHash: z.string(), confirmed: z.literal(true) }),
   permission_check: z.object({ action: z.string(), parameters: z.record(z.string(), z.unknown()), approvalToken: z.string().optional(), mandateId: z.string().optional() }),
@@ -70,7 +76,8 @@ const readOnly = new Set<BankingToolName>([
   'detect_financial_signals', 'explain_decision', 'get_activity', 'export_audit_report',
 ]);
 
-export const bankingToolDefinitions = (Object.keys(schemas) as BankingToolName[]).map(name => ({
+export const bankingToolDefinitions = (Object.keys(schemas) as BankingToolName[])
+  .filter(name => name !== 'apply_goal_candidate').map(name => ({
   name,
   description: `NOVA simulated banking capability: ${name}`,
   annotations: { readOnlyHint: readOnly.has(name), destructiveHint: name === 'revoke_mandate' },
@@ -189,6 +196,24 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       next = { ...activatePlan(next, input.planId), twinVersion: next.twinVersion + 1 };
       next = appendPipeline(next, `goal-${next.goal.id}`, '目标计划已激活');
       return { state: next, result: { goal: next.goal, twinVersion: next.twinVersion } };
+    }
+    case 'apply_goal_candidate': {
+      let next = consumeApproval(state, input.approvalToken, 'apply_goal_candidate', input.approvalParameters);
+      const previous = next.goals.find(item => item.id === input.goalId);
+      if (previous && previous.savedCents !== input.savedCents) throw new Error('GOAL_SAVED_AMOUNT_CHANGED');
+      const goal = { ...next.goal, id: input.goalId, title: input.title,
+        savedCents: input.savedCents, targetCents: input.targetCents,
+        targetDate: input.targetDate, originalDate: input.originalDate,
+        monthlyContributionCents: input.monthlyContributionCents,
+        firstMonthContributionCents: input.firstMonthContributionCents,
+        protectedCents: input.protectedCents, flexibilityWeeks: 0,
+        selectedPlanId: 'custom', status: 'active' as const,
+        quote: '由 NOVA 已验证候选应用' };
+      next = { ...next, twinVersion: next.twinVersion + 1, goal,
+        goals: previous ? next.goals.map(item => item.id === goal.id ? goal : item) : [...next.goals, goal],
+        primaryGoalId: goal.id, pendingImpact: null };
+      next = appendPipeline(next, `goal-${goal.id}`, '已验证候选目标已激活');
+      return { state: next, result: { goal, twinVersion: next.twinVersion } };
     }
     case 'create_approval_snapshot': {
       const expiresAt = new Date(Date.parse(todayTime(state)) + input.expiresInSeconds * 1000).toISOString();

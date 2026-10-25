@@ -53,6 +53,7 @@ export const GoalSchema = z.object({
   id: z.string().min(1), title: z.string().min(1).max(60),
   targetCents: MoneySchema, savedCents: MoneySchema, targetDate: IsoDateSchema,
   originalDate: IsoDateSchema, monthlyContributionCents: MoneySchema,
+  firstMonthContributionCents: MoneySchema.optional(),
   protectedCents: MoneySchema, flexibilityWeeks: z.number().int().min(0).max(52),
   status: z.enum(['draft', 'active', 'paused', 'achieved']),
   selectedPlanId: z.string().nullable(), imageUrl: z.string(), quote: z.string(),
@@ -315,6 +316,241 @@ export const GoalDraftSchema = z.object({
 });
 export type GoalDraft = z.infer<typeof GoalDraftSchema>;
 
+export const AgentTaskPhaseSchema = z.enum([
+  'understanding', 'investigating', 'simulating', 'awaiting_user',
+  'awaiting_confirmation', 'verifying', 'monitoring', 'paused', 'completed', 'failed',
+]);
+export type AgentTaskPhase = z.infer<typeof AgentTaskPhaseSchema>;
+export const AgentTaskSourceSchema = z.object({
+  kind: z.enum(['user_message', 'connected_data', 'system_calculated', 'default_assumption']),
+  messageId: z.string().min(1).nullable(),
+  confirmation: z.enum(['unconfirmed', 'user_confirmed', 'system_verified']),
+});
+export const AgentTaskFactsSchema = z.object({
+  title: z.string().min(1).max(60).nullable(),
+  targetCents: MoneySchema.positive().nullable(),
+  originalTargetDate: IsoDateSchema.nullable(),
+  savedCents: MoneySchema.nullable(),
+});
+export const AgentTaskConstraintsSchema = z.object({
+  latestAllowedDate: IsoDateSchema.nullable(),
+  monthlyContributionCapCents: MoneySchema.nullable(),
+  protectedCents: MoneySchema.nullable(),
+  preserveEssentialSpending: z.boolean().nullable(),
+});
+export const AgentTaskPreferenceSchema = z.object({
+  key: z.string().min(1).max(80), value: z.string().max(240), source: AgentTaskSourceSchema,
+});
+export const AgentTaskRunRecordSchema = z.object({
+  id: z.string().min(1), kind: z.enum(['started', 'tool_completed', 'tool_failed', 'waiting', 'resumed', 'stopped']),
+  summary: z.string().min(1).max(240), at: z.string().datetime({ offset: true }),
+  toolResultId: z.string().min(1).nullable(),
+});
+export const AgentTaskSchema = z.object({
+  taskId: z.string().uuid(), threadId: z.string().min(1), demoRunId: z.string().uuid(),
+  goalDraftId: z.string().min(1).nullable(), goalId: z.string().min(1).nullable(),
+  phase: AgentTaskPhaseSchema,
+  waitingReason: z.enum(['missing_information', 'user_choice', 'approval', 'user_paused', 'thread_archived']).nullable(),
+  taskRevision: z.number().int().nonnegative(), baseTwinVersion: z.number().int().positive(),
+  facts: AgentTaskFactsSchema, constraints: AgentTaskConstraintsSchema,
+  candidateTargetDate: IsoDateSchema.nullable(),
+  fieldSources: z.record(z.string(), AgentTaskSourceSchema),
+  preferences: z.array(AgentTaskPreferenceSchema).max(30),
+  unknowns: z.array(z.string().min(1).max(80)).max(30),
+  evidenceRefs: z.array(z.string().min(1)).max(100), candidateRefs: z.array(z.string().min(1)).max(30),
+  runRecords: z.array(AgentTaskRunRecordSchema).max(100),
+  pendingActionId: z.string().min(1).nullable(), nextCheck: z.string().datetime({ offset: true }).nullable(),
+  createdAt: z.string().datetime({ offset: true }), updatedAt: z.string().datetime({ offset: true }),
+  terminationReason: z.enum(['cancelled', 'goal_completed', 'applied', 'failed', 'demo_reset']).nullable(),
+  readOnly: z.boolean(),
+}).superRefine((task, context) => {
+  if (task.constraints.latestAllowedDate && (!task.facts.originalTargetDate ||
+    task.constraints.latestAllowedDate < task.facts.originalTargetDate))
+    context.addIssue({ code: 'custom', path: ['constraints', 'latestAllowedDate'], message: 'TASK_INVALID_DATE_RANGE' });
+  if (task.candidateTargetDate && (!task.facts.originalTargetDate ||
+    task.candidateTargetDate > (task.constraints.latestAllowedDate ?? task.facts.originalTargetDate)))
+    context.addIssue({ code: 'custom', path: ['candidateTargetDate'], message: 'TASK_CANDIDATE_DATE_OUT_OF_RANGE' });
+  const waiting = task.phase === 'awaiting_user' || task.phase === 'awaiting_confirmation' || task.phase === 'paused';
+  if (waiting !== (task.waitingReason !== null))
+    context.addIssue({ code: 'custom', path: ['waitingReason'], message: 'TASK_WAITING_REASON_MISMATCH' });
+  if (task.phase === 'awaiting_confirmation' && task.waitingReason !== 'approval')
+    context.addIssue({ code: 'custom', path: ['waitingReason'], message: 'TASK_APPROVAL_WAIT_REQUIRED' });
+  if (task.phase === 'awaiting_user' && !['missing_information', 'user_choice'].includes(task.waitingReason ?? ''))
+    context.addIssue({ code: 'custom', path: ['waitingReason'], message: 'TASK_USER_WAIT_REQUIRED' });
+  if (task.phase === 'paused' && !['user_paused', 'thread_archived'].includes(task.waitingReason ?? ''))
+    context.addIssue({ code: 'custom', path: ['waitingReason'], message: 'TASK_PAUSE_REASON_REQUIRED' });
+  if ((task.phase === 'completed' || task.phase === 'failed') !== (task.terminationReason !== null))
+    context.addIssue({ code: 'custom', path: ['terminationReason'], message: 'TASK_TERMINATION_MISMATCH' });
+  if (task.phase === 'failed' && task.terminationReason !== 'failed')
+    context.addIssue({ code: 'custom', path: ['terminationReason'], message: 'TASK_FAILURE_REASON_REQUIRED' });
+});
+export type AgentTask = z.infer<typeof AgentTaskSchema>;
+
+export const AgentReadToolNameSchema = z.enum([
+  'financial_overview', 'essential_bills', 'relevant_transactions', 'data_sufficiency',
+  'candidate_preview', 'search_goal_options', 'stress_test_goal_options', 'repair_stressed_goal_option',
+]);
+export type AgentReadToolName = z.infer<typeof AgentReadToolNameSchema>;
+export const SearchGoalOptionsInputSchema = z.object({
+  objective: z.enum(['lower_monthly', 'earlier', 'higher_buffer', 'balanced']).default('balanced'),
+  maxResults: z.number().int().min(1).max(3).default(3),
+}).strict();
+export type SearchGoalOptionsInput = z.infer<typeof SearchGoalOptionsInputSchema>;
+export const CandidateScenarioSchema = z.object({
+  kind: z.enum(['baseline', 'current_month_expense', 'monthly_income_reduction',
+    'monthly_essential_spending_increase', 'missed_contribution_once',
+    'daily_salary_delay', 'fx_change', 'probability']),
+  amountCents: MoneySchema.optional(),
+  startMonthIndex: z.number().int().min(0).max(600).optional(),
+  monthIndex: z.number().int().min(0).max(600).optional(),
+}).strict();
+export const CandidateInputSchema = z.object({
+  targetCents: MoneySchema.positive(), targetDate: IsoDateSchema,
+  monthlyContributionCents: MoneySchema,
+  firstMonthContributionCents: MoneySchema.optional(),
+  protectedCents: MoneySchema,
+  scenario: CandidateScenarioSchema,
+  evidenceResultIds: z.array(z.string().uuid()).max(10).default([]),
+}).strict();
+export type CandidateInput = z.infer<typeof CandidateInputSchema>;
+export const CandidateAssessmentSchema = z.object({
+  status: z.enum(['on_track', 'at_risk', 'infeasible', 'insufficient_data']),
+  projectedDate: IsoDateSchema.nullable(), requiredMonthlyCents: MoneySchema,
+  availableMonthlyCents: MoneySchema, firstMonthCapacityCents: MoneySchema,
+  bufferCents: z.number().int(), fundedByTargetCents: MoneySchema,
+  shortfallCents: MoneySchema, delayDays: z.number().int().nonnegative(),
+  dataSufficient: z.boolean(), constraintViolations: z.array(z.string()),
+}).strict();
+export type CandidateAssessment = z.infer<typeof CandidateAssessmentSchema>;
+export const StressScenarioSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('current_month_expense'), amountCents: MoneySchema.positive() }).strict(),
+  z.object({ kind: z.literal('monthly_income_reduction'), amountCents: MoneySchema.positive(),
+    startMonthIndex: z.number().int().min(0).max(600).optional() }).strict(),
+  z.object({ kind: z.literal('monthly_essential_spending_increase'), amountCents: MoneySchema.positive(),
+    startMonthIndex: z.number().int().min(0).max(600).optional() }).strict(),
+  z.object({ kind: z.literal('missed_contribution_once'),
+    monthIndex: z.number().int().min(0).max(600) }).strict(),
+]);
+export const StressTestGoalOptionsInputSchema = z.object({
+  candidateResultIds: z.array(z.string().uuid()).min(1).max(3),
+  scenarios: z.array(StressScenarioSchema).min(1).max(2),
+}).strict();
+export type StressTestGoalOptionsInput = z.infer<typeof StressTestGoalOptionsInputSchema>;
+export const RepairStressedGoalOptionInputSchema = z.object({
+  stressTestResultId: z.string().uuid(), stressResultId: z.string().uuid(),
+}).strict();
+export type RepairStressedGoalOptionInput = z.infer<typeof RepairStressedGoalOptionInputSchema>;
+export const AgentToolSourceSchema = z.object({
+  kind: z.enum(['account', 'bill', 'transaction', 'connection', 'finance', 'task', 'tool_result']),
+  id: z.string().min(1),
+}).strict();
+export type AgentToolSource = z.infer<typeof AgentToolSourceSchema>;
+const AgentToolEnvelope = z.object({
+  toolResultId: z.string().uuid(), taskId: z.string().uuid(), threadId: z.string().min(1),
+  demoRunId: z.string().uuid(), tool: AgentReadToolNameSchema,
+  twinVersion: z.number().int().positive(), dataAsOf: IsoDateSchema,
+  createdAt: z.string().datetime({ offset: true }),
+  status: z.enum(['ok', 'insufficient_data', 'constraint_violation', 'unsupported']),
+  errorCode: z.string().nullable(), sourceEntities: z.array(AgentToolSourceSchema).max(100),
+  assumptions: z.array(z.string().max(240)).max(20), gaps: z.array(z.string().max(240)).max(20),
+}).strict();
+export const AgentToolResultSchema = z.discriminatedUnion('tool', [
+  AgentToolEnvelope.extend({ tool: z.literal('financial_overview'), output: z.object({
+    checkingCents: MoneySchema, emergencyCents: MoneySchema, monthlyIncomeCents: MoneySchema,
+    fixedBillsCents: MoneySchema, essentialSpendingCents: MoneySchema,
+    availableMonthlyCents: MoneySchema, historyMonths: z.number().int().nonnegative(),
+  }).strict() }),
+  AgentToolEnvelope.extend({ tool: z.literal('essential_bills'), output: z.object({
+    fixedBillsCents: MoneySchema, essentialSpendingCents: MoneySchema,
+    bills: z.array(BillSchema).max(100),
+  }).strict() }),
+  AgentToolEnvelope.extend({ tool: z.literal('relevant_transactions'), output: z.object({
+    transactions: z.array(TransactionSchema).max(30), category: z.string().nullable(),
+  }).strict() }),
+  AgentToolEnvelope.extend({ tool: z.literal('data_sufficiency'), output: z.object({
+    sufficient: z.boolean(), historyMonths: z.number().int().nonnegative(),
+    connectedSources: z.array(DataSourceKindSchema), coverageStart: IsoDateSchema.nullable(),
+    coverageEnd: IsoDateSchema.nullable(),
+  }).strict() }),
+  AgentToolEnvelope.extend({ tool: z.literal('candidate_preview'), output: z.object({
+    input: CandidateInputSchema, assessment: CandidateAssessmentSchema.nullable(),
+    previewId: z.string().nullable(),
+  }).strict() }),
+  AgentToolEnvelope.extend({ tool: z.literal('search_goal_options'), output: z.object({
+    objective: SearchGoalOptionsInputSchema.shape.objective,
+    searchedRangeCents: z.object({ min: MoneySchema, max: MoneySchema }).strict(),
+    evaluatedCount: z.number().int().nonnegative(),
+    candidateResultIds: z.array(z.string().uuid()).max(3),
+    excluded: z.array(z.object({ reason: z.enum(['same_date_higher_monthly',
+      'negative_first_month_buffer']), count: z.number().int().nonnegative() }).strict()).max(2),
+  }).strict() }),
+  AgentToolEnvelope.extend({ tool: z.literal('stress_test_goal_options'), output: z.object({
+    input: StressTestGoalOptionsInputSchema,
+    scenarioBasis: z.literal('bounded_hypothesis'),
+    results: z.array(z.object({ baselineResultId: z.string().uuid(),
+      stressResultId: z.string().uuid(), scenario: StressScenarioSchema,
+      baseline: CandidateAssessmentSchema, stressed: CandidateAssessmentSchema,
+      outcome: z.enum(['holds', 'fails', 'insufficient_data']),
+      failureReasons: z.array(z.enum(['PROJECTED_AFTER_TARGET', 'NO_PROJECTED_DATE',
+        'FIRST_MONTH_SHORTFALL', 'TARGET_SHORTFALL', 'INSUFFICIENT_DATA'])).max(5),
+    }).strict()).min(1).max(6),
+  }).strict() }),
+  AgentToolEnvelope.extend({ tool: z.literal('repair_stressed_goal_option'), output: z.object({
+    input: RepairStressedGoalOptionInputSchema,
+    baselineResultId: z.string().uuid(),
+    scenario: StressScenarioSchema,
+    status: z.enum(['repair_found', 'none_within_constraints']),
+    searchedBounds: z.object({ monthlyContributionMaxCents: MoneySchema,
+      latestAllowedDate: IsoDateSchema }).strict(),
+    evaluatedCount: z.number().int().nonnegative(),
+    repairs: z.array(z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('monthly_contribution_increase'),
+        proposedMonthlyContributionCents: MoneySchema, increaseCents: MoneySchema.positive(),
+        assessment: CandidateAssessmentSchema }).strict(),
+      z.object({ kind: z.literal('deadline_extension'),
+        proposedTargetDate: IsoDateSchema, extensionDays: z.number().int().positive(),
+        assessment: CandidateAssessmentSchema }).strict(),
+    ])).max(2),
+    unavailableReasons: z.array(z.enum(['MONTHLY_LIMIT', 'DEADLINE_LIMIT',
+      'FIRST_MONTH_CAPACITY', 'NO_REPAIR_IN_SEARCH_BOUNDS'])).max(4),
+  }).strict() }),
+]);
+export type AgentToolResult = z.infer<typeof AgentToolResultSchema>;
+
+export const AgentDecisionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('tool_call'), tool: z.string().min(1).max(80), input: z.unknown() }).strict(),
+  z.object({ type: z.literal('ask_user'), question: z.string().min(1).max(180) }).strict(),
+  z.object({ type: z.literal('recommend'), candidateResultIds: z.array(z.string().uuid()).min(1).max(3),
+    tradeoff: z.enum(['earlier', 'lower_monthly', 'higher_buffer', 'balanced']) }).strict(),
+  z.object({ type: z.literal('finish'), reason: z.enum(['no_viable_candidate', 'insufficient_data', 'unsupported']) }).strict(),
+]);
+export type AgentDecision = z.infer<typeof AgentDecisionSchema>;
+export const AgentRunStepSchema = z.object({
+  kind: z.enum(['started', 'tool_completed', 'tool_failed', 'waiting', 'finished', 'stopped']),
+  summary: z.string().min(1).max(240), at: z.string().datetime({ offset: true }),
+  toolResultId: z.string().uuid().nullable(),
+}).strict();
+export const AgentRunSchema = z.object({
+  runId: z.string().uuid(), taskId: z.string().uuid(), threadId: z.string().min(1),
+  demoRunId: z.string().uuid(), triggeringMessageId: z.string().uuid(),
+  status: z.enum(['running', 'completed', 'awaiting_user', 'cancelled', 'failed', 'timed_out', 'fallback']),
+  revision: z.number().int().nonnegative(), provider: z.enum(['deepseek', 'deterministic']).nullable(),
+  startedAt: z.string().datetime({ offset: true }), updatedAt: z.string().datetime({ offset: true }),
+  deadlineAt: z.string().datetime({ offset: true }), decisionCount: z.number().int().nonnegative(),
+  toolCallCount: z.number().int().nonnegative(), reasonCode: z.string().nullable(),
+  recommendedResultIds: z.array(z.string().uuid()).max(3), question: z.string().nullable(),
+  steps: z.array(AgentRunStepSchema).max(100),
+}).strict();
+export type AgentRun = z.infer<typeof AgentRunSchema>;
+export const MonitorStatusSchema = z.object({
+  enabled: z.boolean(), goalId: z.string().nullable(),
+  status: z.enum(['active', 'paused', 'cancelled']).nullable(),
+  pendingEvents: z.number().int().nonnegative(),
+});
+export type MonitorStatus = z.infer<typeof MonitorStatusSchema>;
+export const AgentRunStatusResponseSchema = z.object({ run: AgentRunSchema.nullable() }).strict();
+export const AgentRunCancelRequestSchema = z.object({ runId: z.string().uuid() }).strict();
+
 export const PlanStepSchema = z.object({
   id: z.enum(['goal_details', 'assumptions', 'plan_selection', 'activation']),
   label: z.string(),
@@ -363,6 +599,15 @@ export const AgentComponentSchema = z.discriminatedUnion('type', [
   AgentComponentBase.extend({ type: z.literal('plan_compare'), title: z.string(), plans: z.array(PlanSchema).min(1).max(3) }),
   AgentComponentBase.extend({ type: z.literal('impact_summary'), title: z.string(), impact: ImpactSchema,
     protectedCents: MoneySchema }),
+  AgentComponentBase.extend({ type: z.literal('expense_impact_answer'), title: z.string(),
+    amountCents: MoneySchema.positive(), mode: z.enum(['hypothetical', 'reported']),
+    summary: z.string(), cashFlowChange: z.string(), goalChange: z.string(),
+    practicalMeaning: z.string(), nextStep: z.string(), question: z.string(),
+    evidence: z.object({ twinVersion: z.number().int().positive(),
+      baselineFirstMonthCapacityCents: MoneySchema, expenseFirstMonthCapacityCents: MoneySchema,
+      baselineProjectedDate: IsoDateSchema.nullable(), expenseProjectedDate: IsoDateSchema.nullable(),
+      baselineStatus: CandidateAssessmentSchema.shape.status,
+      expenseStatus: CandidateAssessmentSchema.shape.status }).strict() }),
   AgentComponentBase.extend({ type: z.literal('risk_signal'), title: z.string(),
     signal: GoalImpactSignalSchema, pattern: SpendingPatternSchema, protectedCents: MoneySchema }),
   AgentComponentBase.extend({ type: z.literal('mandate_preview'), title: z.string(), mandate: z.object({
@@ -375,6 +620,8 @@ export const AgentComponentSchema = z.discriminatedUnion('type', [
     status: z.enum(['succeeded', 'failed', 'unknown']), operationId: z.string().optional() }),
   AgentComponentBase.extend({ type: z.literal('audit_summary'), title: z.string(), body: z.string(), chainValid: z.boolean() }),
   AgentComponentBase.extend({ type: z.literal('clarification'), title: z.string(), body: z.string(), suggestions: z.array(z.string()).max(4) }),
+  AgentComponentBase.extend({ type: z.literal('data_connection_prompt'), title: z.string(), body: z.string(),
+    threadId: z.string() }),
   AgentComponentBase.extend({ type: z.literal('error_recovery'), title: z.string(), body: z.string(), code: z.string() }),
   AgentComponentBase.extend({ type: z.literal('goal_input_card'), title: z.string(), goal: GoalSchema.pick({
     title: true, targetCents: true, savedCents: true, targetDate: true, protectedCents: true, status: true,
@@ -398,6 +645,30 @@ export const AgentComponentSchema = z.discriminatedUnion('type', [
   AgentComponentBase.extend({ type: z.literal('agent_request_batch'), title: z.string(), body: z.string(),
     options: z.array(z.object({ id: z.enum(['execute', 'ask', 'manual_review', 'block']), label: z.string(), detail: z.string() })).length(4),
     action: z.object({ actionId: z.string().min(10), label: z.string() }) }),
+  AgentComponentBase.extend({ type: z.literal('task_progress'), title: z.string(),
+    status: AgentRunSchema.shape.status, steps: z.array(AgentRunStepSchema).max(20) }),
+  AgentComponentBase.extend({ type: z.literal('monitoring_opt_in'), title: z.string(), body: z.string(),
+    taskThreadId: z.string(), goalId: z.string(), enabled: z.boolean() }),
+  AgentComponentBase.extend({ type: z.literal('monitor_followup_offer'), title: z.string(), body: z.string(),
+    taskThreadId: z.string() }),
+  AgentComponentBase.extend({ type: z.literal('candidate_recommendations'), title: z.string(), body: z.string(),
+    taskThreadId: z.string().optional(),
+    conditionalPlan: z.object({ monthlyContributionCents: MoneySchema.positive(),
+      projectedDate: IsoDateSchema, targetDate: IsoDateSchema }).optional(),
+    items: z.array(z.object({ resultId: z.string().uuid(), targetCents: MoneySchema.positive(),
+      label: z.string().max(30).optional(),
+      targetDate: IsoDateSchema, monthlyContributionCents: MoneySchema,
+      firstMonthContributionCents: MoneySchema.optional(),
+      protectedCents: MoneySchema, projectedDate: IsoDateSchema.nullable(),
+      bufferCents: z.number().int(), status: z.enum(['on_track', 'at_risk']),
+      tradeoff: z.enum(['earlier', 'lower_monthly', 'higher_buffer', 'balanced']),
+      explanation: z.string(), assumptions: z.array(z.string()), gaps: z.array(z.string()) })).max(3) }),
+  AgentComponentBase.extend({ type: z.literal('stress_analysis'), title: z.string(), body: z.string(),
+    twinVersion: z.number().int().positive(), dataAsOf: IsoDateSchema,
+    items: z.array(z.object({ baselineResultId: z.string().uuid(), stressResultId: z.string().uuid(),
+      scenarioLabel: z.string().max(120), outcome: z.enum(['holds', 'fails', 'insufficient_data']),
+      explanation: z.string().max(900), repairText: z.string().max(500),
+    }).strict()).min(1).max(6) }),
 ]);
 export type AgentComponent = z.infer<typeof AgentComponentSchema>;
 
@@ -422,6 +693,8 @@ export const AgentTurnSchema = z.object({
   canvasComponents: z.array(AgentComponentSchema).default([]),
 });
 export type AgentTurn = z.infer<typeof AgentTurnSchema>;
+export const AgentTurnWithRunSchema = AgentTurnSchema.extend({ run: AgentRunSchema.nullable() });
+export type AgentTurnWithRun = z.infer<typeof AgentTurnWithRunSchema>;
 
 export const SnapshotSchema = z.object({
   goal: GoalSchema, finance: FinanceSchema, assessment: AssessmentSchema,

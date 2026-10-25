@@ -8,9 +8,9 @@ export default defineConfig({
   reporter: 'line',
   use: { baseURL: 'http://localhost:3177', trace: 'retain-on-failure', channel: 'chrome' },
   webServer: {
-    command: 'npm run build && PORT=3177 NOVA_RP_ID=localhost NOVA_ORIGIN=http://localhost:3177 NOVA_DB_PATH=./data/e2e.sqlite DEEPSEEK_API_KEY= NOVA_SESSION_SECRET=playwright-session-secret-at-least-32-characters npm start',
+    command: 'npm run build && node --import tsx scripts/start-e2e.mjs',
     url: 'http://localhost:3177/api/health',
-    timeout: 30_000,
+    timeout: 90_000,
     reuseExistingServer: false,
   },
   projects: [

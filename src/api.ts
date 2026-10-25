@@ -2,12 +2,18 @@ import { SnapshotSchema, type Snapshot } from '../shared/contracts';
 import type { Goal, ImpactScenario } from './types';
 
 export async function api<T = Snapshot>(url: string, method = 'GET', body?: unknown): Promise<T> {
-  const response = await fetch(url, {
-    method,
-    credentials: 'same-origin',
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      cache: url.startsWith('/api/agent') ? 'no-store' : 'default',
+      credentials: 'same-origin',
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new Error('暂时无法连接本地服务。请稍后重试，已输入的内容会保留。');
+  }
   const json = await response.json();
   if (!response.ok) throw new Error(json.error || '请求失败，请稍后重试');
   return url === '/api/goal/interpret' || url === '/api/goals' || url === '/api/ui/cards' || url === '/api/mcp/token' || url.startsWith('/api/operations/') || url.startsWith('/api/agent') || url.startsWith('/api/risk/') || url.startsWith('/api/data-connections') || url.startsWith('/api/demo/data-connections/')

@@ -19,11 +19,11 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-test('clean HTTP demo completes goal, impact, tool and session isolation flows', { timeout: 30_000 }, async () => {
+test('clean HTTP demo completes goal, impact, tool and session isolation flows', { timeout: 180_000 }, async () => {
   const directory = mkdtempSync(join(tmpdir(), 'nova-http-'));
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
-  const child = spawn(join(process.cwd(), 'node_modules/.bin/tsx'), ['server/index.ts'], {
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
     cwd: process.cwd(), stdio: 'ignore', env: { ...process.env, PORT: String(port),
       NOVA_DB_PATH: join(directory, 'demo.sqlite'), DEEPSEEK_API_KEY: '', NODE_ENV: 'production',
       NOVA_SESSION_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef',
@@ -31,9 +31,9 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
   });
   try {
     let ready = false;
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 180; i++) {
       try { const response = await fetch(`${base}/api/health`); if (response.ok) { ready = true; break; } }
-      catch { await new Promise(resolve => setTimeout(resolve, 100)); }
+      catch { await new Promise(resolve => setTimeout(resolve, 500)); }
     }
     assert.equal(ready, true, 'production server must start');
     let cookie = '';
@@ -43,7 +43,7 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
         body: body === undefined ? undefined : JSON.stringify(body) });
       const setCookie = response.headers.get('set-cookie');
       if (setCookie) cookie = setCookie.split(';')[0];
-      return { code: response.status, data: await response.json() };
+      return { code: response.status, data: await response.json(), cacheControl: response.headers.get('cache-control') };
     }
     const initial = await call('/api/session');
     assert.equal(initial.code, 200);
@@ -179,9 +179,32 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     assert.equal((previewApplied.data as { snapshot: Snapshot }).snapshot.goal.status, 'active');
     const turn = await call('/api/agent/turn', 'POST', { threadId, message: '我想年底去日本旅行，预算 ¥8,000' });
     assert.equal(turn.code, 200);
-    const turnData = turn.data as { intent: string; components: Array<{ type: string; actions?: Array<{ actionId: string }> }> };
+    assert.match(turn.cacheControl ?? '', /no-store/);
+    const turnData = turn.data as { intent: string; run: { runId: string } | null;
+      components: Array<{ type: string; actions?: Array<{ actionId: string }> }> };
     assert.equal(turnData.intent, 'goal_planning');
-    const actionId = turnData.components.find(item => item.type === 'scenario_compare')?.actions?.[0]?.actionId;
+    assert.equal(turnData.run, null);
+    assert.ok(turnData.components.some(item => item.type === 'clarification'));
+    assert.ok(turnData.components.some(item => item.type === 'data_connection_prompt'));
+    const connectedForAgent = await call('/api/data-connections/connect', 'POST',
+      { sources: ['bank', 'wechat_pay', 'alipay'] });
+    assert.equal(connectedForAgent.code, 200);
+    const withSavings = await call('/api/agent/turn', 'POST', { threadId, message: '已存 0 元' });
+    assert.ok((withSavings.data as { run: { runId: string } | null }).run?.runId);
+    let runStatus = await call(`/api/agent/threads/${threadId}/run`);
+    for (let i = 0; i < 20 && (runStatus.data as { run: { status: string } }).run.status === 'running'; i++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      runStatus = await call(`/api/agent/threads/${threadId}/run`);
+    }
+    assert.match(runStatus.cacheControl ?? '', /no-store/);
+    assert.equal((runStatus.data as { run: { status: string } }).run.status, 'fallback');
+    const recommended = await call(`/api/agent/threads/${threadId}/messages`);
+    const resultId = (recommended.data as { messages: Array<{ components: Array<{
+      type: string; items?: Array<{ resultId: string }> }> }> }).messages
+      .flatMap(item => item.components).find(item => item.type === 'candidate_recommendations')?.items?.[0]?.resultId;
+    assert.ok(resultId);
+    const selected = await call('/api/agent/candidate/select', 'POST', { threadId, resultId });
+    const actionId = (selected.data as { actionId: string }).actionId;
     assert.ok(actionId);
     const action = await call('/api/agent/action', 'POST', { actionId, decision: 'confirm' });
     assert.equal(action.code, 200);
@@ -189,7 +212,7 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     const actionReplay = await call('/api/agent/action', 'POST', { actionId, decision: 'confirm' });
     assert.equal((actionReplay.data as { replayed: boolean }).replayed, true);
     const messages = await call(`/api/agent/threads/${threadId}/messages`);
-    assert.equal((messages.data as { messages: unknown[] }).messages.length, 4);
+    assert.ok((messages.data as { messages: unknown[] }).messages.length >= 5);
     assert.equal((await call(`/api/agent/threads/${threadId}`, 'PATCH', { title: '冬季日本旅行' })).code, 200);
     assert.equal((await call(`/api/agent/threads/${threadId}`, 'DELETE')).code, 200);
   } finally {

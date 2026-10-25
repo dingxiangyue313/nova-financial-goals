@@ -20,7 +20,11 @@ React 原版界面 + 对话工作台 ── same-origin /api ── Express 服�
 - 批准：`server/governance.ts` 冻结 action、参数、Twin Version 和过期时间并计算 SHA-256；用户确认后签发短期一次性 Token。参数、版本、期限或消费状态不匹配即拒绝。
 - 外部认证：`server/security.ts` 用 HMAC 绑定 Agent ID、会话主体、时间戳、Nonce 和请求体；5 分钟窗口和持久化 Nonce 防止重放。它同时提供 Prompt Injection 检测与本地限流。
 - 工作台：`server/workspace.ts` 生成完整 Agent Turn。最近 20 条消息和精简 Twin 状态仅用于意图理解；服务端按白名单组合组件，并为写操作签发绑定会话、Twin Version、期限和幂等键的 `actionId`。
-- 模型：`server/agent.ts` 调用 DeepSeek Chat Completions；只识别意图、解析目标和生成短解释。模型不能写状态、生成工具参数、创建组件类型或改变计算值。超时、无 Key、无效输出或 Prompt Injection 回退确定性模式。
+- 模型：`server/agent.ts`、`server/understanding.ts` 与 `server/agent-runner.ts` 调用 DeepSeek Chat Completions。理解环节只接受当前消息的原文片段建议；阶段 4 的任务运行器让模型在受限决策协议中选择只读工具、追问或结束。金额、日期、工具参数和结果引用均由服务端校验；模型不能改变权威计算值、正式状态、Action 或批准。超时、无 Key、无效输出或 Prompt Injection 回退确定性模式。
+- 调查与试算：`server/agent-read-tools.ts` 的八种白名单工具绑定服务端会话和任务，结果保存在 `agent_tool_results`；`server/domain.ts:assessCandidateScenario` 使用逐月投入序列计算单个候选的可行性。`search_goal_options` 在硬约束内寻找不同完成日期的固定月存候选，排除首月负缓冲与同日高月存方案，再保存可追溯的候选结果 ID。`stress_test_goal_options` 对当前任务已核验的基线候选批量计算有界压力假设，汇总来源、版本、失效结果与原因。`repair_stressed_goal_option` 在用户允许的月存与日期范围内分别搜索通过同一压力情景的最小调整。工具结果带来源实体、Twin Version、假设与缺口，输入引用须归属当前任务。已支持的一次性额外支出、持续收入下降、持续必要支出上升及单月漏存只做模拟计算，不写入 Financial Twin，也不能直接作为可激活候选。旧版固定三方案不代表自定义候选结果。详见 `docs/AGENT_OPTION_SEARCH.md` 与 `docs/AGENT_STRESS_CALCULATOR.md`。
+- 自主任务：`server/agent-runner.ts` 在每次模型决策和工具调用后持久化步骤；单次运行最多 6 次决策、12 次工具调用和 45 秒。运行绑定任务修订、演示 Run 和 Twin Version，并使用数据库租约防止并行领取；新消息、取消、旧版本或过期会终止旧运行。候选卡片只接受当前任务已验证的试算结果。工作台可查看进度、刷新恢复与取消运行；Agent API 禁止缓存。
+- 候选应用：工作台从最新运行推荐的只读结果生成冻结 Action，绑定任务修订、候选哈希、Twin Version、期限和幂等键。单独确认后，内部 `apply_goal_candidate` 工具消费 Approval，原子激活精确的自定义目标并核对正式状态；它不在公开工具列表或 MCP 中。主目标指针随之切换，余额、应急金和 Mandate 保持原值，监测需另行启用。
+- 目标监测：用户明确启用后，`persistStateChange` 在财务状态事务中为活跃订阅写入 `monitor_events`。`server/monitor-worker.ts` 定期原子领取、使用 30 秒租约和最多 3 次退避重试；重启后可接管过期租约。确定性风险筛查先过滤安静变化，再调用白名单只读工具核查证据和修复试算。通知与事件完成状态在同一事务中保存，并按风险信号去重。静默时段按 Asia/Shanghai 的真实时间延后，奖金跟进按 Demo Clock 到期且需要单独启用。修复候选仍回到阶段 5 的独立确认链路。
 - 历史：每个体验者可拥有多个长期会话。显著支出按 Impact ID 去重创建未读风险会话；重置演示会轮换 Run ID，并将旧会话转为只读。
 - MCP：`server/mcp.ts` 使用 TypeScript SDK Streamable HTTP，只暴露读取、预测、模拟请求和状态查询；它不能创建 Mandate、确认自己的 Approval 或直接写审计。
 
@@ -62,6 +66,12 @@ Agent 请求按固定顺序判断：身份、有效期、余额、保护资金�
 | `PATCH/DELETE /api/agent/threads/:id` | 重命名、归档、恢复或删除会话 |
 | `GET /api/agent/threads/:id/messages` | 读取已校验的消息与生成组件 |
 | `POST /api/agent/turn` | 自然语言输入 → 意图 → 服务端受控组件 |
+| `POST /api/agent/candidate/select` | 将已验证候选冻结为待用户确认的 Action |
+| `GET /api/agent/threads/:id/monitoring` | 读取目标监测状态 |
+| `POST /api/agent/monitoring` | 明确启用或暂停目标监测 |
+| `POST /api/agent/followup` | 明确安排奖金核对，不预先计入收入 |
+| `GET /api/agent/threads/:id/run` | 读取当前任务运行状态与已保存步骤 |
+| `POST /api/agent/threads/:id/run/cancel` | 取消当前任务运行 |
 | `POST /api/agent/action` | 确认或取消服务端绑定的写操作 |
 | `GET/POST /api/financial-twin` | 读取版本化 Twin 或调用统一模拟工具 |
 | `GET/POST /api/goal-flow` | 读取目标状态机或执行目标迁移 |
@@ -86,6 +96,10 @@ Agent 请求按固定顺序判断：身份、有效期、余额、保护资金�
 | `GET /api/health` | 健康检查 |
 
 HTTP 写入默认检查 Origin，浏览器 Cookie 为 HttpOnly、SameSite=Lax，生产环境加 Secure。服务按 IP/入口做本地限流，结构化日志不记录正文、Key、签名或完整账户标识。MCP 使用独立 Bearer 令牌绑定同一模拟会话。
+
+## 阶段 7 验证分层
+
+`npm test` 验证确定性计算、状态、安全与脚本化决策协议；`server/agent-acceptance.test.ts` 串联目标调整、确认应用、显著变化和修复确认。`npm run eval:agent:real` 是独立 opt-in 的真实 DeepSeek 多轮只读调查评测，默认跳过、最多 24 次模型决策，不属于离线 CI。具体场景、指标、通过与跳过项见 `docs/AGENT_EVALUATION_REPORT.md`。脚本化模型通过不代表真实模型任务完成率。
 
 ## 项目来源与版本
 
