@@ -91,14 +91,14 @@ test('主动询问支出时展示只读对比，不新增模拟流水', async ({
   await activateGoalFromWorkspace(page);
   await openWorkspace(page);
   const before = await page.request.get('/api/session');
-  const transactionsBefore = (await before.json()).transactions.length;
+  const twinVersionBefore = (await before.json()).twinVersion;
   await page.getByPlaceholder('描述目标、风险或授权范围…').fill('这笔¥900支出会影响目标吗？');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByRole('heading', { name: '这笔支出对目标的影响' }).first()).toBeVisible();
   await expect(page.getByText(/支出前.*支出后/).first()).toBeVisible();
   await expect(page.getByText('查看计算依据').first()).toBeVisible();
   const after = await page.request.get('/api/session');
-  expect((await after.json()).transactions.length).toBe(transactionsBefore);
+  expect((await after.json()).twinVersion).toBe(twinVersionBefore);
 });
 
 test('对话故事三：创建限定授权并运行受治理的外部 Agent 请求', async ({ page }) => {
@@ -151,6 +151,7 @@ test('目标画布由 NOVA 核算多个候选并逐项解释', async ({ page }) 
   const card = page.locator('article').filter({ hasText: '已核验的参考方案' }).first();
   await expect(card).toBeVisible();
   await expect(card.getByRole('button', { name: '选择此候选并核对确认' })).toHaveCount(3);
+  await card.getByText('看看计算依据').first().click();
   await expect(card.getByText(/首月可动用额度/).first()).toBeVisible();
   await expect(page.getByTestId('assumption-editor')).toHaveCount(0);
   await card.getByRole('button', { name: '选择此候选并核对确认' }).first().click();
@@ -180,11 +181,11 @@ test('只读调查在刷新后保留真实步骤，并适配工作台宽度', as
     .fill('我想年底去日本旅行，预算 ¥8,000，已经存了 ¥0，每月最多存 ¥2,000');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByText('规则试算已完成')).toBeVisible();
-  await expect(page.getByText('candidate_preview：ok').first()).toBeVisible();
+  await expect(page.getByText('search_goal_options：ok').first()).toBeVisible();
   await page.reload();
   await openWorkspace(page);
   await expect(page.getByText('规则试算已完成')).toBeVisible();
-  await expect(page.getByText('candidate_preview：ok').first()).toBeVisible();
+  await expect(page.getByText('search_goal_options：ok').first()).toBeVisible();
   const overflow = await page.evaluate(() => ({ amount: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     elements: [...document.querySelectorAll('*')].filter(element => element.getBoundingClientRect().right > window.innerWidth + 1)
       .slice(0, 8).map(element => ({ tag: element.tagName, className: element.className, text: element.textContent?.slice(0, 35) })) }));
@@ -202,7 +203,7 @@ test('未确认已存金额时先追问，补充后再开始只读调查', async
   await composer.fill('已存 0 元');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByText('规则试算已完成')).toBeVisible();
-  await expect(page.getByText('candidate_preview：ok').first()).toBeVisible();
+  await expect(page.getByText('search_goal_options：ok').first()).toBeVisible();
 });
 
 test('已验证候选单独确认后才能启用目标监测与奖金跟进', async ({ page }) => {
