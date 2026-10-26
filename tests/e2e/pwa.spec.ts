@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 test.setTimeout(90_000);
 
 async function openDemo(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/demo-control');
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
   await page.request.post('/api/demo/load-japan');
   await page.reload();

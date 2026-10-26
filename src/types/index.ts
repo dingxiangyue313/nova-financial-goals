@@ -1,4 +1,4 @@
-export type ScreenId = 'home' | 'workspace' | 'create_goal' | 'data_connections' | 'feasibility' | 'impact' | 'goals_list' | 'activity' | 'profile' | 'banking_demo';
+export type ScreenId = 'home' | 'bills' | 'savings' | 'workspace' | 'create_goal' | 'data_connections' | 'feasibility' | 'impact' | 'goals_list' | 'activity' | 'profile' | 'banking_demo';
 
 export interface Goal {
   id: string;

@@ -18,7 +18,6 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
   onNext,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [customQuote, setCustomQuote] = useState(
     goal.quote || '“我想三个月后去日本旅行，预算¥8,000，不能动应急金。”'
   );
@@ -80,25 +79,7 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
                 已记录原话
               </span>
             </div>
-            <button
-              onClick={() => {
-                setIsRecording(!isRecording);
-                if (!isRecording) {
-                  setTimeout(() => {
-                    setIsRecording(false);
-                  }, 2000);
-                }
-              }}
-              className="flex items-center gap-1 text-[#5A616B] hover:text-[#0F6B6D] transition-colors cursor-pointer text-left"
-              title="点击模拟语音重录"
-            >
-              <span className={`material-symbols-outlined text-[14px] ${isRecording ? 'text-red-500 animate-pulse' : ''}`}>
-                {isRecording ? 'graphic_eq' : 'mic'}
-              </span>
-              <span className="text-[12px] leading-tight">
-                {isRecording ? '正在聆听录音...' : '2026年9月21日 · 语音/文字输入'}
-              </span>
-            </button>
+            <span className="text-[12px] text-[#5A616B]">文字输入 · 可随时编辑</span>
           </div>
 
           <div className="bg-[#F5F7F8] p-2.5 rounded-lg border border-[#E5E8EB] flex flex-col gap-1.5">
@@ -335,7 +316,8 @@ export const CreateGoalScreen: React.FC<CreateGoalScreenProps> = ({
 
           <button
             onClick={() => {
-              alert('已开启补充信息模式：可记录例如「机票已出/不可退」、「可接受青年旅舍」等个性化边界。');
+              setIsEditing(true);
+              document.querySelector<HTMLTextAreaElement>('textarea')?.focus();
             }}
             type="button"
             id="cta-more"

@@ -5,7 +5,7 @@ async function openApp(page: Page) {
     await new Promise(resolve => setTimeout(resolve, 150));
     await route.continue();
   });
-  await page.goto('/');
+  await page.goto('/demo-control');
   await expect(page.getByTestId('nova-welcome')).toBeVisible();
   await expect(page.getByTestId('nova-welcome')).toBeHidden();
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();

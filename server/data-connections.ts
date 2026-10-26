@@ -91,6 +91,7 @@ function batch(state: DemoState, kind: DataSyncBatch['kind'], sources: DataSourc
 }
 
 export function ensureDataSync(input: DemoState): { state: DemoState; result: DataSyncResult } {
+  if (input.mission) return { state: input, result: { importedCount: 0, replayed: true, status: 'unchanged', sources: input.dataConnections.map(c => ({ source: c.source, status: 'unchanged', importedCount: 0, errorCode: null })), batchKinds: [], coverageStart: '2026-05-01', coverageEnd: input.finance.updatedAt, twinVersion: input.twinVersion } };
   const sources = connectedSources(input);
   const versionBefore = input.twinVersion;
   const beforeIds = new Set(input.transactions.map(item => item.id));

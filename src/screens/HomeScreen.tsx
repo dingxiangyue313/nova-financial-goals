@@ -1,3 +1,5 @@
+import { datedCashflow } from '../../shared/mission';
+import { billFacts, money } from './MoneyMissionScreen';
 import React, { useEffect, useState } from 'react';
 import { Goal } from '../types';
 import { SnapshotSchema, type Snapshot } from '../../shared/contracts';
@@ -27,6 +29,7 @@ interface HomeScreenProps {
   onNavigateToFeasibility: () => void;
   onNavigateToImpact: () => void;
   onNavigateToCreate: () => void;
+  onNavigateToBills: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -36,6 +39,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateToFeasibility,
   onNavigateToImpact,
   onNavigateToCreate,
+  onNavigateToBills,
 }) => {
   const [now, setNow] = useState(() => new Date());
 
@@ -44,6 +48,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => window.clearInterval(timer);
   }, []);
 
+  const facts = snapshot.mission ? billFacts(snapshot.mission.rows) : null;
+  const cashflow = snapshot.mission ? datedCashflow({ clock: snapshot.clock, finance: snapshot.finance, mission: snapshot.mission }, snapshot.mission.schedule?.amountCents ?? 0) : null;
   const percentage = goal.progressPercent.toFixed(1);
   const cards = SnapshotSchema.shape.cards.parse(snapshot.cards).map(card => normalizeUiCard(card));
   const insight = cards.find(card => card.type === 'goal_feasibility_card');
@@ -57,7 +63,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <section className="flex flex-col gap-0.5">
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium text-[#5A616B]">
-            {formatCurrentDate(now)} · 今日
+            {snapshot.mission ? formatCurrentDate(new Date(`${snapshot.clock}T12:00:00+08:00`)) + ' · 模拟今日' : formatCurrentDate(now) + ' · 今日'}
           </span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] text-[11px] font-semibold">
             <span className="material-symbols-outlined text-[13px]">verified</span>
@@ -79,10 +85,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </section>
 
+      {facts && <button onClick={onNavigateToBills} className="text-left rounded-2xl bg-[#0F6B6D] px-[15px] py-4 text-white shadow-md flex flex-col gap-2.5" aria-label="查看账单与消费">
+        <span className="text-[11px] font-semibold text-white/90">消费趋势 · 银行卡 / 微信 / 支付宝 · 截至 {snapshot.clock}</span>
+        <strong className="text-[19px]">10月花了 {money(facts.total)}</strong>
+        <div className="grid grid-cols-3 gap-2">{[{ title: '外卖多出', value: money(facts.increase) + '/月' }, { title: snapshot.mission?.subscription.nextChargeSuppressed ? '已关闭续费' : '11月5日续费', value: snapshot.mission?.subscription.nextChargeSuppressed ? '每月省¥68' : '¥68' }, { title: '工资前最低', value: money(cashflow?.lowCents ?? 0) }].map(x => <div key={x.title} className="rounded-xl bg-white/10 p-2"><span className="block text-[10px] text-white">{x.title}</span><strong className="text-[14px]">{x.value}</strong></div>)}</div>
+        <span className="text-[12px] font-bold">点开处理 CloudBox Plus，并安排工资到账后转入 →</span>
+      </button>}
+      {!facts && <button onClick={onNavigateToBills} className="mission-primary">查看账单与旅行任务 →</button>}
+
       <div className="flex items-center gap-1.5 rounded-lg border border-[#E5E8EB] bg-white px-3 py-2 text-[11px] text-[#5A616B]">
         <span className="material-symbols-outlined text-[15px] text-[#0F6B6D]">sync</span>
         {connectedSources.length
-          ? `已连接 ${connectedSources.length} 个模拟来源 · 数据更新于 ${formatCurrentDateTime(now)}`
+          ? `已连接 ${connectedSources.length} 个模拟来源 · 财务数据截至 ${snapshot.finance.updatedAt}`
           : '尚未连接流水 · 当前结果仅为演示估算'}
       </div>
 
@@ -154,16 +168,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Financial Metrics */}
         <div className="flex items-baseline justify-between pt-0.5">
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex items-baseline gap-1 min-w-0 whitespace-nowrap">
             <span className="text-[12px] text-[#5A616B]">已存</span>
-            <span className="text-[22px] font-bold text-[#1F2329] tracking-tight font-editorial">
+            <span className="text-[20px] font-bold text-[#1F2329] tracking-tight font-editorial">
               ¥{goal.currentAmount.toLocaleString()}
             </span>
-            <span className="text-[13px] text-[#5A616B]">
+            <span className="text-[11px] text-[#5A616B]">
               / ¥{goal.targetAmount.toLocaleString()}
             </span>
           </div>
-          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] text-[12px] font-semibold">
+          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] text-[10px] font-semibold whitespace-nowrap shrink-0">
             <span className="material-symbols-outlined text-[14px]">trending_up</span>
             <span>已完成 {percentage}%</span>
           </div>

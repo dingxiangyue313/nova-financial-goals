@@ -21,6 +21,7 @@ const statusLabel: Record<Operation['status'], string> = {
   executed: '已执行', ask: '待确认', manual_review: '待设备验证', blocked: '已拦截', unknown: '状态待核对',
 };
 const activityLabel: Record<string, string> = {
+  cancel_subscription: '订阅处理结果已核对', create_schedule: '旅行储蓄安排已确认', scheduled_transfer: '储蓄执行结果已核对', reconcile_subscription: '商户状态已核实', pause_schedule: '储蓄计划已暂停', resume_schedule: '储蓄计划已恢复', cancel_schedule: '储蓄计划已取消', mission_loaded: '旅行任务已准备', statement_import: '账单已导入', subscription_preference: '订阅偏好已保存',
   create_goal: '创建了新目标', update_goal: '更新了目标假设', select_goal_plan: '选择了推进方案',
   primary_goal_changed: '切换了首页主目标', demo_loaded: '载入了演示场景', data_sync: '模拟流水已更新',
   simulate_expense: '发现一笔目标相关支出', impact_decision: '调整了目标计划', create_mandate: '创建了旅行助手授权',
@@ -142,7 +143,7 @@ export function ActivityScreen({ snapshot, mutate, hasImpactPending, onNavigateT
     <div><h2 className="text-[18px] font-bold">动态</h2><p className="text-[12px] text-[#5A616B]">先处理需要确认的事项，再查看目标变化</p></div>
     {platformAvailable === false && needsAttention.some(item => item.status === 'manual_review') && <p className="rounded-xl bg-amber-50 p-3 text-[11px] text-amber-800">当前环境不能调用系统设备验证；该请求会保持未执行。公网手机端需使用 HTTPS。</p>}
     {securityMessage && <p role="status" className="rounded-xl bg-[#F1F8F8] p-3 text-[11px] text-[#5A616B]">{securityMessage}</p>}
-    <div className="flex items-center justify-between"><h3 className="text-[14px] font-bold">需要你处理</h3><button onClick={onNavigateToBanking} className="text-[11px] font-semibold text-[#0F6B6D]">演示请求</button></div>
+    <div className="flex items-center justify-between"><h3 className="text-[14px] font-bold">需要你处理</h3>{!snapshot.mission && <button onClick={onNavigateToBanking} className="text-[11px] font-semibold text-[#0F6B6D]">演示请求</button>}</div>
     {needsAttention.length === 0 && <div className="rounded-xl border bg-white p-4 text-[12px] text-[#5A616B]">目前没有待确认事项。</div>}
     {needsAttention.map(operation => <OperationCard key={operation.operationId} operation={operation} events={grouped.get(operation.operationId) || []} snapshot={snapshot} mutate={mutate} passkey={passkey} onPasskeyChanged={register}/>) }
     <h3 className="pt-1 text-[14px] font-bold">目标变化</h3>
@@ -152,6 +153,7 @@ export function ActivityScreen({ snapshot, mutate, hasImpactPending, onNavigateT
       <h4 className="text-[14px] font-bold mt-1">{activityLabel[event.action] || 'NOVA 已更新目标状态'}</h4><p className="text-[12px] text-[#5A616B]">{event.detail}</p>
       {hasImpactPending && event.action === 'simulate_expense' && <button onClick={onNavigateToImpact} className="mt-2 w-full py-2 bg-[#E6F2F2] text-[#0F6B6D] rounded-lg text-[12px] font-semibold">查看影响与解决方案</button>}
     </div>)}
+    {snapshot.mission?.receipts.map(r => <div key={r.id} className="mission-card"><strong className="text-sm">{r.date} · {({ succeeded: '已完成', failed: '未完成', unknown: '结果待核实', skipped: '本期跳过' })[r.status]}</strong><p>{r.detail}</p><span className="text-[10px] text-[#697386] break-all">凭证 {r.id}</span></div>)}
     <h3 className="pt-1 text-[14px] font-bold">最近完成</h3>
     {completed.length === 0 && <div className="rounded-xl border bg-white p-4 text-[12px] text-[#5A616B]">还没有已完成或已拦截的请求。</div>}
     {completed.map(operation => <OperationCard key={operation.operationId} operation={operation} events={grouped.get(operation.operationId) || []} snapshot={snapshot} mutate={mutate} passkey={passkey} onPasskeyChanged={register}/>) }

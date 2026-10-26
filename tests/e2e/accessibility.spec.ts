@@ -12,7 +12,7 @@ async function expectNoSeriousViolations(page: Page, screen: string) {
 test('首页、工作台、可行性、影响和授权页无严重无障碍问题', async ({ page }) => {
   test.setTimeout(60_000);
   await page.route(/https:\/\/(fonts\.(googleapis|gstatic)\.com|images\.unsplash\.com|lh3\.googleusercontent\.com)\/.*/, route => route.abort());
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/demo-control', { waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ content: '*, *::before, *::after { animation: none !important; transition: none !important; }' });
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
   await page.request.post('/api/demo/load-japan');

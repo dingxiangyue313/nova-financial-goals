@@ -42,9 +42,10 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <div className="flex items-center gap-2">
           <button
+            disabled={!onOpenSimulateModal}
             onClick={onOpenSimulateModal}
             className="px-2.5 py-0.5 rounded-full bg-[#F0F2F5] hover:bg-[#E5E8EB] active:scale-95 text-[#5A616B] text-[12px] font-medium transition-all cursor-pointer flex items-center gap-1"
-            title="查看模拟时间与自动同步"
+            title={onOpenSimulateModal ? "查看模拟时间与自动同步" : "所有操作仅使用模拟数据"}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#8F959E]"></span>
             <span>模拟数据</span>

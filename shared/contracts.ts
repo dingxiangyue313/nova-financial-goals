@@ -1,3 +1,4 @@
+import { MissionSchema } from './mission.ts';
 import { z } from 'zod';
 
 export const MoneySchema = z.number().int().nonnegative();
@@ -250,6 +251,7 @@ export const FinancialTwinSchema = z.object({
 export type FinancialTwin = z.infer<typeof FinancialTwinSchema>;
 
 export const DemoStateSchema = z.object({
+  mission: MissionSchema.optional(),
   clock: IsoDateSchema, goal: GoalSchema, finance: FinanceSchema,
   goals: z.array(GoalSchema).default([]), primaryGoalId: z.string().nullable().default(null),
   pendingImpact: ImpactSchema.nullable(), mandate: MandateSchema.nullable(),
@@ -697,6 +699,7 @@ export const AgentTurnWithRunSchema = AgentTurnSchema.extend({ run: AgentRunSche
 export type AgentTurnWithRun = z.infer<typeof AgentTurnWithRunSchema>;
 
 export const SnapshotSchema = z.object({
+  mission: MissionSchema.optional(),
   goal: GoalSchema, finance: FinanceSchema, assessment: AssessmentSchema,
   goals: z.array(GoalSchema).default([]), primaryGoalId: z.string().nullable().default(null),
   primaryGoal: GoalSchema.nullable().default(null),

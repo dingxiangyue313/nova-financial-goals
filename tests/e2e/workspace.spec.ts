@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 async function openApp(page: Page) {
-  await page.goto('/');
+  await page.goto('/demo-control');
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
   await page.request.post('/api/demo/load-japan');
   await page.request.post('/api/data-connections/connect',
@@ -15,8 +15,8 @@ async function openWorkspace(page: Page) {
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
 }
 
-test('首次使用先展示品牌欢迎页，再进入空白目标工作台', async ({ page }) => {
-  await page.goto('/');
+test('独立演示后台保留品牌欢迎页和空白目标工作台', async ({ page }) => {
+  await page.goto('/demo-control');
   const welcome = page.getByTestId('nova-welcome');
   await expect(welcome).toBeVisible();
   await expect(welcome.getByText('不记账，也有数')).toBeVisible();
@@ -27,7 +27,7 @@ test('首次使用先展示品牌欢迎页，再进入空白目标工作台', as
 });
 
 test('首次目标先提示连接模拟数据，连接后回到同一任务核算方案', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/demo-control');
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
   await page.getByPlaceholder('描述目标、风险或授权范围…')
     .fill('我想年底去日本旅行，预算 ¥8,000，已存 0 元');

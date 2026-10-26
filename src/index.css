@@ -1,6 +1,17 @@
 @import "tailwindcss" source(none);
 @source "./";
 
+.mission-page { display: flex; flex-direction: column; gap: 12px; padding: 12px 15px 28px; }
+.mission-card { display: flex; flex-direction: column; gap: 10px; padding: 16px; background: white; border: 1px solid #E5E8EB; border-radius: 18px; box-shadow: 0 1px 2px #00000012; }
+.mission-card p { font-size: 13px; line-height: 1.65; color: #5A616B; }
+.mission-primary, .mission-secondary { min-height: 44px; padding: 10px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.mission-primary { background: #0F6B6D; color: white; border: 1px solid #0F6B6D; }
+.mission-secondary { background: white; color: #1F2329; border: 1px solid #D0D5DD; }
+.mission-link { color: #007D84; font-size: 12px; font-weight: 700; text-align: left; min-height: 28px; cursor: pointer; }
+.mission-input { display: block; width: 100%; margin-top: 6px; border: 1px solid #D0D5DD; border-radius: 10px; min-height: 44px; padding: 8px; background: white; }
+button:disabled { cursor: default; opacity: .65; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #39A5A8; outline-offset: 3px; }
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
