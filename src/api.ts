@@ -16,7 +16,7 @@ export async function api<T = Snapshot>(url: string, method = 'GET', body?: unkn
   }
   const json = await response.json();
   if (!response.ok) throw new Error(json.error || '请求失败，请稍后重试');
-  return url === '/api/mission/forecast' || url.startsWith('/api/mission/forecast?') || url === '/api/goal/interpret' || url === '/api/goals' || url === '/api/ui/cards' || url === '/api/mcp/token' || url.startsWith('/api/operations/') || url.startsWith('/api/agent') || url.startsWith('/api/risk/') || url.startsWith('/api/data-connections') || url.startsWith('/api/demo/data-connections/')
+  return url.startsWith('/api/money-mission') || url.startsWith('/api/statement-import') || url.startsWith('/api/account-snapshots') || url === '/api/mission/forecast' || url.startsWith('/api/mission/forecast?') || url === '/api/goal/interpret' || url === '/api/goals' || url === '/api/ui/cards' || url === '/api/mcp/token' || url.startsWith('/api/operations/') || url.startsWith('/api/agent') || url.startsWith('/api/risk/') || url.startsWith('/api/data-connections') || url.startsWith('/api/demo/data-connections/')
     ? json as T : SnapshotSchema.parse(json) as T;
 }
 

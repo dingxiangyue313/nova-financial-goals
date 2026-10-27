@@ -1,4 +1,6 @@
-import { createMissionFixture, sampleRows, importSample, forecastMission, prepareMission, confirmMission, reconcileSubscription, tickMission } from './mission.ts';
+import { registerMoneyMissionRoutes } from './money-mission-routes.ts';
+import { tickTransferWorker } from './transfer-worker.ts';
+import { registerStatementRoutes } from './statement-upload.ts';
 import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
@@ -75,7 +77,7 @@ function sessionId(req: express.Request, res: express.Response): string {
 function respond(res: express.Response, state: DemoState) { return res.json(snapshot(state)); }
 function failure(res: express.Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
-  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_|DATA_)/.test(message);
+  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|IMPORT_|EVIDENCE_|SCHEDULE_|SKILL_|HANDOFF_|SUBSCRIPTION_|TRANSFER_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_|DATA_)/.test(message);
   return res.status(bad ? 400 : 500).json({ error: bad ? message : '服务暂时不可用，请稍后重试。' });
 }
 function route(fn: (req: express.Request, res: express.Response) => Promise<unknown> | unknown): express.RequestHandler {
@@ -89,62 +91,14 @@ const audit = (state: DemoState, action: string, outcome: string, detail: string
   return appendAuditEvent(next, action, outcome, detail);
 };
 
+registerStatementRoutes(app, sessionId, route);
+registerMoneyMissionRoutes(app, sessionId, route);
+
 app.get('/api/health', route((req, res) => {
   const id = sessionId(req, res);
   res.json({ status: 'ok', mode: 'simulated', sqlite: 'ok', contracts: 'ok',
     deepseek: process.env.DEEPSEEK_API_KEY ? 'configured' : 'deterministic_fallback',
     auditChainValid: verifyAuditChain(getState(id).audit), artifacts: artifactCounts(id) });
-}));
-app.get('/api/mission/forecast', route((req, res) => {
-  const state = getState(sessionId(req, res));
-  const amount = z.coerce.number().int().min(0).max(10000000).default(100000).parse(req.query.amount);
-  res.json(forecastMission(state, amount));
-}));
-app.get('/api/mission/sample.csv', route((_req, res) => {
-  const rows = sampleRows();
-  res.type('text/csv').attachment('nova-synthetic-statements.csv').send('id,date,merchant,cents,category,source,excluded\n' + rows.map(r => [r.id,r.date,r.merchant,r.cents,r.category,r.source,r.excluded].join(',')).join('\n'));
-}));
-app.post('/api/mission/start', route((req, res) => respond(res, mutateState(sessionId(req, res), old => old.mission || old.goals.length ? old : createMissionFixture()))));
-app.post('/api/mission/demo-event', route((req, res) => {
-  const kind = z.enum(['salary','missing_salary','cancel_timeout','cancel_failure']).parse(req.body.kind);
-  return respond(res, mutateState(sessionId(req, res), old => {
-    if (!old.mission) throw new Error('DATA_MISSION_NOT_LOADED');
-    if (kind.startsWith('cancel_')) return { ...old, mission: { ...old.mission, demoOutcome: kind === 'cancel_timeout' ? 'unknown' : 'failed' } };
-    if (kind === 'missing_salary') return tickMission(old, '2026-11-28');
-    const transfers = old.transactions.filter(t => t.category === 'goal_transfer' && t.amountCents < 0).reduce((total, t) => total - t.amountCents, 0);
-    const balance = (old.mission.subscription.nextChargeSuppressed ? 324000 : 317200) + 850000 - transfers;
-    if (balance < 0) throw new Error('INSUFFICIENT_BALANCE');
-    const row = { id: 'salary-11', date: '2026-11-25', merchant: '星河设计 · 工资', cents: 850000, category: '工资' as const, source: '银行卡' as const, excluded: true };
-    if (old.mission.rows.some(r => r.id === row.id)) return old;
-    const next = { ...old, finance: { ...old.finance, checkingCents: balance, updatedAt: '2026-11-26' }, accounts: old.accounts.map(a => a.id === 'checking' ? { ...a, balanceCents: balance } : a), mission: { ...old.mission, rows: [...old.mission.rows,row] } };
-    return tickMission(next, '2026-11-26');
-  }));
-}));
-app.post('/api/mission/load', route((req, res) => respond(res, mutateState(sessionId(req, res), old => appendAuditEvent({ ...createMissionFixture(), twinVersion: old.twinVersion + 1 }, 'mission_loaded', 'verified', '载入合成旅行任务')))));
-app.post('/api/mission/import', route((req, res) => {
-  const body = z.object({ source: z.literal('bundled_sample') }).parse(req.body);
-  return respond(res, mutateState(sessionId(req, res), old => importSample(old, sampleRows(), '合成CSV账单')));
-}));
-app.post('/api/mission/prepare', route((req, res) => {
-  const body = z.object({ kind: z.enum(['cancel_subscription','create_schedule','pause_schedule','resume_schedule','cancel_schedule']), amountCents: z.number().int().positive().max(10000000).default(100000), frequency: z.enum(['once','monthly']).default('monthly') }).parse(req.body);
-  return respond(res, mutateState(sessionId(req, res), old => prepareMission(old, body.kind, body.amountCents, body.frequency)));
-}));
-app.post('/api/mission/confirm', route((req, res) => {
-  const body = z.object({ requestId: z.string().uuid(), confirmed: z.literal(true) }).parse(req.body);
-  return respond(res, mutateState(sessionId(req, res), old => confirmMission(old, body.requestId, old.mission?.demoOutcome ?? 'succeeded')));
-}));
-app.post('/api/mission/dismiss', route((req, res) => respond(res, mutateState(sessionId(req, res), old => ({ ...old, mission: old.mission ? { ...old.mission, pending: null } : undefined })))));
-app.post('/api/mission/reconcile', route((req, res) => respond(res, mutateState(sessionId(req, res), reconcileSubscription))));
-app.post('/api/mission/preference', route((req, res) => {
-  const preference = z.enum(['keep','remind','ignored']).parse(req.body.preference);
-  return respond(res, mutateState(sessionId(req, res), old => {
-    if (!old.mission) throw new Error('DATA_MISSION_NOT_LOADED');
-    return appendAuditEvent({ ...old, mission: { ...old.mission, subscription: { ...old.mission.subscription, preference } } }, 'subscription_preference', 'saved', preference);
-  }));
-}));
-app.post('/api/mission/demo-clock', route((req, res) => {
-  const date = z.iso.date().parse(req.body.date);
-  return respond(res, mutateState(sessionId(req, res), old => tickMission(old, date)));
 }));
 app.get('/api/session', route((req, res) => respond(res, getState(sessionId(req, res)))));
 app.get('/api/data-connections', route((req, res) => {
@@ -313,7 +267,7 @@ app.post('/api/agent/turn', route(async (req, res) => {
   const id = sessionId(req, res);
   const turn = await createAgentTurn(id, body.threadId, body.message, getState(id));
   const latestUser = getAgentMessages(id, turn.thread.id).filter(item => item.role === 'user').at(-1);
-  const run = turn.intent === 'goal_planning' && turn.components.some(item => item.type === 'goal_input_card') &&
+  const run = turn.intent === 'money_mission' && latestUser ? startAgentRun(id,turn.thread.id,latestUser.id) : turn.intent === 'goal_planning' && turn.components.some(item => item.type === 'goal_input_card') &&
     !turn.components.some(item => item.type === 'clarification' || item.type === 'data_connection_prompt') && latestUser
     ? startAgentRun(id, turn.thread.id, latestUser.id) : null;
   res.json(AgentTurnWithRunSchema.parse({ ...turn, run }));
@@ -651,7 +605,7 @@ if (production) {
   app.use(vite.middlewares);
 }
 const server = app.listen(port, '0.0.0.0', () => console.log(`NOVA original UI + new simulated backend: http://localhost:${port}`));
-function runMonitorTick() { try { tickMonitorWorker(); } catch { console.error('Monitor worker tick failed'); } }
+function runMonitorTick() { try { tickMonitorWorker(); tickTransferWorker(); } catch { console.error('Monitor worker tick failed'); } }
 const monitorTimer = setInterval(runMonitorTick, 5_000);
 monitorTimer.unref();
 setImmediate(runMonitorTick);

@@ -1,3 +1,4 @@
+import { readMoneyMission, projectLegacyMission } from './money-mission.ts';
 import { missionCompletionDate } from '../shared/mission.ts';
 import { forecastMission } from './mission.ts';
 import { SnapshotSchema, type Assessment, type DemoState, type Snapshot, type UiCard } from '../shared/contracts.ts';
@@ -59,7 +60,7 @@ export function snapshot(state: DemoState): Snapshot {
         return { id: p.id, label: p.label, monthlyCents: p.amount, projectedDate: date, safeToSpendCents: forecastMission(state, p.amount).lowCents - p.initial, status: date && date <= state.goal.targetDate ? 'on_track' : 'at_risk', explanation: p.initial ? '先单独确认一次性转入，再创建月度计划。' : '工资实际到账后次日转入，未到账则跳过。', recommended: p.id === 'balanced' };
       }) };
   }
-  return SnapshotSchema.parse({ mission: state.mission, goal: primaryGoal ?? state.goal, finance: state.finance, assessment,
+  return SnapshotSchema.parse({ moneyMission: state.accountSnapshots.length ? readMoneyMission(state) : undefined, mission: state.accountSnapshots.length ? projectLegacyMission(state) : state.mission, goal: primaryGoal ?? state.goal, finance: state.finance, assessment,
     goals: state.goals, primaryGoalId: state.primaryGoalId, primaryGoal,
     pendingImpact: state.pendingImpact, mandate: state.mandate, audit: state.audit,
     operations: state.operations, receipts: state.receipts,

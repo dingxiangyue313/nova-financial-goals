@@ -153,6 +153,8 @@ export function AgentComponentRenderer({ value, onAction, onCancel, onSelectCand
   onUpdateRiskPreferences?: (changes: Partial<RiskPreferences>) => void;
 }) {
   const component = normalizeAgentComponent(value);
+  if(component.type==='mission_skill_result')return <article className="mission-card"><h4 className="text-sm font-bold">{component.title}</h4><p>{component.result.summary}</p>{component.result.claims.map((claim,i)=><div key={i} className="text-xs border-t border-[#E5E8EB] pt-2"><strong className="text-[#0F6B6D]">{({fact:'事实',assumption:'假设',prediction:'预测',limitation:'限制'})[claim.claimType]}</strong><p>{claim.text}</p><span className="text-[10px] text-[#697386]">{claim.sourceRefs.length}项来源可核对</span></div>)}<button className="mission-primary" onClick={()=>onNavigate(component.result.stage==='planning'||component.result.stage==='transfer'?'savings':'bills')}>查看依据与下一步</button></article>;
+
   if (component.type === 'data_connection_prompt') return <article className="rounded-2xl border border-[#B9D9D8] bg-white p-4 shadow-sm">
     <h4 className="text-[14px] font-bold">{component.title}</h4>
     <p className="mt-2 text-[12px] leading-relaxed text-[#5A616B]">{component.body}</p>

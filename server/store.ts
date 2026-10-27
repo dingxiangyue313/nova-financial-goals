@@ -1,3 +1,4 @@
+import {migrateMoneyMissionState} from './money-mission-migration.ts';
 import { StatementImportBatchSchema, ImportIssueSchema, EvidenceRefSchema, SubscriptionActionSchema, TransferScheduleSchema, TransferExecutionSchema, type StatementImportBatch, type ImportIssue, type EvidenceRef, type SubscriptionAction, type TransferSchedule, type TransferExecution } from '../shared/money-mission.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -221,7 +222,7 @@ export function migrateDemoStateShape(raw: unknown): DemoState {
     if (!('primaryGoalId' in record)) record.primaryGoalId = legacyGoal && typeof legacyGoal === 'object'
       ? String((legacyGoal as { id?: unknown }).id || '') || null : null;
   }
-  return DemoStateSchema.parse(value);
+  return migrateMoneyMissionState(DemoStateSchema.parse(value));
 }
 
 export function getState(sessionId: string): DemoState {
@@ -1174,3 +1175,16 @@ export function saveEvidenceRefs(sessionId: string, values: EvidenceRef[]) {
 export function saveSubscriptionAction(sessionId: string, value: SubscriptionAction) { return saveMissionArtifact(sessionId, 'subscriptionActions', SubscriptionActionSchema.parse(value)); }
 export function saveTransferSchedule(sessionId: string, value: TransferSchedule) { return saveMissionArtifact(sessionId, 'transferSchedules', TransferScheduleSchema.parse(value)); }
 export function saveTransferExecution(sessionId: string, value: TransferExecution) { return saveMissionArtifact(sessionId, 'transferExecutions', TransferExecutionSchema.parse(value)); }
+
+db.exec(`CREATE TABLE IF NOT EXISTS transfer_worker_leases(session_id TEXT NOT NULL,schedule_id TEXT NOT NULL,owner TEXT NOT NULL,expires_at INTEGER NOT NULL,PRIMARY KEY(session_id,schedule_id))`);
+db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS transfer_execution_period ON transfer_executions(session_id,json_extract(payload_json,'$.periodKey'))`);
+export function listActiveTransferSchedules(limit=100) {
+  return db.prepare(`SELECT s.id AS sessionId,json_extract(p.value,'$.id') AS scheduleId FROM demo_sessions s JOIN json_each(s.state_json,'$.transferSchedules') p WHERE json_extract(p.value,'$.status')='active' ORDER BY s.updated_at LIMIT ?`).all(Math.min(1000,Math.max(1,limit))) as {sessionId:string;scheduleId:string}[];
+}
+export function claimTransferLease(sessionId:string,scheduleId:string,owner:string) {
+  const now=Date.now();return !!db.prepare(`INSERT INTO transfer_worker_leases(session_id,schedule_id,owner,expires_at) VALUES(?,?,?,?) ON CONFLICT(session_id,schedule_id) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at WHERE transfer_worker_leases.expires_at<=?`).run(sessionId,scheduleId,owner,now+30000,now).changes;
+}
+export function releaseTransferLease(sessionId:string,scheduleId:string,owner:string) { db.prepare('DELETE FROM transfer_worker_leases WHERE session_id=? AND schedule_id=? AND owner=?').run(sessionId,scheduleId,owner); }
+
+db.exec('CREATE TABLE IF NOT EXISTS product_events(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,event_name TEXT NOT NULL,properties_json TEXT NOT NULL,at TEXT NOT NULL)');
+export function saveProductEvent(sessionId:string,event:{id:string;name:string;properties:unknown;at:string}){db.prepare('INSERT INTO product_events(id,session_id,event_name,properties_json,at) VALUES(?,?,?,?,?)').run(event.id,sessionId,event.name,JSON.stringify(event.properties),event.at);}

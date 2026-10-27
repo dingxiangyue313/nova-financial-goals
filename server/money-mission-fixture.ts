@@ -14,10 +14,12 @@ export function createJapanMoneyMissionFixture(includeHistory = true): DemoState
   }));
   return {
     ...old,
+    accounts: old.accounts.map(a => a.id==='goal-wallet' ? {...a,goalId:old.goal.id} : a),
+    bills: [['rent','房租',1,280000],['purchase','日常采购',8,30000],['utilities','水电',10,42000],['transport','交通',15,20000],['insurance','保险',18,28000]].map(([id,title,day,amount]) => ({ id: String(id), title: String(title), dueDate: `2026-11-${String(day).padStart(2,'0')}`,amountCents: Number(amount),paid: false,recurrence: 'monthly' as const })),
     accountSnapshots: old.accounts.filter(a => a.currency === 'CNY').map(a => ({ id: `snapshot-${a.id}`, accountId: a.id, balanceCents: a.balanceCents, currency: a.currency, asOf: old.clock, source: 'simulated_connection', confirmed: true, twinVersion: old.twinVersion })),
     normalizedStatementRows: includeHistory ? rows : [],
     statementImportBatches: includeHistory ? [{ id: 'bundled-history', templateId: 'nova-synthetic-v1', format: 'csv', status: 'committed', coverageStart: '2026-05-01', coverageEnd: '2026-10-26', recordCount: rows.length, duplicateCount: 0, issueIds: [], rowIds: rows.map(r => r.id), createdAt: '2026-10-26T12:00:00+08:00', committedAt: '2026-10-26T12:00:00+08:00', twinVersion: old.twinVersion }] : [],
     transactions: includeHistory ? old.transactions : [],
-    mission: { ...old.mission!, rows: includeHistory ? old.mission!.rows : [], batches: includeHistory ? old.mission!.batches : [] },
+    mission: { ...old.mission!, artifactsVersion:2, rows: includeHistory ? old.mission!.rows : [], batches: includeHistory ? old.mission!.batches : [] },
   };
 }

@@ -31,7 +31,7 @@ export default defineConfig(() => {
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/mcp(?:\/|$)/],
         runtimeCaching: [{
-          urlPattern: ({ url }) => url.pathname.startsWith('/api/') || url.pathname === '/mcp',
+          urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/api/') || url.pathname === '/mcp',
           handler: 'NetworkOnly',
           options: { cacheName: 'nova-network-only' },
         }],

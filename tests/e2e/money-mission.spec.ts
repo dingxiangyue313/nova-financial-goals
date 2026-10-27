@@ -1,3 +1,4 @@
+type Result = { id: string; impact?: string | null; nodes: unknown[] };
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -56,7 +57,7 @@ test('mission screens support reduced motion, contrast and keyboard confirmation
   await expect(page.getByRole('button', { name: '查看账单与消费' })).toBeVisible();
   for (const screen of ['home', 'bills', 'approval']) {
     const report = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
-    expect(report.violations.filter(v => v.impact === 'serious' || v.impact === 'critical'), screen).toEqual([]);
+    expect(report.violations.filter((v: Result) => v.impact === 'serious' || v.impact === 'critical'), screen).toEqual([]);
     if (screen === 'home') await page.getByRole('button', { name: '查看账单与消费' }).click();
     if (screen === 'bills') await page.getByRole('button', { name: '不再使用，准备取消' }).click();
   }

@@ -1,0 +1,22 @@
+import type {DemoState,NormalizedStatementRow,SubscriptionAction,TransferSchedule} from '../shared/contracts.ts';
+import {CATEGORY_MAP,createJapanMoneyMissionFixture} from './money-mission-fixture.ts';
+import {verifyAuditChain,stableHash} from './governance.ts';
+import {scheduleParameters} from './transfer-schedules.ts';
+
+// Migrate the previous product increment without replacing balances, goals or receipts.
+// Old schedules are retained as paused because their original goal ceiling was not frozen.
+export function migrateMoneyMissionState(state:DemoState):DemoState {
+  if(!state.mission||state.mission.artifactsVersion===2)return state;
+  const old=state.mission,baseline=createJapanMoneyMissionFixture(false),batchId='legacy-mission-history';
+  const rows:NormalizedStatementRow[]=old.rows.map(r=>({id:r.id,externalId:r.id,accountId:'checking',currency:'CNY',date:r.date,title:r.merchant,merchantId:r.merchant==='CloudBox Plus'?'cloudbox-plus':r.category==='工资'?'salary':null,amountCents:r.cents,category:CATEGORY_MAP[r.category]??'unclassified',originalCategory:r.category,sourceKind:r.source==='银行卡'?'bank':r.source==='微信'?'wechat_pay':'alipay',rawDescription:r.merchant,confidence:1,excludedReason:r.category==='工资'?'income':r.category==='内部转账'?'internal_transfer':r.excluded?'refund_match':null,batchId}));
+  const accountSnapshots=state.accounts.filter(a=>a.currency==='CNY').map(a=>({id:`legacy-snapshot:${a.id}:${state.twinVersion}`,accountId:a.id,balanceCents:a.balanceCents,currency:a.currency,asOf:state.finance.updatedAt,source:'simulated_connection' as const,confirmed:state.dataConnections.some(c=>c.source==='bank'&&c.status==='connected'&&c.permissionScopes.includes('balances')),twinVersion:state.twinVersion}));
+  const subscriptionActions:SubscriptionAction[]=[...state.subscriptionActions];
+  const verified=old.subscription.nextChargeSuppressed&&old.subscription.merchantOperationId&&verifyAuditChain(state.audit)&&old.receipts.some(r=>r.kind==='cancel_subscription'&&r.status==='succeeded');
+  if(verified)subscriptionActions.push({id:`legacy-subscription:${old.subscription.merchantOperationId}`,subscriptionId:'cloudbox',merchantId:'cloudbox-plus',action:'cancel',status:'reconciled',monthlyCents:6800,effectiveAt:old.subscription.effectiveAt??'2026-11-05',paidThrough:old.subscription.paidThrough,cancelledAt:old.subscription.cancelledAt,nextChargeSuppressed:true,refundCents:0,merchantOperationId:old.subscription.merchantOperationId,approvalId:null,snapshotHash:null,twinVersion:state.twinVersion,idempotencyKey:`legacy:${old.subscription.merchantOperationId}`,receiptId:null});
+  const transferSchedules:TransferSchedule[]=[...state.transferSchedules];
+  if(old.schedule){const schedule:TransferSchedule={id:old.schedule.id,goalId:old.schedule.goalId??state.goal.id,targetCents:state.goals.find(g=>g.id===old.schedule!.goalId)?.targetCents??state.goal.targetCents,sourceAccountId:'checking',destinationAccountId:'goal-wallet',currency:'CNY',amountCents:old.schedule.amountCents,frequency:old.schedule.frequency==='once'?'one_time':'monthly',status:old.schedule.status==='active'?'paused':old.schedule.status,trigger:{type:'salary_event',expectedDay:25,executeOffsetDays:1,executeTime:'09:00',missingEventPolicy:'skip_no_catchup',graceDay:27,minimumSalaryCents:800000,maximumSalaryCents:900000,sourceAccountId:'checking'},createdAt:old.schedule.createdAt+'T12:00:00+08:00',endDate:old.schedule.endDate,forecastId:'legacy-review-required',twinVersion:state.twinVersion,authorizationHash:'',approvalId:null,snapshotHash:null,nextEvaluationDate:state.clock};schedule.authorizationHash=stableHash(scheduleParameters(schedule));transferSchedules.push(schedule);}
+  return {...state,transferSchedules,bills:baseline.bills,accountSnapshots,normalizedStatementRows:rows,subscriptionActions,
+    statementImportBatches:rows.length?[{id:batchId,templateId:'nova-synthetic-v1',format:'csv',status:'committed',coverageStart:rows.map(r=>r.date).sort()[0],coverageEnd:rows.map(r=>r.date).sort().at(-1)!,recordCount:rows.length,duplicateCount:0,issueIds:[],rowIds:rows.map(r=>r.id),createdAt:`${state.clock}T12:00:00+08:00`,committedAt:`${state.clock}T12:00:00+08:00`,twinVersion:state.twinVersion}]:[],
+    accounts:state.accounts.map(a=>a.id==='goal-wallet'?{...a,goalId:state.goal.id}:a),
+    mission:{...old,artifactsVersion:2,pending:null,schedule:old.schedule?{...old.schedule,status:'paused'}:null}};
+}

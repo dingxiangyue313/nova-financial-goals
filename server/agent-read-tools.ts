@@ -1,3 +1,4 @@
+import {runBankingTool} from './banking.ts';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AgentReadToolNameSchema, AgentToolResultSchema, CandidateInputSchema, SearchGoalOptionsInputSchema,
@@ -19,7 +20,7 @@ type Source = AgentToolSource;
 
 function validatedInput(name: string, input: unknown) {
   if (!AgentReadToolNameSchema.safeParse(name).success) throw new Error('READ_TOOL_NOT_ALLOWED');
-  const schema = name === 'candidate_preview' ? CandidateInputSchema
+  const schema = name === 'evidence_detail' ? z.object({evidenceId:z.string()}).strict() : name==='dated_cashflow_forecast' ? z.object({horizonDays:z.number().int().min(1).max(366).default(62),scenario:z.enum(['baseline','stress']).default('baseline')}).strict() : name === 'candidate_preview' ? CandidateInputSchema
     : name === 'relevant_transactions' ? TransactionsInput
       : name === 'search_goal_options' ? SearchGoalOptionsInputSchema
         : name === 'stress_test_goal_options' ? StressTestGoalOptionsInputSchema
@@ -290,7 +291,10 @@ export function runAgentReadTool(sessionId: string, threadId: string, name: stri
     twinVersion: state.twinVersion, dataAsOf: state.finance.updatedAt,
     createdAt: new Date().toISOString() };
   let result: AgentToolResult;
-  if (name === 'financial_overview') {
+  if(['bill_period_summary','spending_baseline_comparison','subscription_candidates','evidence_detail','dated_cashflow_forecast'].includes(name)){
+    const calculated=runBankingTool(state,name as Parameters<typeof runBankingTool>[1],input).result;
+    result=AgentToolResultSchema.parse({...base,tool:name,status:name==='dated_cashflow_forecast'&&calculated.precision!=='exact'?'insufficient_data':'ok',errorCode:name==='dated_cashflow_forecast'&&calculated.precision!=='exact'?'READ_TOOL_DATA_INSUFFICIENT':null,sourceEntities:state.transactions.slice(0,100).map(t=>({kind:'transaction',id:t.id})),assumptions:['金额、日期与证据由服务端确定性核算。'],gaps:[],output:calculated});
+  } else if (name === 'financial_overview') {
     const { checkingCents, emergencyCents, monthlyIncomeCents, fixedBillsCents,
       essentialSpendingCents, historyMonths } = state.finance;
     result = AgentToolResultSchema.parse({ ...base, tool: name, status: historyMonths < 2 ? 'insufficient_data' : 'ok',

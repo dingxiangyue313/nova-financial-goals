@@ -1,3 +1,6 @@
+import { MISSION_ACTION_TYPES, executePreparedMoneyMissionAction } from './money-mission-actions.ts';
+import { isMoneyMissionRequest } from './skills/registry.ts';
+import { applyAccountSnapshot } from './account-snapshots.ts';
 import { z } from 'zod';
 import { AgentTurnSchema, GoalAssumptionsSchema, type AgentComponent, type AgentIntent,
   type AgentTurn, type DemoState, type GoalAssumptions, type GoalDraft } from '../shared/contracts.ts';
@@ -208,7 +211,7 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
   const priorTask = getAgentTaskForThread(sessionId, thread.id);
   const understood = await interpretAgentRequest(trimmed, deterministicIntent, { context,
     twin: { version: state.twinVersion, goalStatus: state.goal.status, hasImpact: Boolean(state.pendingImpact), hasMandate: Boolean(state.mandate?.active) } });
-  const intent = understood.intent !== 'rejected_prompt_injection' && priorTask &&
+  const intent = state.accountSnapshots.length && understood.intent!=='rejected_prompt_injection' && isMoneyMissionRequest(trimmed) ? 'money_mission' : understood.intent !== 'rejected_prompt_injection' && priorTask &&
     priorTask.phase !== 'completed' && priorTask.phase !== 'failed' &&
     !['mandate_management', 'external_agent_request'].includes(understood.intent) &&
     !(understood.intent === 'goal_impact' && /影响|意外支出|额外支出|突然支出|花了|消费了|保养|延期/.test(trimmed))
@@ -219,7 +222,8 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
   let fallbackReason: string | null = understood.fallbackReason;
   let components: AgentComponent[] = [];
   let reply = '';
-  if (intent === 'goal_planning') {
+  if(intent==='money_mission'){reply='正在核对账单、账户与已确认的执行结果；任何写操作仍需你单独确认。';components=[{id:componentId(),type:'explanation',title:'正在核对你的财务任务',body:reply,tone:'neutral'}];
+  } else if (intent === 'goal_planning') {
     const parsed = await understandGoalMessage(trimmed, state.clock, priorTask, context);
     provider = parsed.provider; fallbackReason = parsed.fallbackReason ?? fallbackReason;
     if (parsed.kind === 'cancel' && priorTask) {
@@ -413,6 +417,7 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
     return { state, replayed: false, message, nextStep: null };
   }
   if (decision === 'cancel') {
+    if(MISSION_ACTION_TYPES.includes(action.actionType)){const id=String(action.payload.relatedId);state={...state,subscriptionActions:state.subscriptionActions.map(a=>a.id===id&&a.status==='awaiting_confirmation'?{...a,status:'cancelled'}:a),transferSchedules:state.transferSchedules.map(s=>s.id===id&&s.status==='awaiting_confirmation'?{...s,status:'cancelled'}:s),mission:state.mission?{...state.mission,pending:null}:undefined};}
     finishAgentAction(sessionId, actionId, 'cancelled', state);
     const message = saveAgentMessage(sessionId, action.threadId, { role: 'assistant', content: '已取消，本次没有修改任何数据。',
       components: [{ id: componentId(), type: 'receipt', title: '操作已取消', body: 'Financial Twin 未发生变化。', status: 'failed' }] });
@@ -420,7 +425,8 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
   }
   let next = state;
   let detail = '操作已完成';
-  if (action.actionType === 'apply_verified_candidate') {
+  if(MISSION_ACTION_TYPES.includes(action.actionType)){const executed=executePreparedMoneyMissionAction(state,action.actionType,action.payload);next=executed.state;detail=executed.detail;
+  } else if (action.actionType === 'apply_verified_candidate') {
     const payload = z.object({ taskId: z.string().uuid(), expectedTaskRevision: z.number().int(),
       demoRunId: z.string().uuid(), resultId: z.string().uuid(), candidateHash: z.string(),
       frozen: z.object({ goalId: z.string(), title: z.string(), savedCents: z.number().int().nonnegative(),
@@ -467,6 +473,8 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
       next.finance.emergencyCents !== state.finance.emergencyCents ||
       next.mandate !== state.mandate) throw new Error('CANDIDATE_VERIFY_MISMATCH');
     detail = '自定义候选已激活；正式目标与确认内容逐项一致，未扣款或创建授权。';
+  } else if (action.actionType === 'confirm_account_snapshot') {
+    next = applyAccountSnapshot(next, action.payload);
   } else if (action.actionType === 'upsert_goal') {
     next = runBankingTool(state, 'create_goal', { ...action.payload, flexibilityWeeks: state.goal.flexibilityWeeks,
       quote: '由 NOVA 对话工作台创建' }).state;
@@ -542,7 +550,7 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
     detail = `已生成 ${selected.length} 个独立请求（${outcomes.join('；')}）`;
   } else throw new Error('UNKNOWN_AGENT_ACTION');
   const receipt: AgentComponent = { id: componentId(), type: 'receipt', title: 'NOVA 操作凭证', body: detail,
-    status: 'succeeded', operationId: action.actionType === 'apply_verified_candidate'
+    status: action.actionType==='confirm_subscription_cancellation' ? next.subscriptionActions.find(a=>a.id===action.payload.relatedId)?.status==='unknown'?'unknown':next.subscriptionActions.find(a=>a.id===action.payload.relatedId)?.nextChargeSuppressed?'succeeded':'failed' : 'succeeded', operationId: action.actionType === 'apply_verified_candidate'
       ? undefined : next.operations.length > state.operations.length ? next.operations.at(-1)?.operationId : undefined };
   let followups: AgentComponent[] = [];
   const requiresConnection = ['upsert_goal', 'apply_goal_scenario', 'apply_goal_scenario_plan'].includes(action.actionType)

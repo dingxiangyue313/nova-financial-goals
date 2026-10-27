@@ -1,3 +1,4 @@
+type Result = { id: string; impact?: string | null; nodes: unknown[] };
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect, type Page } from '@playwright/test';
 
@@ -5,8 +6,8 @@ async function expectNoSeriousViolations(page: Page, screen: string) {
   const result = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze();
-  const violations = result.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical');
-  expect(violations, `${screen}: ${violations.map((item) => `${item.id} (${item.nodes.length})`).join(', ')}`).toEqual([]);
+  const violations = result.violations.filter((item: Result) => item.impact === 'serious' || item.impact === 'critical');
+  expect(violations, `${screen}: ${violations.map((item: Result) => `${item.id} (${item.nodes.length})`).join(', ')}`).toEqual([]);
 }
 
 test('首页、工作台、可行性、影响和授权页无严重无障碍问题', async ({ page }) => {

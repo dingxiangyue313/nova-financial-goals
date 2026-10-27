@@ -1,4 +1,4 @@
-import { AccountSnapshotSchema, StatementImportBatchSchema, ImportIssueSchema, NormalizedStatementRowSchema, EvidenceRefSchema, BillBriefSchema, SubscriptionActionSchema, DatedCashflowForecastSchema, GoalPlanOptionSchema, TransferScheduleSchema, TransferExecutionSchema, HandoffCasePackSchema } from './money-mission.ts';
+import { SkillIdSchema, MissionSkillResultSchema, MoneyMissionReadModelSchema, AccountSnapshotSchema, StatementImportBatchSchema, ImportIssueSchema, NormalizedStatementRowSchema, EvidenceRefSchema, BillBriefSchema, SubscriptionActionSchema, DatedCashflowForecastSchema, GoalPlanOptionSchema, TransferScheduleSchema, TransferExecutionSchema, HandoffCasePackSchema } from './money-mission.ts';
 export * from './money-mission.ts';
 import { MissionSchema } from './mission.ts';
 import { z } from 'zod';
@@ -12,7 +12,7 @@ export type DataSourceKind = z.infer<typeof DataSourceKindSchema>;
 export const DataPermissionScopeSchema = z.enum(['balances', 'transactions_90_days']);
 export type DataPermissionScope = z.infer<typeof DataPermissionScopeSchema>;
 
-export const DataProvenanceSchema = z.enum(['connected_data', 'system_calculated', 'user_assumption']);
+export const DataProvenanceSchema = z.enum(['connected_data', 'system_calculated', 'user_assumption', 'uploaded_statement']);
 export type DataProvenance = z.infer<typeof DataProvenanceSchema>;
 
 export const DataConnectionSchema = z.object({
@@ -72,6 +72,7 @@ export const FinanceSchema = z.object({
 export type Finance = z.infer<typeof FinanceSchema>;
 
 export const AccountSchema = z.object({
+  goalId: z.string().optional(),
   id: z.string(), label: z.string(), type: z.enum(['checking', 'emergency', 'goal', 'investment']),
   balanceCents: MoneySchema, currency: z.string().length(3).default('CNY'), protected: z.boolean().default(false),
 });
@@ -170,11 +171,13 @@ export const WeeklyRiskSummarySchema = z.object({
 export type WeeklyRiskSummary = z.infer<typeof WeeklyRiskSummarySchema>;
 
 export const BillSchema = z.object({
+  recurrence: z.enum(['monthly','one_time']).optional(),
   id: z.string(), title: z.string(), dueDate: IsoDateSchema, amountCents: MoneySchema, paid: z.boolean(),
 });
 export type Bill = z.infer<typeof BillSchema>;
 
 export const SubscriptionSchema = z.object({
+  cadence: z.enum(['monthly','annual']).optional(),
   id: z.string(), title: z.string(), monthlyCents: MoneySchema, nextChargeDate: IsoDateSchema,
   status: z.enum(['active', 'cancelled']),
 });
@@ -404,6 +407,7 @@ export type AgentTask = z.infer<typeof AgentTaskSchema>;
 
 export const AgentReadToolNameSchema = z.enum([
   'financial_overview', 'essential_bills', 'relevant_transactions', 'data_sufficiency',
+  'bill_period_summary','spending_baseline_comparison','subscription_candidates','evidence_detail','dated_cashflow_forecast',
   'candidate_preview', 'search_goal_options', 'stress_test_goal_options', 'repair_stressed_goal_option',
 ]);
 export type AgentReadToolName = z.infer<typeof AgentReadToolNameSchema>;
@@ -471,6 +475,12 @@ const AgentToolEnvelope = z.object({
   assumptions: z.array(z.string().max(240)).max(20), gaps: z.array(z.string().max(240)).max(20),
 }).strict();
 export const AgentToolResultSchema = z.discriminatedUnion('tool', [
+  AgentToolEnvelope.extend({tool:z.literal('bill_period_summary'),output:BillBriefSchema}),
+  AgentToolEnvelope.extend({tool:z.literal('spending_baseline_comparison'),output:z.object({changes:BillBriefSchema.shape.changes}).strict()}),
+  AgentToolEnvelope.extend({tool:z.literal('subscription_candidates'),output:z.object({candidates:BillBriefSchema.shape.subscriptionCandidates}).strict()}),
+  AgentToolEnvelope.extend({tool:z.literal('evidence_detail'),output:EvidenceRefSchema}),
+  AgentToolEnvelope.extend({tool:z.literal('dated_cashflow_forecast'),output:DatedCashflowForecastSchema}),
+
   AgentToolEnvelope.extend({ tool: z.literal('financial_overview'), output: z.object({
     checkingCents: MoneySchema, emergencyCents: MoneySchema, monthlyIncomeCents: MoneySchema,
     fixedBillsCents: MoneySchema, essentialSpendingCents: MoneySchema,
@@ -534,6 +544,7 @@ export const AgentToolResultSchema = z.discriminatedUnion('tool', [
 export type AgentToolResult = z.infer<typeof AgentToolResultSchema>;
 
 export const AgentDecisionSchema = z.discriminatedUnion('type', [
+  z.object({type:z.literal('select_skill'),skillId:SkillIdSchema}).strict(),
   z.object({ type: z.literal('tool_call'), tool: z.string().min(1).max(80), input: z.unknown() }).strict(),
   z.object({ type: z.literal('ask_user'), question: z.string().min(1).max(180) }).strict(),
   z.object({ type: z.literal('recommend'), candidateResultIds: z.array(z.string().uuid()).min(1).max(3),
@@ -599,6 +610,7 @@ export const UiCardSchema = z.object({
 export type UiCard = z.infer<typeof UiCardSchema>;
 
 export const AgentIntentSchema = z.enum([
+  'money_mission',
   'goal_planning', 'goal_status', 'goal_impact', 'mandate_management',
   'external_agent_request', 'clarification', 'rejected_prompt_injection',
 ]);
@@ -607,6 +619,7 @@ export type AgentIntent = z.infer<typeof AgentIntentSchema>;
 const AgentComponentBase = z.object({ id: z.string().min(1) });
 const AgentToneSchema = z.enum(['neutral', 'good', 'warning', 'danger']);
 export const AgentComponentSchema = z.discriminatedUnion('type', [
+  AgentComponentBase.extend({type:z.literal('mission_skill_result'),title:z.string(),twinVersion:z.number().int(),result:MissionSkillResultSchema}),
   AgentComponentBase.extend({ type: z.literal('explanation'), title: z.string(), body: z.string(), tone: AgentToneSchema }),
   AgentComponentBase.extend({ type: z.literal('goal_summary'), title: z.string(), goal: GoalSchema.pick({
     title: true, targetCents: true, savedCents: true, targetDate: true, protectedCents: true, status: true,
@@ -713,6 +726,7 @@ export const AgentTurnWithRunSchema = AgentTurnSchema.extend({ run: AgentRunSche
 export type AgentTurnWithRun = z.infer<typeof AgentTurnWithRunSchema>;
 
 export const SnapshotSchema = z.object({
+  moneyMission: MoneyMissionReadModelSchema.optional(),
   mission: MissionSchema.optional(),
   goal: GoalSchema, finance: FinanceSchema, assessment: AssessmentSchema,
   goals: z.array(GoalSchema).default([]), primaryGoalId: z.string().nullable().default(null),

@@ -1,3 +1,4 @@
+import {MissionNotificationSchema} from './money-mission.ts';
 import { z } from 'zod';
 
 export const MissionRowSchema = z.object({
@@ -7,13 +8,14 @@ export const MissionRowSchema = z.object({
 });
 export type MissionRow = z.infer<typeof MissionRowSchema>;
 export const MissionSchema = z.object({
+  artifactsVersion:z.literal(2).optional(),monitoringEnabled:z.boolean().optional(),notifications:z.array(MissionNotificationSchema).optional(),
   demoOutcome: z.enum(['succeeded', 'failed', 'unknown']).optional(),
   version: z.literal(1), rows: z.array(MissionRowSchema),
   batches: z.array(z.object({ id: z.string(), name: z.string(), count: z.number().int(), duplicates: z.number().int(), at: z.iso.date(), rowIds: z.array(z.string()) })),
   subscription: z.object({ status: z.enum(['active', 'cancelled', 'unknown', 'failed']), preference: z.enum(['none', 'keep', 'remind', 'ignored']),
     cancelledAt: z.string().nullable(), effectiveAt: z.iso.date().nullable(), paidThrough: z.iso.date(), nextChargeSuppressed: z.boolean(), merchantOperationId: z.string().nullable() }),
   schedule: z.object({ id: z.string(), goalId: z.string(), amountCents: z.number().int().positive(), frequency: z.enum(['once', 'monthly']), status: z.enum(['active', 'paused', 'cancelled', 'completed']), createdAt: z.iso.date(), endDate: z.iso.date(), processedMonths: z.array(z.string()) }).nullable(),
-  pending: z.object({ id: z.string(), kind: z.enum(['cancel_subscription', 'create_schedule', 'pause_schedule', 'resume_schedule', 'cancel_schedule']), amountCents: z.number().int(), frequency: z.enum(['once', 'monthly']), twinVersion: z.number().int(), expiresAt: z.number(), fingerprint: z.string() }).nullable(),
+  pending: z.object({ relatedId:z.string().optional(), id: z.string(), kind: z.enum(['cancel_subscription', 'create_schedule', 'pause_schedule', 'resume_schedule', 'cancel_schedule']), amountCents: z.number().int(), frequency: z.enum(['once', 'monthly']), twinVersion: z.number().int(), expiresAt: z.number(), fingerprint: z.string() }).nullable(),
   receipts: z.array(z.object({ id: z.string(), kind: z.string(), status: z.enum(['succeeded', 'failed', 'unknown', 'skipped']), date: z.iso.date(), detail: z.string(), amountCents: z.number().int(), requestId: z.string() })),
 });
 export type Mission = z.infer<typeof MissionSchema>;

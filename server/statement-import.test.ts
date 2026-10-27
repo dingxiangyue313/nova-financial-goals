@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createJapanMoneyMissionFixture } from './money-mission-fixture.ts';
+import { parseStatementBuffer } from './statement-parser.ts';
+import { previewStatementImport, resolveImportIssue, commitStatementImport, revokeStatementImport } from './statement-import.ts';
+import { verifyAuditChain } from './governance.ts';
+
+const parsed = (rows: string) => parseStatementBuffer({ buffer: Buffer.from(`id,date,merchant,cents,category,source\n${rows}`), fileName: 'x.csv', mimeType: 'text/csv', templateId: 'nova-synthetic-v1' });
+test('preview and corrected commit never derive balances from historical statement amounts', async () => {
+  const state = createJapanMoneyMissionFixture(false);
+  const preview = previewStatementImport(state, await parsed('one,2026-10-06,余额快照伪装,-99999999,购物,微信\ntwo,2026-02-30,商户,-500,购物,微信'));
+  assert.equal(preview.state.transactions.length, 0);
+  assert.throws(() => commitStatementImport(preview.state, preview.batch.id, state.twinVersion), /UNRESOLVED/);
+  const issue = preview.issues.find(i => i.kind === 'invalid_date')!;
+  const resolved = resolveImportIssue(preview.state, preview.batch.id, issue.id, { value: '2026-10-07' });
+  const committed = commitStatementImport(resolved, preview.batch.id, state.twinVersion);
+  assert.equal(committed.transactions.length, 2);
+  assert.equal(committed.finance.checkingCents, 724000); assert.equal(committed.goal.savedCents, 200000);
+  assert.equal(committed.accountSnapshots[0].balanceCents, 724000);
+  assert.equal(committed.twinVersion, state.twinVersion + 1);
+  assert.equal(committed.importIssues[0].originalValue, '2026-02-30');
+  assert.equal(committed.importIssues[0].correctedValue, '2026-10-07');
+  assert.deepEqual(commitStatementImport(committed, preview.batch.id, state.twinVersion), committed);
+  assert.ok(verifyAuditChain(committed.audit));
+  assert.equal(committed.approvals.at(-1)!.status, 'consumed');
+  const revoked = revokeStatementImport(committed, preview.batch.id, committed.twinVersion);
+  assert.equal(revoked.transactions.length, 0); assert.equal(revoked.finance.checkingCents, 724000);
+});
+test('refund pairs, repeated external IDs and internal transfer legs remain evidence without spending', async () => {
+  const state = createJapanMoneyMissionFixture(false);
+  const preview = previewStatementImport(state, await parsed('a,2026-10-06,美团 · 已退款订单,-9000,购物,微信\nb,2026-10-07,美团 · 原路退款,9000,退款,微信\nc,2026-10-08,转入微信零钱,-50000,内部转账,银行卡\nd,2026-10-08,转入微信零钱,50000,内部转账,微信\na,2026-10-06,美团 · 已退款订单,-9000,购物,微信'));
+  const committed = commitStatementImport(preview.state, preview.batch.id, state.twinVersion);
+  assert.equal(committed.normalizedStatementRows.filter(r => r.excludedReason === 'refund_match').length, 2);
+  assert.equal(committed.normalizedStatementRows.filter(r => r.excludedReason === 'internal_transfer').length, 2);
+  assert.equal(committed.transactions.length, 4);
+  assert.throws(() => commitStatementImport({ ...preview.state, twinVersion: 99 }, preview.batch.id, 1), /TWIN/);
+  assert.throws(() => commitStatementImport(createJapanMoneyMissionFixture(false), preview.batch.id, 1), /IMPORT_BATCH_NOT_FOUND/);
+});
