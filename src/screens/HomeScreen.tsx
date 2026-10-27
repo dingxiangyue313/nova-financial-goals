@@ -27,6 +27,7 @@ interface HomeScreenProps {
   onNavigateToFeasibility: () => void;
   onNavigateToImpact: () => void;
   onNavigateToCreate: () => void;
+  onNavigateToMoneyMission: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -36,6 +37,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateToFeasibility,
   onNavigateToImpact,
   onNavigateToCreate,
+  onNavigateToMoneyMission,
 }) => {
   const [now, setNow] = useState(() => new Date());
 
@@ -78,6 +80,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </button>
         </div>
       </section>
+
+      <button type="button" onClick={onNavigateToMoneyMission}
+        className="min-h-11 rounded-xl border border-[#B9D9D8] bg-white px-4 py-3 text-left text-[13px] font-semibold text-[#0F6B6D] focus-visible:outline-2 focus-visible:outline-offset-2">
+        继续日本旅行 Money Mission
+      </button>
 
       <div className="flex items-center gap-1.5 rounded-lg border border-[#E5E8EB] bg-white px-3 py-2 text-[11px] text-[#5A616B]">
         <span className="material-symbols-outlined text-[15px] text-[#0F6B6D]">sync</span>

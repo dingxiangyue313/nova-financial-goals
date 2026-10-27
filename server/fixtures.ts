@@ -1,4 +1,4 @@
-import type { DemoState } from '../shared/contracts.ts';
+import { DemoStateSchema, type DemoState } from '../shared/contracts.ts';
 
 export const JAPAN_IMAGE = 'https://lh3.googleusercontent.com/aida/AEtjO1UrwbCWWFERF-Q6qaqJaXETXbphhrx4S6cHkreRUfDf1RmQQM91tfbxSEg6NgOztnIflKRoZqpXV6lf6TP2CDg74qhxuSZ4MnLj4PlVqIo2UirrbkvgYAlEDtm6gLrG710cn4v8VCjgrw0eOEufJdfbyWC66IgTDEtMo6fDswf29rG2NN2CGC0GXpzCDihK6lpa59ywP8FIHxxR19FOlokWcPMrCV82urfygNsMjEgntfouq79dAvkn5ema';
 
@@ -11,7 +11,7 @@ export function createFixture(): DemoState {
     imageUrl: JAPAN_IMAGE,
     quote: '我想三个月后去日本旅行，预算¥8,000，不能动应急金。',
   };
-  return {
+  return DemoStateSchema.parse({
     clock: '2026-09-21',
     goal, goals: [goal], primaryGoalId: goal.id,
     finance: {
@@ -45,7 +45,7 @@ export function createFixture(): DemoState {
     spendingPatterns: [], riskSignals: [], weeklyRiskSummaries: [],
     dataConnections: [], dataSyncBatches: [],
     pendingImpact: null, mandate: null, audit: [], operations: [],
-  };
+  });
 }
 
 export function createFirstUseFixture(): DemoState {

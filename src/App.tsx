@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ScreenId, Goal } from './types';
+import { ScreenId, Goal, type MoneyMissionReadModel } from './types';
 import { api, cents, displayGoal, displayImpact } from './api';
 import type { DataSourceKind, DataSyncResult, RiskPreferences, Snapshot, UiCard } from '../shared/contracts';
 import { normalizeUiCard } from '../shared/generative';
 import { TopBar } from './components/TopBar';
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './screens/HomeScreen';
+import { MoneyMissionScreen } from './screens/MoneyMissionScreen';
 import { CreateGoalScreen } from './screens/CreateGoalScreen';
 import { FeasibilityScreen } from './screens/FeasibilityScreen';
 import { GoalImpactScreen } from './screens/GoalImpactScreen';
@@ -30,6 +31,9 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('home');
   const [previousScreen, setPreviousScreen] = useState<ScreenId>('home');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [missionModel, setMissionModel] = useState<MoneyMissionReadModel | null>(null);
+  const [missionLoading, setMissionLoading] = useState(false);
+  const [missionError, setMissionError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [deviceFrame, setDeviceFrame] = useState<boolean>(true);
@@ -50,6 +54,24 @@ export default function App() {
   const [welcomeLeaving, setWelcomeLeaving] = useState(false);
   const initiallyRouted = useRef(false);
   const autoSyncing = useRef(false);
+  const missionRequest = useRef(0);
+  const refreshMission = async () => {
+    const request = ++missionRequest.current;
+    setMissionLoading(true);
+    setMissionError(null);
+    try {
+      const model = await api<MoneyMissionReadModel>('/api/money-mission');
+      if (request === missionRequest.current) setMissionModel(model);
+    } catch (error) {
+      if (request === missionRequest.current) setMissionError(error instanceof Error ? error.message : '暂时无法读取任务');
+    } finally {
+      if (request === missionRequest.current) setMissionLoading(false);
+    }
+  };
+  useEffect(() => {
+    if (currentScreen === 'money_mission') void refreshMission();
+    return () => { missionRequest.current += 1; };
+  }, [currentScreen, snapshot?.twinVersion]);
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -381,6 +403,8 @@ export default function App() {
         return '授权与执行记录';
       case 'workspace':
         return 'NOVA 工作台';
+      case 'money_mission':
+        return '旅行任务';
       default:
         return '';
     }
@@ -390,6 +414,7 @@ export default function App() {
   const showBottomNav =
     currentScreen === 'home' ||
     currentScreen === 'workspace' ||
+    currentScreen === 'money_mission' ||
     currentScreen === 'goals_list' ||
     currentScreen === 'activity' ||
     currentScreen === 'profile';
@@ -474,7 +499,7 @@ export default function App() {
         className={`bg-[#F5F7F8] relative flex flex-col overflow-hidden transition-all duration-300 ${
           deviceFrame
             ? 'w-[390px] max-w-[calc(100vw-16px)] h-[844px] max-h-[844px] min-h-[844px] rounded-[38px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border-[8px] border-[#1F2329]'
-            : currentScreen === 'workspace'
+            : currentScreen === 'workspace' || currentScreen === 'money_mission'
               ? 'w-full max-w-[1120px] min-h-screen md:min-h-[760px] md:max-h-[90vh] md:rounded-2xl md:shadow-xl md:border border-[#E5E8EB]'
               : 'w-full max-w-[420px] min-h-screen md:min-h-[844px] md:max-h-[90vh] md:rounded-2xl md:shadow-xl md:border border-[#E5E8EB]'
         }`}
@@ -495,6 +520,7 @@ export default function App() {
               <h1 className="text-[17px] font-bold text-[#1F2329]">还没有财务目标</h1>
               <p className="mt-2 text-[13px] leading-relaxed text-[#5A616B]">创建目标后，这里会显示首页进度、可行性分析和智能守护提醒。你也可以载入日本旅行模拟数据，查看完整的原版页面。</p>
               <button onClick={() => navigateTo('workspace')} className="mt-4 w-full rounded-xl bg-[#0F6B6D] px-4 py-3 text-[13px] font-semibold text-white">和 NOVA 创建目标</button>
+              <button onClick={() => navigateTo('money_mission')} className="mt-2 min-h-11 w-full rounded-xl border border-[#B9D9D8] px-4 py-3 text-[13px] font-semibold text-[#0F6B6D]">开始日本旅行 Money Mission</button>
               <button onClick={() => setShowSimulateModal(true)} className="mt-2 w-full rounded-xl border border-[#B9D9D8] px-4 py-3 text-[13px] font-semibold text-[#0F6B6D]">查看日本旅行演示</button>
             </section>
           )}
@@ -506,8 +532,13 @@ export default function App() {
               onNavigateToFeasibility={() => navigateTo('feasibility')}
               onNavigateToImpact={() => navigateTo('impact')}
               onNavigateToCreate={() => { setWorkspaceStarter('我想创建一个新的财务目标'); navigateTo('workspace'); }}
+              onNavigateToMoneyMission={() => navigateTo('money_mission')}
             />
           )}
+
+          {currentScreen === 'money_mission' && <MoneyMissionScreen model={missionModel} loading={missionLoading}
+            error={missionError} compact={deviceFrame} onRefresh={() => void refreshMission()}
+            onNavigate={() => { setWorkspaceStarter('请继续日本旅行目标的当前任务'); navigateTo('workspace'); }} />}
 
           {currentScreen === 'create_goal' && goal && (
             <CreateGoalScreen

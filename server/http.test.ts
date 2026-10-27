@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +9,152 @@ import type { Snapshot } from '../shared/contracts.ts';
 import { signExternalRequest } from './security.ts';
 
 const externalSecret = 'abcdef0123456789abcdef0123456789abcdef0123456789';
+
+test('statement previews use the validated store boundary exactly once per request', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'nova-preview-boundary-'));
+  const port = await freePort();
+  try {
+    // Wrap only the designated persistence boundary; the actual SQLite write still executes.
+    const script = `
+      import assert from 'node:assert/strict';
+      import { mock } from 'node:test';
+      import { DatabaseSync } from 'node:sqlite';
+      const actual = await import('./server/store.ts');
+      const calls = [];
+      mock.module('./server/store.ts', { namedExports: { ...actual, saveStatementImportPreview(...args) {
+        const saved = actual.saveStatementImportPreview(...args); calls.push(args); return saved;
+      } } });
+      await import('./server/index.ts');
+      const base = 'http://127.0.0.1:' + process.env.PORT;
+      const initial = await fetch(base + '/api/session');
+      const cookie = initial.headers.get('set-cookie').split(';')[0];
+      const id = cookie.split('=')[1].split('.')[0];
+      const db = new DatabaseSync(process.env.NOVA_DB_PATH);
+      const version = () => db.prepare('SELECT version FROM demo_sessions WHERE id=?').get(id).version;
+      const firstVersion = version();
+      const sample = await fetch(base + '/api/statement-imports/sample', { method: 'POST', headers: { Cookie: cookie } });
+      assert.equal(sample.status, 200); const sampleBody = await sample.json();
+      assert.equal(calls.length, 1, 'sample must pass through saveStatementImportPreview');
+      assert.equal(version(), firstVersion + 1, 'sample must persist once');
+      assert.equal(calls[0][0], id);
+      assert.equal(actual.getStatementImportBatch(id, sampleBody.batch.id).recordCount, 18);
+      assert.equal(actual.getState(id).normalizedStatementRows.length, 18);
+      const form = new FormData(); form.append('templateId', 'bank-csv-v1');
+      form.append('file', new Blob(['date,description,amount\\n2026-08-01,Cafe,-1.00'], { type: 'text/csv' }), 'file.csv');
+      const upload = await fetch(base + '/api/statement-imports/upload', { method: 'POST', headers: { Cookie: cookie }, body: form });
+      assert.equal(upload.status, 200); const uploaded = await upload.json();
+      assert.equal(calls.length, 2, 'upload must pass through saveStatementImportPreview');
+      assert.equal(version(), firstVersion + 2, 'upload must persist once');
+      assert.equal(calls[1][0], id);
+      assert.deepEqual(Object.keys(calls[1][1]).sort(), ['batch', 'issues', 'rows']);
+      assert.equal(actual.getStatementImportBatch(id, uploaded.batch.id).recordCount, 1);
+      assert.equal(actual.getState(id).normalizedStatementRows.length, 19);
+      db.close(); process.exit(0);
+    `;
+    const result = spawnSync(process.execPath, ['--experimental-test-module-mocks', '--import', 'tsx', '--input-type=module', '-e', script], {
+      cwd: process.cwd(), encoding: 'utf8', timeout: 30_000,
+      env: { ...process.env, PORT: String(port), NOVA_DB_PATH: join(directory, 'demo.sqlite'), NODE_ENV: 'production',
+        NOVA_SESSION_SECRET: externalSecret, NOVA_ALLOW_STATEMENT_UPLOAD: 'true', DEEPSEEK_API_KEY: '' },
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('statement HTTP lifecycle is session isolated, governed, private and upload gated', { timeout: 180_000 }, async () => {
+  for (const uploadEnabled of [false, true]) {
+    const directory = mkdtempSync(join(tmpdir(), 'nova-statement-http-'));
+    const port = await freePort(); const base = `http://127.0.0.1:${port}`;
+    const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], { cwd: process.cwd(), stdio: 'ignore',
+      env: { ...process.env, PORT: String(port), NOVA_DB_PATH: join(directory, 'demo.sqlite'), DEEPSEEK_API_KEY: '', NODE_ENV: 'production',
+        NOVA_ALLOW_STATEMENT_UPLOAD: String(uploadEnabled), NOVA_SESSION_SECRET: externalSecret } });
+    try {
+      let ready = false;
+      for (let i = 0; i < 120; i++) {
+        try { if ((await fetch(`${base}/api/health`)).ok) { ready = true; break; } }
+        catch { await new Promise(resolve => setTimeout(resolve, 250)); }
+      }
+      assert.equal(ready, true);
+      let cookie = '';
+      const call = async (path: string, method = 'GET', body?: unknown) => {
+        const response = await fetch(`${base}${path}`, { method, headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: body === undefined ? undefined : JSON.stringify(body) });
+        if (response.headers.get('set-cookie')) cookie = response.headers.get('set-cookie')!.split(';')[0];
+        const text = await response.text();
+        return { code: response.status, data: response.headers.get('content-type')?.includes('json') ? JSON.parse(text) : null,
+          cache: response.headers.get('cache-control') };
+      };
+      const templates = await call('/api/statement-import/templates');
+      assert.equal(templates.code, 200); assert.equal(templates.data.templates.length, 4);
+      const before = (await call('/api/session')).data;
+      const beforeTwin = (await call('/api/financial-twin')).data;
+      const preview = await call('/api/statement-imports/sample', 'POST', {});
+      assert.equal(preview.code, 200); assert.equal(preview.data.rows.length, 18);
+      assert.match(preview.cache ?? '', /no-store/);
+      const batchId = preview.data.batch.id;
+      assert.match(preview.data.contentHash ?? '', /^[a-f0-9]{64}$/, 'preview must identify the exact reviewed contents');
+      const confirmation = { expectedTwinVersion: before.twinVersion, expectedContentHash: preview.data.contentHash };
+      const originalCookie = cookie; cookie = '';
+      const foreign = await call(`/api/statement-imports/${batchId}/commit`, 'POST', confirmation);
+      assert.equal(foreign.code, 400); assert.equal(foreign.data.error, 'IMPORT_BATCH_NOT_FOUND');
+      cookie = originalCookie;
+      assert.equal((await call(`/api/statement-imports/${batchId}/commit`, 'POST', { ...confirmation, expectedTwinVersion: before.twinVersion + 1 })).code, 400);
+      assert.equal((await call(`/api/statement-imports/${batchId}/commit`, 'POST', { expectedTwinVersion: before.twinVersion })).code, 400);
+      const committed = await call(`/api/statement-imports/${batchId}/commit`, 'POST', confirmation);
+      assert.equal(committed.code, 200);
+      assert.deepEqual(committed.data.finance, before.finance);
+      assert.deepEqual((await call('/api/financial-twin')).data.accounts, beforeTwin.accounts);
+      assert.equal(committed.data.twinVersion, before.twinVersion + 1);
+      assert.equal(JSON.stringify(committed.data).includes('normalizedStatementRows'), false);
+      assert.equal(JSON.stringify(committed.data).includes('originalValues'), false);
+      assert.equal((await call(`/api/statement-imports/${batchId}/commit`, 'POST', confirmation)).data.twinVersion, before.twinVersion + 1);
+      const revoked = await call(`/api/statement-imports/${batchId}/revoke`, 'POST', { expectedTwinVersion: before.twinVersion + 1 });
+      assert.equal(revoked.code, 200); assert.deepEqual((await call('/api/financial-twin')).data.transactions, beforeTwin.transactions);
+      const thread = await call('/api/agent/threads', 'POST', { title: 'Balance' });
+      const prepared = await call('/api/account-snapshots/prepare', 'POST', { threadId: thread.data.thread.id,
+        accountId: 'checking', balanceCents: 123456, currency: 'CNY', asOf: before.clock });
+      assert.equal(prepared.code, 200);
+      const confirmed = await call('/api/agent/action', 'POST', { actionId: prepared.data.actionId, decision: 'confirm' });
+      assert.equal(confirmed.code, 200); assert.equal(confirmed.data.snapshot.finance.checkingCents, 123456);
+      const form = new FormData(); form.append('templateId', 'bank-csv-v1');
+      form.append('file', new Blob(['date,description,amount\nbad,Cafe,wrong'], { type: 'text/csv' }), 'sample.csv');
+      const upload = await fetch(`${base}/api/statement-imports/upload`, { method: 'POST', headers: { Cookie: cookie }, body: form });
+      const uploaded = await upload.json();
+      assert.equal(upload.status, uploadEnabled ? 200 : 403);
+      if (!uploadEnabled) assert.equal(uploaded.error, 'DATA_UPLOAD_DISABLED');
+      else {
+        assert.equal(uploaded.issues.length, 2);
+        const block = await call(`/api/statement-imports/${uploaded.batch.id}/commit`, 'POST', {
+          expectedTwinVersion: confirmed.data.snapshot.twinVersion, expectedContentHash: uploaded.contentHash });
+        assert.equal(block.data.error, 'IMPORT_UNRESOLVED');
+        let reviewed = uploaded;
+        for (const issue of uploaded.issues) {
+          const resolved = await call(`/api/statement-imports/${uploaded.batch.id}/issues/${issue.id}`, 'PATCH',
+            { correctedValue: issue.kind === 'invalid_date' ? before.clock : -1234 });
+          assert.equal(resolved.code, 200);
+          reviewed = resolved.data;
+        }
+        const oldConfirmation = { expectedTwinVersion: confirmed.data.snapshot.twinVersion, expectedContentHash: reviewed.contentHash };
+        const amountIssue = uploaded.issues.find((issue: { kind: string }) => issue.kind === 'invalid_amount');
+        const correctedAgain = await call(`/api/statement-imports/${uploaded.batch.id}/issues/${amountIssue.id}`, 'PATCH', { correctedValue: -99999 });
+        assert.notEqual(correctedAgain.data.contentHash, reviewed.contentHash);
+        const beforeStaleCommit = (await call('/api/financial-twin')).data;
+        const staleContents = await call(`/api/statement-imports/${uploaded.batch.id}/commit`, 'POST', oldConfirmation);
+        assert.equal(staleContents.code, 400); assert.equal(staleContents.data.error, 'IMPORT_CONTENT_CHANGED');
+        assert.deepEqual((await call('/api/financial-twin')).data, beforeStaleCommit);
+        const accepted = await call(`/api/statement-imports/${uploaded.batch.id}/commit`, 'POST', {
+          ...oldConfirmation, expectedContentHash: correctedAgain.data.contentHash });
+        assert.equal(accepted.code, 200);
+        assert.equal((await call('/api/financial-twin')).data.transactions.at(-1).amountCents, -99999);
+        const oversized = new FormData(); oversized.append('file', new Blob([new Uint8Array(5 * 1024 * 1024 + 1)], { type: 'text/csv' }), 'large.csv');
+        const rejected = await fetch(`${base}/api/statement-imports/upload`, { method: 'POST', headers: { Cookie: cookie }, body: oversized });
+        assert.equal(rejected.status, 413); assert.equal((await rejected.json()).error, 'STATEMENT_TOO_LARGE');
+      }
+    } finally {
+      child.kill('SIGTERM'); await new Promise(resolve => child.once('exit', resolve));
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
 
 async function freePort(): Promise<number> {
   const server = createServer();

@@ -1,4 +1,5 @@
-export type ScreenId = 'home' | 'workspace' | 'create_goal' | 'data_connections' | 'feasibility' | 'impact' | 'goals_list' | 'activity' | 'profile' | 'banking_demo';
+export type ScreenId = 'home' | 'workspace' | 'money_mission' | 'create_goal' | 'data_connections' | 'feasibility' | 'impact' | 'goals_list' | 'activity' | 'profile' | 'banking_demo';
+export type { MoneyMissionReadModel } from '../../shared/contracts';
 
 export interface Goal {
   id: string;

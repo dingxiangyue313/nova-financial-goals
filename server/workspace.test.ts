@@ -5,6 +5,11 @@ import { createFirstUseFixture, createFixture } from './fixtures.ts';
 import { activatePlan } from './domain.ts';
 import { applySpendingTrendDemo } from './risk.ts';
 import { connectDataSources } from './data-connections.ts';
+import { createJapanMoneyMissionFixture } from './money-mission-fixture.ts';
+import { DemoStateSchema } from '../shared/contracts.ts';
+import { prepareSubscriptionConfirmation } from './workspace.ts';
+import { runBankingTool } from './banking.ts';
+import { verifyAuditChain } from './governance.ts';
 import {
   agentArtifactCounts,
   createAgentThread,
@@ -20,6 +25,126 @@ import {
   setAgentThreadStatus,
 } from './store.ts';
 import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary, executeWorkspaceAction } from './workspace.ts';
+import { prepareTransferScheduleConfirmation } from './workspace.ts';
+import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
+import { buildMoneyMissionPlans } from './money-mission-plans.ts';
+
+test('schedule workspace uses existing actions for activation pause cancel and stable replay with no first transfer', () => {
+  const sessionId = randomUUID(); const thread = createAgentThread(sessionId, { title: '工资后存旅行金' });
+  const state = createJapanMoneyMissionFixture();
+  const forecast = buildDatedCashflowForecast(state, { accountId: 'checking', horizonEnd: state.goal.targetDate, scenario: 'baseline' });
+  const plan = buildMoneyMissionPlans(state, forecast)[1];
+  state.goal = { ...state.goal, selectedPlanId: plan.id, status: 'active', firstMonthContributionCents: 100000 }; state.goals = [state.goal];
+  const input = { goalId: state.goal.id, planOptionId: plan.id, forecastId: forecast.id, twinVersion: 1,
+    sourceAccountId: 'checking', destinationAccountId: 'goal-wallet', amountCents: 100000, currency: 'CNY',
+    recurrence: 'monthly' as const, startDate: '2026-11-26', endDate: '2027-04-26', stopAtGoal: true,
+    trigger: { type: 'salary_event' as const, accountId: 'checking', sourceKind: 'bank' as const, category: 'income' as const,
+      classification: 'salary' as const, expectedAmountCents: 850000, toleranceBps: 1000, expectedDay: 25, windowStartDay: 23,
+      graceEndDay: 27, graceEndTime: '23:59' as const, executeOffsetDays: 1, executeTime: '09:00' as const, missingEventPolicy: 'skip_no_catchup' as const } };
+  const prepared = prepareTransferScheduleConfirmation(sessionId, thread.id, state, { action: 'activate', input });
+  assert.match(prepared.component.body, /1,000/); assert.match(prepared.component.body, /工资/);
+  assert.match(prepared.component.body, /跳过/); assert.match(prepared.component.body, /2027-04-26/);
+  assert.match(prepared.component.body, /25 日/); assert.match(prepared.component.body, /8,500/);
+  assert.match(prepared.component.body, /10%/); assert.match(prepared.component.body, /23/);
+  assert.throws(() => executeWorkspaceAction(randomUUID(), prepared.actionId, 'confirm', prepared.state));
+  const result = executeWorkspaceAction(sessionId, prepared.actionId, 'confirm', prepared.state);
+  assert.equal(result.state.transferSchedules[0].status, 'active');
+  assert.deepEqual(result.state.accounts, state.accounts); assert.equal(result.state.transferExecutions.length, 0);
+  const replay = executeWorkspaceAction(sessionId, prepared.actionId, 'confirm', result.state);
+  assert.equal(replay.replayed, true); assert.deepEqual(replay.state, result.state); assert.equal(replay.message.id, result.message.id);
+  const pause = prepareTransferScheduleConfirmation(sessionId, thread.id, result.state, { action: 'pause', scheduleId: result.state.transferSchedules[0].id });
+  const paused = executeWorkspaceAction(sessionId, pause.actionId, 'confirm', pause.state);
+  assert.equal(paused.state.transferSchedules[0].status, 'paused');
+  const cancel = prepareTransferScheduleConfirmation(sessionId, thread.id, paused.state, { action: 'cancel', scheduleId: result.state.transferSchedules[0].id });
+  const cancelled = executeWorkspaceAction(sessionId, cancel.actionId, 'confirm', cancel.state);
+  assert.equal(cancelled.state.transferSchedules[0].status, 'cancelled');
+  const denied = prepareTransferScheduleConfirmation(sessionId, thread.id, state, { action: 'activate', input });
+  const denial = executeWorkspaceAction(sessionId, denied.actionId, 'cancel', denied.state);
+  assert.deepEqual(denial.state.approvals, []); assert.deepEqual(denial.state.transferSchedules, []);
+  const fresh = prepareTransferScheduleConfirmation(sessionId, thread.id, state, { action: 'activate', input });
+  const stale = executeWorkspaceAction(sessionId, fresh.actionId, 'confirm', { ...fresh.state, twinVersion: 2 });
+  assert.equal(stale.state.transferSchedules.length, 0);
+  assert.equal(stale.state.approvals.length, 0);
+  assert.ok(stale.message.components.some(component => component.type === 'error_recovery'));
+  const once = prepareTransferScheduleConfirmation(sessionId, thread.id, state, { action: 'activate', input: {
+    ...input, recurrence: 'one_time', endDate: input.startDate, trigger: { type: 'fixed_day', day: 26 } } });
+  assert.match(once.component.body, /一次性/); assert.doesNotMatch(once.component.body, /固定每月/);
+});
+
+test('denying subscription cancellation records governed refusal in exported audit and replays without new evidence', () => {
+  const sessionId = randomUUID(); const thread = createAgentThread(sessionId, { title: 'CloudBox Plus' });
+  const prepared = prepareSubscriptionConfirmation(sessionId, thread.id, 'cloudbox-plus', createJapanMoneyMissionFixture());
+  const result = executeWorkspaceAction(sessionId, prepared.actionId, 'cancel', prepared.state);
+  const events = result.state.audit.slice(prepared.state.audit.length);
+  assert.deepEqual(events.map(event => event.action), ['permission', 'risk', 'execute', 'verify', 'audit']);
+  assert.ok(events.every(event => event.operationId === prepared.preview.action.id));
+  assert.match(events[0].detail, /用户.*拒绝取消/);
+  assert.equal(events[2].outcome, 'cancelled');
+  assert.equal(events[3].outcome, 'cancelled');
+  assert.ok(verifyAuditChain(result.state.audit));
+  assert.equal(result.state.twinVersion, prepared.state.twinVersion + 1);
+  assert.deepEqual(result.state.subscriptionMerchants, []);
+  assert.deepEqual(result.state.approvals, []);
+  assert.deepEqual(result.state.receipts, []);
+  const exported = JSON.parse(runBankingTool(result.state, 'export_audit_report', { format: 'json' }).result.content);
+  assert.ok(exported.events.some((event: { operationId: string; outcome: string }) =>
+    event.operationId === prepared.preview.action.id && event.outcome === 'cancelled'));
+  const replay = executeWorkspaceAction(sessionId, prepared.actionId, 'cancel', result.state);
+  assert.equal(replay.replayed, true);
+  assert.equal(replay.message.id, result.message.id);
+  assert.deepEqual(replay.state, result.state);
+});
+
+test('subscription workspace confirmation executes once and denial leaves merchant and approvals untouched', () => {
+  for (const decision of ['confirm', 'cancel'] as const) {
+    const sessionId = randomUUID(); const thread = createAgentThread(sessionId, { title: 'CloudBox Plus' });
+    const prepared = prepareSubscriptionConfirmation(sessionId, thread.id, 'cloudbox-plus', createJapanMoneyMissionFixture());
+    assert.match(prepared.component.body, /68/);
+    assert.match(prepared.component.body, /2026-11-04/);
+    assert.match(prepared.component.body, /不退款/);
+    const result = executeWorkspaceAction(sessionId, prepared.actionId, decision, prepared.state);
+    if (decision === 'confirm') {
+      assert.equal(result.state.subscriptionActions[0].status, 'succeeded');
+      assert.equal(result.state.receipts.length, 1);
+      const replay = executeWorkspaceAction(sessionId, prepared.actionId, decision, result.state);
+      assert.equal(replay.replayed, true);
+      assert.deepEqual(replay.state, result.state);
+      assert.equal(replay.message.id, result.message.id);
+    } else {
+      assert.equal(result.state.subscriptionActions[0].status, 'cancelled');
+      assert.equal(result.state.subscriptionActions[0].nextChargeSuppressed, false);
+      assert.deepEqual(result.state.subscriptionMerchants, []);
+      assert.equal(result.state.approvals.length, 0);
+      assert.equal(result.state.receipts.length, 0);
+    }
+  }
+});
+
+test('stale subscription workspace confirmation cannot submit to the merchant', () => {
+  const sessionId = randomUUID(); const thread = createAgentThread(sessionId, { title: 'CloudBox Plus' });
+  const prepared = prepareSubscriptionConfirmation(sessionId, thread.id, 'cloudbox-plus', createJapanMoneyMissionFixture());
+  const result = executeWorkspaceAction(sessionId, prepared.actionId, 'confirm', { ...prepared.state, twinVersion: 2 });
+  assert.deepEqual(result.state.subscriptionMerchants, []);
+  assert.equal(result.state.receipts.length, 0);
+  assert.ok(result.message.components.some(c => c.type === 'error_recovery'));
+});
+
+test('workspace unknown and failed merchant responses never emit a success receipt', () => {
+  for (const behavior of ['unknown', 'failed', 'requires_merchant']) {
+    const sessionId = randomUUID(); const thread = createAgentThread(sessionId, { title: 'CloudBox Plus' });
+    const base = DemoStateSchema.parse({ ...createJapanMoneyMissionFixture(), subscriptionMerchants: [{
+      subscriptionId: 'cloudbox-plus', merchantId: 'cloudbox-plus', monthlyCents: 6800, paidThrough: '2026-11-04',
+      effectiveAt: '2026-11-05', renewalEnabled: true, cancellationBehavior: behavior, status: 'active',
+      operationId: null, cancelledAt: null }] });
+    const prepared = prepareSubscriptionConfirmation(sessionId, thread.id, 'cloudbox-plus', base);
+    const result = executeWorkspaceAction(sessionId, prepared.actionId, 'confirm', prepared.state);
+    assert.equal(result.state.subscriptionActions[0].status, behavior);
+    assert.equal(result.state.receipts.length, 0);
+    const receipt = result.message.components.find(c => c.type === 'receipt');
+    assert.ok(receipt?.type === 'receipt');
+    assert.equal(receipt.status, behavior === 'unknown' ? 'unknown' : 'failed');
+  }
+});
 
 test('agent threads persist, are isolated, editable, and return only the latest 20 context messages', () => {
   const owner = randomUUID();

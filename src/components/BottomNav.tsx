@@ -20,7 +20,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
               : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
-          <span className="material-symbols-outlined text-[20px]">dashboard</span>
+          <span aria-hidden="true" className="material-symbols-outlined w-5 overflow-hidden text-[20px]">dashboard</span>
           <span className="text-[11px]">首页</span>
         </button>
 
@@ -34,7 +34,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
               : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
-          <span className="material-symbols-outlined text-[20px]">track_changes</span>
+          <span aria-hidden="true" className="material-symbols-outlined w-5 overflow-hidden text-[20px]">track_changes</span>
           <span className="text-[11px]">目标</span>
         </button>
 
@@ -70,7 +70,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
               : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
-          <span className="material-symbols-outlined text-[20px]">timeline</span>
+          <span aria-hidden="true" className="material-symbols-outlined w-5 overflow-hidden text-[20px]">timeline</span>
           <span className="text-[11px]">动态</span>
         </button>
 
@@ -84,7 +84,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
               : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
-          <span className="material-symbols-outlined text-[20px]">account_circle</span>
+          <span aria-hidden="true" className="material-symbols-outlined w-5 overflow-hidden text-[20px]">account_circle</span>
           <span className="text-[11px]">我的</span>
         </button>
       </div>

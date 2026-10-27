@@ -46,6 +46,11 @@ export function snapshot(state: DemoState): Snapshot {
   const displayState = primaryGoal ? { ...state, goal: primaryGoal } : state;
   const assessment = assessGoal(displayState);
   return SnapshotSchema.parse({ goal: primaryGoal ?? state.goal, finance: state.finance, assessment,
+    accountSnapshots: state.accountSnapshots, statementImportBatches: state.statementImportBatches,
+    evidenceRefs: state.evidenceRefs, billBriefs: state.billBriefs, subscriptionActions: state.subscriptionActions,
+    datedCashflowForecasts: state.datedCashflowForecasts, goalPlanOptions: state.goalPlanOptions,
+    transferSchedulePreviews: state.transferSchedulePreviews, transferSchedules: state.transferSchedules,
+    transferExecutions: state.transferExecutions, handoffCasePacks: state.handoffCasePacks,
     goals: state.goals, primaryGoalId: state.primaryGoalId, primaryGoal,
     pendingImpact: state.pendingImpact, mandate: state.mandate, audit: state.audit,
     operations: state.operations, receipts: state.receipts,

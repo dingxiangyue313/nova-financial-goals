@@ -214,6 +214,9 @@ export const ReceiptSchema = z.object({
   operationId: z.string(), tool: z.string(), status: z.enum(['succeeded', 'failed', 'unknown']),
   amountCents: MoneySchema.optional(), currency: z.string().length(3).default('CNY'),
   executedAt: z.string(), twinVersion: z.number().int().positive(),
+  merchantOperationId: z.string().optional(), cancelledAt: z.string().optional(),
+  paidThrough: IsoDateSchema.optional(), effectiveAt: IsoDateSchema.optional(),
+  nextChargeSuppressed: z.boolean().optional(), refundCents: MoneySchema.optional(),
 });
 export type Receipt = z.infer<typeof ReceiptSchema>;
 
@@ -249,7 +252,369 @@ export const FinancialTwinSchema = z.object({
 });
 export type FinancialTwin = z.infer<typeof FinancialTwinSchema>;
 
+// Money Mission artifacts are additive: historical sessions receive empty collections.
+const ArtifactIdSchema = z.string().min(1);
+const TimestampSchema = z.iso.datetime({ offset: true });
+const CountSchema = z.number().int().nonnegative();
+const ConfidenceSchema = z.number().min(0).max(1);
+const SourceRefsSchema = z.array(ArtifactIdSchema);
+
+export const AccountSnapshotSchema = z.object({
+  id: ArtifactIdSchema, accountId: ArtifactIdSchema, balanceCents: MoneySchema,
+  currency: z.string().length(3), asOf: IsoDateSchema,
+  sourceKind: z.enum(['simulated_connection', 'user_confirmed']), sourceId: ArtifactIdSchema,
+  twinVersion: z.number().int().positive(), createdAt: TimestampSchema,
+});
+export type AccountSnapshot = z.infer<typeof AccountSnapshotSchema>;
+
+export const StatementImportBatchSchema = z.object({
+  id: ArtifactIdSchema, templateId: ArtifactIdSchema, format: z.enum(['csv', 'xlsx', 'pdf', 'image']),
+  sourceKind: DataSourceKindSchema, accountId: ArtifactIdSchema,
+  status: z.enum(['preview', 'needs_review', 'ready', 'committed', 'revoked', 'failed']),
+  coverageStart: IsoDateSchema, coverageEnd: IsoDateSchema,
+  recordCount: CountSchema, importedCount: CountSchema, excludedCount: CountSchema, reviewCount: CountSchema,
+  issueIds: SourceRefsSchema, createdAt: TimestampSchema, committedAt: TimestampSchema.nullable(),
+}).refine(batch => batch.coverageStart <= batch.coverageEnd, {
+  path: ['coverageEnd'], message: 'IMPORT_INVALID_COVERAGE',
+});
+export type StatementImportBatch = z.infer<typeof StatementImportBatchSchema>;
+
+const ImportValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+export const ImportIssueSchema = z.object({
+  id: ArtifactIdSchema, batchId: ArtifactIdSchema, rowId: ArtifactIdSchema.nullable(), field: z.string(),
+  kind: z.enum(['invalid_date', 'invalid_amount', 'missing_field', 'duplicate', 'refund_match', 'internal_transfer', 'low_confidence']),
+  severity: z.enum(['blocking', 'review', 'info']),
+  originalValue: ImportValueSchema, correctedValue: ImportValueSchema,
+});
+export type ImportIssue = z.infer<typeof ImportIssueSchema>;
+
+export const NormalizedStatementRowSchema = z.object({
+  id: ArtifactIdSchema, batchId: ArtifactIdSchema, rowNumber: z.number().int().positive(),
+  accountId: ArtifactIdSchema, sourceKind: DataSourceKindSchema,
+  date: IsoDateSchema, title: z.string(), merchantId: ArtifactIdSchema.nullable(),
+  category: z.string(), amountCents: z.number().int(), currency: z.string().length(3),
+  confidence: ConfidenceSchema, issueIds: SourceRefsSchema,
+  excludedReason: z.enum(['duplicate', 'refund_match', 'internal_transfer']).nullable(),
+  originalValues: z.record(z.string(), ImportValueSchema),
+  correctedValues: z.record(z.string(), ImportValueSchema),
+});
+export type NormalizedStatementRow = z.infer<typeof NormalizedStatementRowSchema>;
+
+export const EvidenceRefSchema = z.object({
+  id: ArtifactIdSchema, claimType: z.enum(['fact', 'assumption', 'prediction', 'limitation']),
+  sourceKind: z.enum(['account_snapshot', 'transaction', 'import_batch', 'bill', 'subscription',
+    'subscription_action', 'forecast', 'goal', 'goal_plan', 'transfer_schedule', 'transfer_execution',
+    'user_input', 'system_calculated']),
+  sourceId: ArtifactIdSchema, dataAsOf: IsoDateSchema, label: z.string().min(1), confidence: ConfidenceSchema,
+  sourceRefs: SourceRefsSchema.optional(), limitations: z.array(z.string()).optional(),
+  twinVersion: z.number().int().positive().optional(), calculationVersion: z.string().min(1).optional(),
+});
+export type EvidenceRef = z.infer<typeof EvidenceRefSchema>;
+
+export const BillCalculationVersionSchema = z.literal('bill-investigation-v2');
+export const BillEvidenceDetailSchema = EvidenceRefSchema.extend({
+  sourceRefs: SourceRefsSchema.min(1), limitations: z.array(z.string()),
+  twinVersion: z.number().int().positive(), calculationVersion: BillCalculationVersionSchema,
+  transaction: z.object({
+    id: ArtifactIdSchema, rowId: ArtifactIdSchema, batchId: ArtifactIdSchema, rowNumber: CountSchema.positive(),
+    accountId: ArtifactIdSchema, date: IsoDateSchema, amountCents: z.number().int(), currency: z.string().length(3),
+    merchantId: ArtifactIdSchema.nullable(), category: z.string(),
+    excludedReason: NormalizedStatementRowSchema.shape.excludedReason,
+    refundPairEvidenceId: ArtifactIdSchema.nullable(),
+  }).strict().nullable(),
+});
+export type BillEvidenceDetail = z.infer<typeof BillEvidenceDetailSchema>;
+
+export const BillBriefSchema = z.object({
+  id: ArtifactIdSchema, periodStart: IsoDateSchema, periodEnd: IsoDateSchema,
+  dataAsOf: IsoDateSchema, twinVersion: z.number().int().positive(), totalExpenseCents: MoneySchema,
+  sourceRefs: SourceRefsSchema.optional(), confidence: ConfidenceSchema.optional(),
+  calculationVersion: z.string().min(1).optional(), grossExpenseCents: MoneySchema.optional(),
+  refundCreditsCents: MoneySchema.optional(), netExpenseCents: z.number().int().optional(),
+  categories: z.array(z.object({ category: z.string(), amountCents: MoneySchema, transactionCount: CountSchema,
+    sourceRefs: SourceRefsSchema, dataAsOf: IsoDateSchema.optional(), confidence: ConfidenceSchema.optional(),
+    limitations: z.array(z.string()).optional() })),
+  changes: z.array(z.object({ category: z.string(), baselineCents: MoneySchema, currentCents: MoneySchema,
+    increaseCents: z.number().int(), confidence: ConfidenceSchema, sourceRefs: SourceRefsSchema,
+    dataAsOf: IsoDateSchema.optional(), limitations: z.array(z.string()).optional() })),
+  subscriptionCandidates: z.array(z.object({ subscriptionId: ArtifactIdSchema.nullable(), merchantId: ArtifactIdSchema,
+    label: z.string(), monthlyCents: MoneySchema, nextChargeDate: IsoDateSchema.nullable(),
+    confidence: ConfidenceSchema, sourceRefs: SourceRefsSchema,
+    dataAsOf: IsoDateSchema.optional(), limitations: z.array(z.string()).optional() })),
+  claims: z.array(z.object({ id: ArtifactIdSchema, claimType: EvidenceRefSchema.shape.claimType,
+    label: z.string(), dataAsOf: IsoDateSchema, confidence: ConfidenceSchema,
+    twinVersion: z.number().int().positive().optional(), calculationVersion: z.string().min(1).optional(),
+    sourceRefs: SourceRefsSchema.min(1), limitations: z.array(z.string()) })),
+  limitations: z.array(z.string()), createdAt: TimestampSchema,
+});
+export type BillBrief = z.infer<typeof BillBriefSchema>;
+
+// Legacy stored artifacts stay readable; every newly generated investigation must use this stricter boundary.
+export const BillInvestigationBriefSchema = BillBriefSchema.extend({
+  calculationVersion: BillCalculationVersionSchema,
+  grossExpenseCents: MoneySchema, refundCreditsCents: MoneySchema, netExpenseCents: z.number().int(),
+  claims: z.array(BillBriefSchema.shape.claims.element.extend({
+    twinVersion: z.number().int().positive(), calculationVersion: BillCalculationVersionSchema,
+  })),
+});
+export type BillInvestigationBrief = z.infer<typeof BillInvestigationBriefSchema>;
+
+export const BillPeriodInputSchema = z.object({ periodStart: IsoDateSchema, periodEnd: IsoDateSchema }).strict()
+  .refine(value => value.periodStart <= value.periodEnd, { message: 'BILL_INVALID_PERIOD' })
+  .refine(value => Date.parse(value.periodEnd) - Date.parse(value.periodStart) <= 366 * 86_400_000,
+    { message: 'BILL_INVALID_PERIOD' });
+export const EvidenceDetailInputSchema = z.object({ evidenceId: ArtifactIdSchema.max(200) }).strict();
+
+export const SubscriptionActionSchema = z.object({
+  id: ArtifactIdSchema, subscriptionId: ArtifactIdSchema, merchantId: ArtifactIdSchema,
+  action: z.enum(['keep', 'remind', 'cancel', 'not_subscription']),
+  status: z.enum(['prepared', 'awaiting_confirmation', 'executing', 'succeeded', 'failed',
+    'requires_merchant', 'unknown', 'reconciled', 'cancelled']),
+  monthlyCents: MoneySchema, paidThrough: IsoDateSchema, effectiveAt: IsoDateSchema,
+  nextChargeSuppressed: z.boolean(), refundCents: MoneySchema,
+  twinVersion: z.number().int().positive(), actionHash: z.string(),
+  merchantOperationId: z.string().nullable(), receiptOperationId: z.string().nullable(),
+  reminderAt: IsoDateSchema.nullable().optional(),
+  evidenceRefs: SourceRefsSchema, createdAt: TimestampSchema, updatedAt: TimestampSchema,
+});
+export type SubscriptionAction = z.infer<typeof SubscriptionActionSchema>;
+
+export const SubscriptionActionInputSchema = z.object({ subscriptionId: ArtifactIdSchema,
+  action: SubscriptionActionSchema.shape.action }).strict();
+export const SubscriptionCancellationInputSchema = z.object({ actionId: ArtifactIdSchema,
+  approvalToken: z.string().min(1) }).strict();
+export const SubscriptionCancellationParametersSchema = z.object({ subscriptionId: ArtifactIdSchema,
+  merchantId: ArtifactIdSchema, monthlyCents: MoneySchema, effectiveAt: IsoDateSchema, paidThrough: IsoDateSchema,
+  twinVersion: z.number().int().positive(), actionHash: z.string().min(1) }).strict();
+export const SubscriptionActionPreviewSchema = z.object({ action: SubscriptionActionSchema,
+  approvalParameters: SubscriptionCancellationParametersSchema.nullable(),
+  potentialMonthlySavingsCents: MoneySchema, verifiedMonthlySavingsCents: MoneySchema,
+  consequences: z.array(z.string()).min(1) });
+export type SubscriptionActionPreview = z.infer<typeof SubscriptionActionPreviewSchema>;
+
+// Private simulator state. A prepared action or an optimistic client result cannot change this ledger.
+export const SubscriptionMerchantSchema = z.object({ subscriptionId: ArtifactIdSchema, merchantId: ArtifactIdSchema,
+  monthlyCents: MoneySchema, paidThrough: IsoDateSchema, effectiveAt: IsoDateSchema, renewalEnabled: z.boolean(),
+  cancellationBehavior: z.enum(['succeeded', 'failed', 'unknown', 'requires_merchant', 'pending']),
+  status: z.enum(['active', 'cancelled', 'failed', 'requires_merchant', 'pending']),
+  operationId: z.string().nullable(), cancelledAt: TimestampSchema.nullable() });
+export type SubscriptionMerchant = z.infer<typeof SubscriptionMerchantSchema>;
+
+export const DatedCashflowForecastSchema = z.object({
+  id: ArtifactIdSchema, executableForecastId: ArtifactIdSchema.nullable(), accountId: ArtifactIdSchema,
+  currency: z.string().length(3), twinVersion: z.number().int().positive(), dataAsOf: IsoDateSchema,
+  horizonStart: IsoDateSchema, horizonEnd: IsoDateSchema, scenario: z.enum(['baseline', 'stress', 'edited']),
+  precision: z.enum(['exact', 'range', 'insufficient_balance']),
+  startingBalanceCents: MoneySchema.nullable(), minimumBalanceCents: z.number().int().nullable(),
+  minimumBalanceDate: IsoDateSchema.nullable(),
+  events: z.array(z.object({ id: ArtifactIdSchema, date: IsoDateSchema, label: z.string(),
+    kind: z.enum(['income', 'bill', 'subscription', 'transfer', 'purchase']),
+    amountCents: z.number().int(), priority: z.number().int(), sourceRefs: SourceRefsSchema })),
+  dailyBalances: z.array(z.object({ date: IsoDateSchema, balanceCents: z.number().int() })),
+  evidenceRefs: SourceRefsSchema, assumptions: z.array(z.string()), limitations: z.array(z.string()),
+  createdAt: TimestampSchema,
+}).superRefine((forecast, context) => {
+  if (forecast.precision !== 'exact' && (forecast.executableForecastId !== null ||
+    forecast.minimumBalanceCents !== null || forecast.minimumBalanceDate !== null))
+    context.addIssue({ code: 'custom', message: 'FORECAST_EXACT_BALANCE_REQUIRED' });
+  if (forecast.precision === 'exact' && (forecast.startingBalanceCents === null ||
+    forecast.minimumBalanceCents === null || forecast.minimumBalanceDate === null))
+    context.addIssue({ code: 'custom', message: 'FORECAST_MISSING_BALANCE' });
+});
+export type DatedCashflowForecast = z.infer<typeof DatedCashflowForecastSchema>;
+
+const CashflowEditEventSchema = z.object({ id: ArtifactIdSchema, date: IsoDateSchema, label: z.string().min(1).max(120),
+  kind: z.enum(['income', 'bill', 'subscription', 'transfer', 'purchase']), amountCents: z.number().int(),
+  currency: z.string().length(3), sourceRefs: SourceRefsSchema.min(1).max(100) }).strict();
+export const CashflowEditSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('add'), event: CashflowEditEventSchema }).strict(),
+  z.object({ type: z.literal('update'), eventId: ArtifactIdSchema, date: IsoDateSchema.optional(),
+    amountCents: z.number().int().optional() }).strict().refine(value => value.date !== undefined || value.amountCents !== undefined),
+  z.object({ type: z.literal('remove'), eventId: ArtifactIdSchema }).strict(),
+]);
+export type CashflowEdit = z.infer<typeof CashflowEditSchema>;
+export const DatedCashflowForecastInputSchema = z.object({ accountId: ArtifactIdSchema, horizonEnd: IsoDateSchema,
+  scenario: z.enum(['baseline', 'stress', 'edited']), edits: z.array(CashflowEditSchema).max(100).optional(),
+}).strict().refine(input => input.scenario !== 'baseline' || !input.edits?.length,
+  { message: 'FORECAST_BASELINE_EDITS_NOT_ALLOWED' });
+export type DatedCashflowForecastInput = z.infer<typeof DatedCashflowForecastInputSchema>;
+
+export const GoalPlanOptionSchema = z.object({
+  id: ArtifactIdSchema, goalId: ArtifactIdSchema, forecastId: ArtifactIdSchema,
+  twinVersion: z.number().int().positive(), label: z.string(),
+  monthlyCents: MoneySchema, upfrontCents: MoneySchema, firstMonthContributionCents: MoneySchema,
+  occurrences: z.number().int().positive(), projectedDate: IsoDateSchema,
+  minimumBalanceCents: z.number().int().nullable(), executable: z.boolean(),
+  evidenceRefs: SourceRefsSchema, assumptions: z.array(z.string()), limitations: z.array(z.string()),
+});
+export type GoalPlanOption = z.infer<typeof GoalPlanOptionSchema>;
+
+export const TransferTriggerSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('fixed_day'), day: z.number().int().min(1).max(31) }),
+  z.object({ type: z.literal('salary_event'), accountId: ArtifactIdSchema, sourceKind: z.literal('bank'),
+    category: z.literal('income'), classification: z.literal('salary'),
+    expectedAmountCents: MoneySchema.positive(), toleranceBps: z.number().int().min(0).max(10000),
+    expectedDay: z.number().int().min(1).max(31), windowStartDay: z.number().int().min(1).max(31),
+    graceEndDay: z.number().int().min(1).max(31), graceEndTime: z.literal('23:59'),
+    executeOffsetDays: z.number().int().nonnegative(), executeTime: z.literal('09:00'),
+    missingEventPolicy: z.literal('skip_no_catchup') }),
+]);
+export type TransferTrigger = z.infer<typeof TransferTriggerSchema>;
+
+export const TransferScheduleInputSchema = z.object({
+  goalId: ArtifactIdSchema, planOptionId: ArtifactIdSchema.nullable(),
+  sourceAccountId: ArtifactIdSchema, destinationAccountId: ArtifactIdSchema,
+  amountCents: MoneySchema.positive(), currency: z.string().length(3),
+  recurrence: z.enum(['one_time', 'monthly']), trigger: TransferTriggerSchema,
+  startDate: IsoDateSchema, endDate: IsoDateSchema.nullable(), stopAtGoal: z.boolean(),
+  forecastId: ArtifactIdSchema, twinVersion: z.number().int().positive(),
+}).strict();
+export type TransferScheduleInput = z.infer<typeof TransferScheduleInputSchema>;
+export const TransferSchedulePreviewSchema = TransferScheduleInputSchema.extend({
+  id: ArtifactIdSchema, precision: z.literal('exact'),
+  authorityContextHash: z.string().optional(),
+  occurrences: z.array(z.object({ date: IsoDateSchema, amountCents: MoneySchema,
+    minimumBalanceCents: z.number().int(), conflicts: z.array(z.string()) })).max(3),
+  evidenceRefs: SourceRefsSchema, limitations: z.array(z.string()), createdAt: TimestampSchema,
+});
+export type TransferSchedulePreview = z.infer<typeof TransferSchedulePreviewSchema>;
+
+export const TransferScheduleSchema = TransferScheduleInputSchema.extend({
+  id: ArtifactIdSchema, previewId: ArtifactIdSchema,
+  authorityContextHash: z.string().optional(),
+  status: z.enum(['draft', 'simulated', 'awaiting_confirmation', 'active', 'paused', 'completed', 'failed', 'cancelled']),
+  authorizationHash: z.string(), nextEvaluationAt: TimestampSchema.nullable(),
+  createdAt: TimestampSchema, updatedAt: TimestampSchema,
+});
+export type TransferSchedule = z.infer<typeof TransferScheduleSchema>;
+
+export const TransferExecutionSchema = z.object({
+  id: ArtifactIdSchema, scheduleId: ArtifactIdSchema, period: z.string().regex(/^\d{4}-\d{2}$/),
+  status: z.enum(['scheduled', 'succeeded', 'failed', 'unknown', 'skipped_missing_trigger', 'reconciled']),
+  amountCents: MoneySchema, currency: z.string().length(3), operationId: z.string().nullable(),
+  triggerTransactionId: z.string().nullable(), scheduledAt: TimestampSchema.nullable(),
+  executedAt: TimestampSchema.nullable(), receiptOperationId: z.string().nullable(),
+  reason: z.string().nullable(), createdAt: TimestampSchema, updatedAt: TimestampSchema,
+});
+export type TransferExecution = z.infer<typeof TransferExecutionSchema>;
+
+// Mission clients receive outcome/display fields and public selectors only.
+// Merchant/operation/session identifiers and execution authority remain server-side.
+export const MoneyMissionSubscriptionActionSchema = SubscriptionActionSchema.pick({
+  id: true, subscriptionId: true, action: true, status: true,
+  monthlyCents: true, paidThrough: true, effectiveAt: true, nextChargeSuppressed: true,
+  refundCents: true, twinVersion: true, reminderAt: true,
+  evidenceRefs: true, createdAt: true, updatedAt: true,
+}).strip();
+export type MoneyMissionSubscriptionAction = z.infer<typeof MoneyMissionSubscriptionActionSchema>;
+
+export const MoneyMissionTransferExecutionSchema = TransferExecutionSchema.pick({
+  id: true, scheduleId: true, period: true, status: true, amountCents: true, currency: true,
+  scheduledAt: true, executedAt: true, reason: true, createdAt: true, updatedAt: true,
+}).strip();
+export type MoneyMissionTransferExecution = z.infer<typeof MoneyMissionTransferExecutionSchema>;
+
+export const HandoffCasePackSchema = z.object({
+  id: ArtifactIdSchema, goalId: ArtifactIdSchema.nullable(), summary: z.string(),
+  facts: z.array(z.object({ label: z.string(), sourceRefs: SourceRefsSchema })),
+  unknowns: z.array(z.string()), limitations: z.array(z.string()),
+  attemptedActions: z.array(z.object({ actionId: ArtifactIdSchema, label: z.string(), outcome: z.string() })),
+  receiptOperationIds: SourceRefsSchema, questions: z.array(z.string()), createdAt: TimestampSchema,
+});
+export type HandoffCasePack = z.infer<typeof HandoffCasePackSchema>;
+
+export const MoneyMissionStageSchema = z.enum(['goal', 'data', 'bill', 'subscription', 'plan', 'transfer', 'monitoring']);
+export const MoneyMissionReadModelSchema = z.object({
+  goalId: ArtifactIdSchema.nullable(), currentStage: MoneyMissionStageSchema,
+  completedStages: z.array(MoneyMissionStageSchema),
+  nextAction: z.object({ id: ArtifactIdSchema, label: z.string() }).nullable(),
+  dataAsOf: IsoDateSchema, twinVersion: z.number().int().positive(),
+  billBrief: BillBriefSchema.nullable(), subscriptionAction: MoneyMissionSubscriptionActionSchema.nullable(),
+  forecast: DatedCashflowForecastSchema.nullable(), planOptions: z.array(GoalPlanOptionSchema).max(3),
+  transferSchedule: TransferScheduleSchema.nullable(), transferExecutions: z.array(MoneyMissionTransferExecutionSchema),
+  evidenceRefs: z.array(EvidenceRefSchema), limitations: z.array(z.string()),
+});
+export type MoneyMissionReadModel = z.infer<typeof MoneyMissionReadModelSchema>;
+
+export const SkillIdSchema = z.enum([
+  'statement_ingestion_and_reconciliation', 'bill_and_subscription_investigator', 'dated_cashflow_forecast',
+  'goal_portfolio_planner', 'transfer_and_savings_executor', 'mandate_builder', 'external_agent_request_inbox',
+  'outcome_monitor_and_replanner', 'financial_explanation_and_provenance', 'human_handoff_case_pack',
+]);
+export type SkillId = z.infer<typeof SkillIdSchema>;
+export const SkillDefinitionSchema = z.object({
+  name: SkillIdSchema, version: z.string().min(1), description: z.string().min(1),
+  riskClass: z.enum(['read', 'recommend', 'prepare_write', 'write']),
+  inputSchema: z.unknown(), outputSchema: z.unknown(), allowedTools: z.array(z.string().min(1)),
+  maxToolCalls: z.number().int().nonnegative(), timeoutMs: z.number().int().positive(),
+  requiresEvidence: z.boolean(), canPrepareAction: z.boolean(), canExecuteAction: z.literal(false),
+  enabled: z.boolean(), release: z.enum(['p0', 'p1_stretch']),
+}).refine(skill => !['mandate_builder', 'external_agent_request_inbox'].includes(skill.name) ||
+  (!skill.enabled && skill.release === 'p1_stretch'), { message: 'SKILL_P1_STRETCH_DISABLED' });
+export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>;
+
+// Model-facing Money Mission decisions carry selectors only. Financial arguments,
+// task identity, and authorization are resolved by the server after selection.
+export const EnabledSkillIdSchema = SkillIdSchema.exclude(['mandate_builder', 'external_agent_request_inbox']);
+export const SkillReferenceIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/);
+export const MoneyMissionQuestionKeySchema = z.enum(['confirm_goal', 'select_data_source',
+  'select_bill_period', 'confirm_subscription_choice', 'select_transfer_preview', 'clarify_scope']);
+export const MoneyMissionDecisionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('select_skill'), skillId: EnabledSkillIdSchema }).strict(),
+  z.object({ type: z.literal('ask_user'), questionKey: MoneyMissionQuestionKeySchema }).strict(),
+  z.object({ type: z.literal('finish'), reason: z.enum(['completed', 'insufficient_data', 'unsupported']) }).strict(),
+]);
+export type MoneyMissionDecision = z.infer<typeof MoneyMissionDecisionSchema>;
+export const SkillFactSchema = z.object({
+  kind: z.enum(['import_batch', 'import_issue', 'bill', 'subscription', 'forecast', 'plan',
+    'goal', 'account', 'schedule', 'execution', 'evidence', 'case_pack']),
+  refId: SkillReferenceIdSchema,
+  claimType: z.enum(['fact', 'user_input', 'assumption', 'prediction', 'recommendation', 'simulated_result']),
+  sourceRefs: z.array(SkillReferenceIdSchema).max(100),
+  amountCents: z.number().int().safe().optional(), minimumBalanceCents: z.number().int().safe().nullable().optional(),
+  date: IsoDateSchema.optional(), count: z.number().int().nonnegative().optional(),
+  executable: z.boolean().optional(), nextChargeSuppressed: z.boolean().optional(),
+  status: z.enum(['preview', 'needs_review', 'ready', 'committed', 'revoked', 'failed', 'active', 'paused',
+    'cancelled', 'awaiting_confirmation', 'executing', 'unknown', 'succeeded', 'reconciled', 'requires_merchant',
+    'exact', 'range', 'skipped_missing_trigger', 'skipped', 'blocked', 'not_due', 'pending',
+    'draft', 'simulated', 'completed', 'scheduled', 'prepared', 'insufficient_balance']).optional(),
+}).strict();
+export type SkillFact = z.infer<typeof SkillFactSchema>;
+export const SkillOutputSchema = z.object({
+  skillId: EnabledSkillIdSchema, status: z.enum(['completed', 'awaiting_user', 'awaiting_confirmation', 'handoff']),
+  evidenceRefs: z.array(SkillReferenceIdSchema).max(100), facts: z.array(SkillFactSchema).max(100),
+  limitations: z.array(z.enum(['DATA_REQUIRED', 'CONFIRMATION_REQUIRED', 'PREVIEW_ONLY', 'NO_EXTERNAL_CONTACT',
+    'SOURCE_LIMITATIONS', 'CAPABILITY_UNAVAILABLE'])).max(6),
+  nextActionIds: z.array(SkillReferenceIdSchema).max(10), handoff: EnabledSkillIdSchema.nullable(),
+}).strict();
+export type SkillOutput = z.infer<typeof SkillOutputSchema>;
+export const MoneyMissionDecisionContextSchema = z.object({
+  intent: z.enum(['import', 'bill', 'subscription', 'forecast', 'goal', 'transfer', 'monitor', 'explain', 'handoff', 'unsupported']),
+  phase: z.enum(['data', 'investigating', 'forecast', 'planning', 'confirmation', 'monitoring', 'explanation', 'handoff']),
+  availableSkillIds: z.array(EnabledSkillIdSchema).max(8), feedback: z.array(SkillOutputSchema).max(10),
+}).strict();
+export type MoneyMissionDecisionContext = z.infer<typeof MoneyMissionDecisionContextSchema>;
+
+const MoneyMissionArtifactCollections = {
+  accountSnapshots: z.array(AccountSnapshotSchema).default([]),
+  statementImportBatches: z.array(StatementImportBatchSchema).default([]),
+  importIssues: z.array(ImportIssueSchema).default([]),
+  normalizedStatementRows: z.array(NormalizedStatementRowSchema).default([]),
+  evidenceRefs: z.array(EvidenceRefSchema).default([]), billBriefs: z.array(BillBriefSchema).default([]),
+  subscriptionActions: z.array(SubscriptionActionSchema).default([]),
+  datedCashflowForecasts: z.array(DatedCashflowForecastSchema).default([]),
+  goalPlanOptions: z.array(GoalPlanOptionSchema).default([]),
+  transferSchedulePreviews: z.array(TransferSchedulePreviewSchema).default([]),
+  transferSchedules: z.array(TransferScheduleSchema).default([]),
+  transferExecutions: z.array(TransferExecutionSchema).default([]),
+  handoffCasePacks: z.array(HandoffCasePackSchema).default([]),
+};
+const { importIssues: _importIssues, normalizedStatementRows: _normalizedRows,
+  ...MoneyMissionPublicArtifactCollections } = MoneyMissionArtifactCollections;
+
 export const DemoStateSchema = z.object({
+  ...MoneyMissionArtifactCollections,
+  subscriptionMerchants: z.array(SubscriptionMerchantSchema).default([]),
   clock: IsoDateSchema, goal: GoalSchema, finance: FinanceSchema,
   goals: z.array(GoalSchema).default([]), primaryGoalId: z.string().nullable().default(null),
   pendingImpact: ImpactSchema.nullable(), mandate: MandateSchema.nullable(),
@@ -389,6 +754,8 @@ export type AgentTask = z.infer<typeof AgentTaskSchema>;
 export const AgentReadToolNameSchema = z.enum([
   'financial_overview', 'essential_bills', 'relevant_transactions', 'data_sufficiency',
   'candidate_preview', 'search_goal_options', 'stress_test_goal_options', 'repair_stressed_goal_option',
+  'bill_period_summary', 'spending_baseline_comparison', 'subscription_candidates', 'evidence_detail',
+  'dated_cashflow_forecast',
 ]);
 export type AgentReadToolName = z.infer<typeof AgentReadToolNameSchema>;
 export const SearchGoalOptionsInputSchema = z.object({
@@ -441,7 +808,7 @@ export const RepairStressedGoalOptionInputSchema = z.object({
 }).strict();
 export type RepairStressedGoalOptionInput = z.infer<typeof RepairStressedGoalOptionInputSchema>;
 export const AgentToolSourceSchema = z.object({
-  kind: z.enum(['account', 'bill', 'transaction', 'connection', 'finance', 'task', 'tool_result']),
+  kind: z.enum(['account', 'bill', 'transaction', 'connection', 'finance', 'task', 'tool_result', 'evidence']),
   id: z.string().min(1),
 }).strict();
 export type AgentToolSource = z.infer<typeof AgentToolSourceSchema>;
@@ -455,6 +822,17 @@ const AgentToolEnvelope = z.object({
   assumptions: z.array(z.string().max(240)).max(20), gaps: z.array(z.string().max(240)).max(20),
 }).strict();
 export const AgentToolResultSchema = z.discriminatedUnion('tool', [
+  AgentToolEnvelope.extend({ tool: z.literal('dated_cashflow_forecast'), output: DatedCashflowForecastSchema }),
+  AgentToolEnvelope.extend({ tool: z.literal('bill_period_summary'), output: BillInvestigationBriefSchema }),
+  AgentToolEnvelope.extend({ tool: z.literal('spending_baseline_comparison'), output: z.object({
+    briefId: ArtifactIdSchema, changes: BillBriefSchema.shape.changes,
+    claims: BillInvestigationBriefSchema.shape.claims, limitations: z.array(z.string()),
+  }).strict() }),
+  AgentToolEnvelope.extend({ tool: z.literal('subscription_candidates'), output: z.object({
+    briefId: ArtifactIdSchema, subscriptionCandidates: BillBriefSchema.shape.subscriptionCandidates,
+    claims: BillInvestigationBriefSchema.shape.claims, limitations: z.array(z.string()),
+  }).strict() }),
+  AgentToolEnvelope.extend({ tool: z.literal('evidence_detail'), output: BillEvidenceDetailSchema }),
   AgentToolEnvelope.extend({ tool: z.literal('financial_overview'), output: z.object({
     checkingCents: MoneySchema, emergencyCents: MoneySchema, monthlyIncomeCents: MoneySchema,
     fixedBillsCents: MoneySchema, essentialSpendingCents: MoneySchema,
@@ -697,6 +1075,9 @@ export const AgentTurnWithRunSchema = AgentTurnSchema.extend({ run: AgentRunSche
 export type AgentTurnWithRun = z.infer<typeof AgentTurnWithRunSchema>;
 
 export const SnapshotSchema = z.object({
+  // Parsed rows and correction values stay server-side; expose structured artifacts only.
+  ...MoneyMissionPublicArtifactCollections,
+  moneyMission: MoneyMissionReadModelSchema.nullable().default(null),
   goal: GoalSchema, finance: FinanceSchema, assessment: AssessmentSchema,
   goals: z.array(GoalSchema).default([]), primaryGoalId: z.string().nullable().default(null),
   primaryGoal: GoalSchema.nullable().default(null),

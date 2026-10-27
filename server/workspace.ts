@@ -1,11 +1,16 @@
 import { z } from 'zod';
+import { applyConfirmedAccountSnapshot } from './account-snapshots.ts';
 import { AgentTurnSchema, GoalAssumptionsSchema, type AgentComponent, type AgentIntent,
-  type AgentTurn, type DemoState, type GoalAssumptions, type GoalDraft } from '../shared/contracts.ts';
+  type AgentTurn, type DemoState, type GoalAssumptions, type GoalDraft, type TransferScheduleInput } from '../shared/contracts.ts';
 import { interpretAgentRequest } from './agent.ts';
 import { understandGoalMessage, type Understanding } from './understanding.ts';
 import { buildWeeklyRiskSummary, markActiveRiskSignal, notificationDelivery } from './risk.ts';
 import { assessGoal, availableMonthly, resolveImpact } from './domain.ts';
 import { runBankingTool } from './banking.ts';
+import { SubscriptionCancellationParametersSchema } from '../shared/contracts.ts';
+import { persistSubscriptionDecision, subscriptionCancellationParameters } from './subscription-service.ts';
+import { activateTransferSchedule, getTransferScheduleStatus, transferScheduleApprovalParameters,
+  transferScheduleLifecycleParameters } from './transfer-schedules.ts';
 import { evaluateExternalRequest } from './tools.ts';
 import { stableHash, verifyAuditChain } from './governance.ts';
 import { previewGoalScenario } from './scenario.ts';
@@ -83,6 +88,59 @@ function confirmation(sessionId: string, threadId: string, state: DemoState, act
   const action = createAgentAction(sessionId, threadId, actionType, state.twinVersion, payload);
   return { id: componentId(), type: 'confirmation', title, body, tone: destructive ? 'danger' : 'warning',
     action: { actionId: action.id, label, destructive } };
+}
+
+export function prepareSubscriptionConfirmation(sessionId: string, threadId: string, subscriptionId: string, state: DemoState) {
+  getAgentThread(sessionId, threadId);
+  const prepared = runBankingTool(state, 'prepare_subscription_action', { subscriptionId, action: 'cancel' });
+  const preview = prepared.result;
+  const action = createAgentAction(sessionId, threadId, 'confirm_subscription_cancellation', state.twinVersion,
+    { subscriptionActionId: preview.action.id, parameters: preview.approvalParameters });
+  const component: Extract<AgentComponent, { type: 'confirmation' }> = {
+    id: componentId(), type: 'confirmation', title: '核对并取消自动续费', body: preview.consequences.join(' '),
+    tone: 'warning', action: { actionId: action.id, label: `确认停止每月 ${yuan(preview.action.monthlyCents)} 续费`, destructive: true } };
+  return { state: prepared.state, actionId: action.id, preview, component };
+}
+
+export function prepareTransferScheduleConfirmation(sessionId: string, threadId: string, state: DemoState,
+  request: { action: 'activate'; input: TransferScheduleInput } | { action: 'activate'; previewId: string }
+    | { action: 'pause' | 'cancel'; scheduleId: string }) {
+  const thread = getAgentThread(sessionId, threadId);
+  if (thread.readOnly || thread.status !== 'active') throw new Error('THREAD_READ_ONLY');
+  let next = state;
+  let payload: Record<string, unknown>;
+  let body: string;
+  if (request.action === 'activate') {
+    const preview = 'input' in request ? (() => {
+      const prepared = runBankingTool(state, 'prepare_recurring_transfer', request.input);
+      next = prepared.state; return prepared.result.preview;
+    })() : state.transferSchedulePreviews.find(item => item.id === request.previewId);
+    if (!preview) throw new Error('SCHEDULE_PREVIEW_NOT_FOUND');
+    payload = { previewId: preview.id, parameters: transferScheduleApprovalParameters(preview) };
+    const source = state.accounts.find(item => item.id === preview.sourceAccountId)?.label;
+    const destination = state.accounts.find(item => item.id === preview.destinationAccountId)?.label;
+    const rule = preview.trigger.type === 'salary_event'
+      ? `预计每月 ${preview.trigger.expectedDay} 日银行工资 ${yuan(preview.trigger.expectedAmountCents)} ±${preview.trigger.toleranceBps / 100}%，` +
+        `在 ${preview.trigger.windowStartDay}—${preview.trigger.graceEndDay} 日验证工资实际到账后 ${preview.trigger.executeOffsetDays} 天 09:00 转入；` +
+        `${preview.trigger.graceEndDay} 日 23:59 前缺少工资时跳过，不补扣`
+      : preview.recurrence === 'one_time' ? `固定 ${preview.startDate} 09:00` : `固定每月 ${preview.trigger.day} 日 09:00`;
+    body = `${source} → ${destination}，${yuan(preview.amountCents)} ${preview.currency}；${preview.recurrence === 'monthly' ? '每月' : '一次性'}，` +
+      `首次预计 ${preview.startDate}，${rule}。结束日期 ${preview.endDate}，目标达成即停止，费用 ¥0。` +
+      `预计最低余额 ${yuan(Math.min(...preview.occurrences.map((item: { minimumBalanceCents: number }) => item.minimumBalanceCents)))}，` +
+      '应急金保持隔离。创建仅安排后续模拟转入，首笔尚未执行。';
+  } else {
+    const schedule = getTransferScheduleStatus(state, request.scheduleId);
+    if (request.action === 'pause' ? schedule.status !== 'active' : !['active', 'paused'].includes(schedule.status))
+      throw new Error('SCHEDULE_INVALID_STATUS');
+    payload = { scheduleId: schedule.id, parameters: transferScheduleLifecycleParameters(schedule) };
+    body = `确认${request.action === 'pause' ? '暂停' : '取消'} ${yuan(schedule.amountCents)} 的模拟转账计划。后续不会执行，已完成的转入不会撤回。`;
+  }
+  const action = createAgentAction(sessionId, threadId, `${request.action}_transfer_schedule`, state.twinVersion, payload);
+  const component: Extract<AgentComponent, { type: 'confirmation' }> = { id: componentId(), type: 'confirmation',
+    title: '核对模拟转账安排', body, tone: 'warning',
+    action: { actionId: action.id, label: `确认${request.action === 'activate' ? '创建' : request.action === 'pause' ? '暂停' : '取消'}计划`,
+      destructive: request.action === 'cancel' } };
+  return { state: next, actionId: action.id, component };
 }
 
 function statusComponents(sessionId: string, threadId: string, state: DemoState): AgentComponent[] {
@@ -393,7 +451,8 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
   state: DemoState, selection: string[] = []): { state: DemoState; replayed: boolean; message: ReturnType<typeof saveAgentMessage>;
     nextStep: 'connect_data' | null } {
   const action = getAgentAction(sessionId, actionId);
-  if (action.status === 'consumed') {
+  if (action.status === 'consumed' || ((action.actionType === 'confirm_subscription_cancellation' || action.actionType.endsWith('_transfer_schedule'))
+    && action.status === 'cancelled' && action.result && typeof action.result === 'object' && 'messageId' in action.result)) {
     const messages = getAgentMessages(sessionId, action.threadId);
     const messageId = action.result && typeof action.result === 'object' && 'messageId' in action.result
       ? String((action.result as { messageId: unknown }).messageId) : null;
@@ -413,14 +472,71 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
     return { state, replayed: false, message, nextStep: null };
   }
   if (decision === 'cancel') {
-    finishAgentAction(sessionId, actionId, 'cancelled', state);
-    const message = saveAgentMessage(sessionId, action.threadId, { role: 'assistant', content: '已取消，本次没有修改任何数据。',
-      components: [{ id: componentId(), type: 'receipt', title: '操作已取消', body: 'Financial Twin 未发生变化。', status: 'failed' }] });
+    const subscriptionDenial = action.actionType === 'confirm_subscription_cancellation';
+    if (subscriptionDenial) {
+      const subscriptionActionId = String(action.payload.subscriptionActionId);
+      const previous = state.subscriptionActions.find(item => item.id === subscriptionActionId);
+      if (!previous) throw new Error('SUBSCRIPTION_ACTION_NOT_FOUND');
+      state = persistSubscriptionDecision(state, { ...previous, status: 'cancelled',
+        updatedAt: `${state.clock}T12:00:00.000Z` }, action.id);
+    }
+    const message = saveAgentMessage(sessionId, action.threadId, { role: 'assistant',
+      content: subscriptionDenial ? '已撤回取消请求并记录你的决定。续费和资金保持不变。' : '已取消，本次没有修改任何数据。',
+      components: [{ id: componentId(), type: 'receipt', title: '操作已取消',
+        body: subscriptionDenial ? '没有向商户提交取消请求，已保存本次拒绝取消的决定。' : 'Financial Twin 未发生变化。', status: 'failed' }] });
+    finishAgentAction(sessionId, actionId, 'cancelled', subscriptionDenial || action.actionType.endsWith('_transfer_schedule') ? { messageId: message.id } : state);
     return { state, replayed: false, message, nextStep: null };
   }
   let next = state;
   let detail = '操作已完成';
-  if (action.actionType === 'apply_verified_candidate') {
+  let receiptStatus: 'succeeded' | 'failed' | 'unknown' = 'succeeded';
+  let receiptOperationId: string | undefined;
+  if (['activate_transfer_schedule', 'pause_transfer_schedule', 'cancel_transfer_schedule'].includes(action.actionType)) {
+    const payload = z.object({ previewId: z.string().optional(), scheduleId: z.string().optional(),
+      parameters: z.record(z.string(), z.unknown()) }).strict().parse(action.payload);
+    const current = action.actionType === 'activate_transfer_schedule'
+      ? state.transferSchedulePreviews.find(item => item.id === payload.previewId)
+      : getTransferScheduleStatus(state, String(payload.scheduleId));
+    if (!current || stableHash(payload.parameters) !== stableHash('previewId' in current
+      ? transferScheduleLifecycleParameters(current) : transferScheduleApprovalParameters(current)))
+      throw new Error('SCHEDULE_AUTHORITY_CHANGED');
+    const approval = runBankingTool(state, 'create_approval_snapshot', { action: action.actionType,
+      parameters: payload.parameters, expiresInSeconds: 300 });
+    const confirmed = runBankingTool(approval.state, 'confirm_approval', { approvalId: approval.result.approvalId,
+      snapshotHash: approval.result.snapshotHash, confirmed: true }, { userConfirmed: true });
+    if (action.actionType === 'activate_transfer_schedule')
+      next = activateTransferSchedule(confirmed.state, { previewId: String(payload.previewId), approvalToken: confirmed.result.approvalToken }).state;
+    else next = runBankingTool(confirmed.state, action.actionType as 'pause_transfer_schedule' | 'cancel_transfer_schedule',
+      { scheduleId: payload.scheduleId, approvalToken: confirmed.result.approvalToken }).state;
+    receiptOperationId = next.receipts.at(-1)?.operationId;
+    detail = action.actionType === 'activate_transfer_schedule' ? '模拟转账计划已创建；首笔尚未执行。'
+      : action.actionType === 'pause_transfer_schedule' ? '模拟转账计划已暂停。' : '模拟转账计划已取消。';
+  } else if (action.actionType === 'confirm_subscription_cancellation') {
+    const payload = z.object({ subscriptionActionId: z.string().min(1),
+      parameters: SubscriptionCancellationParametersSchema }).strict().parse(action.payload);
+    const cancellation = state.subscriptionActions.find(item => item.id === payload.subscriptionActionId);
+    if (!cancellation || cancellation.status !== 'awaiting_confirmation'
+      || stableHash(payload.parameters) !== stableHash(subscriptionCancellationParameters(cancellation)))
+      throw new Error('SUBSCRIPTION_ACTION_CHANGED');
+    const approval = runBankingTool(state, 'create_approval_snapshot', {
+      action: 'execute_subscription_cancellation', parameters: payload.parameters, expiresInSeconds: 300 });
+    const confirmed = runBankingTool(approval.state, 'confirm_approval', { approvalId: approval.result.approvalId,
+      snapshotHash: approval.result.snapshotHash, confirmed: true }, { userConfirmed: true });
+    const result = runBankingTool(confirmed.state, 'execute_subscription_cancellation', {
+      actionId: cancellation.id, approvalToken: confirmed.result.approvalToken });
+    next = result.state;
+    receiptOperationId = result.result.receipt?.operationId;
+    receiptStatus = result.result.action.status === 'succeeded' ? 'succeeded'
+      : result.result.action.status === 'unknown' ? 'unknown' : 'failed';
+    detail = receiptStatus === 'succeeded'
+      ? `已确认停止每月 ${yuan(cancellation.monthlyCents)} 自动续费。不退款，服务可使用至 ${cancellation.paidThrough}，${cancellation.effectiveAt} 起不再续费。`
+      : receiptStatus === 'unknown' ? '当前无法确认是否取消成功。预计续费保持不变，请先查询商户状态，不要重复提交。'
+        : result.result.action.status === 'requires_merchant' ? '需要前往商户处理。尚未停止续费，也未计入节省。'
+          : '商户未能取消续费。预计续费保持不变，可核对状态后重新准备。';
+  } else if (action.actionType === 'confirm_account_snapshot') {
+    next = applyConfirmedAccountSnapshot(state, action);
+    detail = '模拟账户余额已按确认快照更新；目标储蓄保持不变。';
+  } else if (action.actionType === 'apply_verified_candidate') {
     const payload = z.object({ taskId: z.string().uuid(), expectedTaskRevision: z.number().int(),
       demoRunId: z.string().uuid(), resultId: z.string().uuid(), candidateHash: z.string(),
       frozen: z.object({ goalId: z.string(), title: z.string(), savedCents: z.number().int().nonnegative(),
@@ -542,8 +658,8 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
     detail = `已生成 ${selected.length} 个独立请求（${outcomes.join('；')}）`;
   } else throw new Error('UNKNOWN_AGENT_ACTION');
   const receipt: AgentComponent = { id: componentId(), type: 'receipt', title: 'NOVA 操作凭证', body: detail,
-    status: 'succeeded', operationId: action.actionType === 'apply_verified_candidate'
-      ? undefined : next.operations.length > state.operations.length ? next.operations.at(-1)?.operationId : undefined };
+    status: receiptStatus, operationId: receiptOperationId ?? (action.actionType === 'apply_verified_candidate'
+      ? undefined : next.operations.length > state.operations.length ? next.operations.at(-1)?.operationId : undefined) };
   let followups: AgentComponent[] = [];
   const requiresConnection = ['upsert_goal', 'apply_goal_scenario', 'apply_goal_scenario_plan'].includes(action.actionType)
     && !next.dataConnections.some(item => item.status === 'connected');
