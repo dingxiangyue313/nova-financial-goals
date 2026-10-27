@@ -1,3 +1,4 @@
+import { StatementImportBatchSchema, ImportIssueSchema, EvidenceRefSchema, SubscriptionActionSchema, TransferScheduleSchema, TransferExecutionSchema, type StatementImportBatch, type ImportIssue, type EvidenceRef, type SubscriptionAction, type TransferSchedule, type TransferExecution } from '../shared/money-mission.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -160,7 +161,20 @@ for (const [column, definition] of [
 ensureColumn('monitor_notifications', 'subject_key', 'TEXT');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS monitor_notifications_subject ON monitor_notifications(session_id,subject_key) WHERE subject_key IS NOT NULL');
 
+
+const missionArtifactTables = {
+  statementImportBatches: 'statement_import_batches', importIssues: 'statement_import_issues', evidenceRefs: 'evidence_refs',
+  subscriptionActions: 'subscription_actions', transferSchedules: 'transfer_schedules', transferExecutions: 'transfer_executions',
+} as const;
+for (const table of Object.values(missionArtifactTables)) db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, payload_json TEXT NOT NULL, PRIMARY KEY(session_id,id)
+)`);
+
 function syncArtifacts(sessionId: string, state: DemoState) {
+  for (const [field, table] of Object.entries(missionArtifactTables)) {
+    for (const item of state[field as keyof typeof missionArtifactTables]) db.prepare(`INSERT INTO ${table}(session_id,id,payload_json) VALUES(?,?,?) ON CONFLICT(session_id,id) DO UPDATE SET payload_json=excluded.payload_json`).run(sessionId,item.id,JSON.stringify(item));
+  }
+
   db.prepare(`INSERT INTO risk_preferences(session_id,payload_json,updated_at) VALUES(?,?,?)
     ON CONFLICT(session_id) DO UPDATE SET payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
     .run(sessionId, JSON.stringify(state.riskPreferences), new Date().toISOString());
@@ -1140,3 +1154,23 @@ export function storedAuditChain(sessionId: string) {
 }
 
 export function closeStore() { db.close(); }
+
+function saveMissionArtifact<K extends keyof typeof missionArtifactTables>(sessionId: string, field: K, item: DemoState[K][number]) {
+  mutateState(sessionId, state => ({ ...state, [field]: [...state[field].filter(x => x.id !== item.id), item] }));
+  return item;
+}
+export function saveStatementImportPreview(sessionId: string, value: StatementImportBatch) { return saveMissionArtifact(sessionId, 'statementImportBatches', StatementImportBatchSchema.parse(value)); }
+export function getStatementImportBatch(sessionId: string, id: string) {
+  const batch = getState(sessionId).statementImportBatches.find(x => x.id === id);
+  if (!batch) throw new Error('IMPORT_BATCH_NOT_FOUND');
+  return StatementImportBatchSchema.parse(batch);
+}
+export function listStatementImportBatches(sessionId: string) { return getState(sessionId).statementImportBatches; }
+export function saveEvidenceRefs(sessionId: string, values: EvidenceRef[]) {
+  const parsed = EvidenceRefSchema.array().parse(values);
+  mutateState(sessionId, s => ({ ...s, evidenceRefs: [...s.evidenceRefs.filter(r => !parsed.some(x => x.id === r.id)), ...parsed] }));
+  return parsed;
+}
+export function saveSubscriptionAction(sessionId: string, value: SubscriptionAction) { return saveMissionArtifact(sessionId, 'subscriptionActions', SubscriptionActionSchema.parse(value)); }
+export function saveTransferSchedule(sessionId: string, value: TransferSchedule) { return saveMissionArtifact(sessionId, 'transferSchedules', TransferScheduleSchema.parse(value)); }
+export function saveTransferExecution(sessionId: string, value: TransferExecution) { return saveMissionArtifact(sessionId, 'transferExecutions', TransferExecutionSchema.parse(value)); }

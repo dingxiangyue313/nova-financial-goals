@@ -1,3 +1,5 @@
+import { AccountSnapshotSchema, StatementImportBatchSchema, ImportIssueSchema, NormalizedStatementRowSchema, EvidenceRefSchema, BillBriefSchema, SubscriptionActionSchema, DatedCashflowForecastSchema, GoalPlanOptionSchema, TransferScheduleSchema, TransferExecutionSchema, HandoffCasePackSchema } from './money-mission.ts';
+export * from './money-mission.ts';
 import { MissionSchema } from './mission.ts';
 import { z } from 'zod';
 
@@ -251,6 +253,18 @@ export const FinancialTwinSchema = z.object({
 export type FinancialTwin = z.infer<typeof FinancialTwinSchema>;
 
 export const DemoStateSchema = z.object({
+  accountSnapshots: z.array(AccountSnapshotSchema).default([]),
+  statementImportBatches: z.array(StatementImportBatchSchema).default([]),
+  importIssues: z.array(ImportIssueSchema).default([]),
+  normalizedStatementRows: z.array(NormalizedStatementRowSchema).default([]),
+  evidenceRefs: z.array(EvidenceRefSchema).default([]),
+  billBriefs: z.array(BillBriefSchema).default([]),
+  subscriptionActions: z.array(SubscriptionActionSchema).default([]),
+  datedForecasts: z.array(DatedCashflowForecastSchema).default([]),
+  goalPlanOptions: z.array(GoalPlanOptionSchema).default([]),
+  transferSchedules: z.array(TransferScheduleSchema).default([]),
+  transferExecutions: z.array(TransferExecutionSchema).default([]),
+  handoffCasePacks: z.array(HandoffCasePackSchema).default([]),
   mission: MissionSchema.optional(),
   clock: IsoDateSchema, goal: GoalSchema, finance: FinanceSchema,
   goals: z.array(GoalSchema).default([]), primaryGoalId: z.string().nullable().default(null),

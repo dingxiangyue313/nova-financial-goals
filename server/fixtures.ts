@@ -12,6 +12,7 @@ export function createFixture(): DemoState {
     quote: '我想三个月后去日本旅行，预算¥8,000，不能动应急金。',
   };
   return {
+    accountSnapshots: [], statementImportBatches: [], importIssues: [], normalizedStatementRows: [], evidenceRefs: [], billBriefs: [], subscriptionActions: [], datedForecasts: [], goalPlanOptions: [], transferSchedules: [], transferExecutions: [], handoffCasePacks: [],
     clock: '2026-09-21',
     goal, goals: [goal], primaryGoalId: goal.id,
     finance: {
