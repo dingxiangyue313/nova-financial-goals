@@ -1,4 +1,5 @@
 import type { Assessment, CandidateAssessment, CandidateInput, DemoState, Impact, Plan } from '../shared/contracts.ts';
+import { assessDatedCandidate } from './dated-candidate.ts';
 
 const DAY = 86_400_000;
 export function addDays(iso: string, days: number): string {
@@ -65,6 +66,7 @@ export function simulateCandidateMonths(state: DemoState, input: CandidateInput,
 
 export function assessCandidateScenario(state: DemoState, input: CandidateInput,
   savedCents: number, constraintViolations: string[], latestAllowedDate: string): CandidateAssessment {
+  if (state.mission?.artifactsVersion === 2) return assessDatedCandidate(state, input, savedCents, constraintViolations, latestAllowedDate);
   const { remainingCents: remaining, remainingMonths: months, requiredMonthlyCents: required } =
     calculateMonthlyRequirement(input.targetCents, savedCents, state.clock, input.targetDate);
   const simulation = simulateCandidateMonths(state, input, savedCents);

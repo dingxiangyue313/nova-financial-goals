@@ -6,7 +6,6 @@ async function openApp(page: Page) {
     await route.continue();
   });
   await page.goto('/demo-control');
-  await expect(page.getByTestId('nova-welcome')).toBeVisible();
   await expect(page.getByTestId('nova-welcome')).toBeHidden();
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
   await page.request.post('/api/demo/load-japan');

@@ -26,7 +26,7 @@ export function registerStatementRoutes(app: Express, sessionId: (req: Request, 
     return preview(req,res,buffer,name,'text/csv',input.templateId);
   }));
   app.post('/api/statement-imports/upload', (req,res,next) => {
-    if (process.env.NOVA_ALLOW_STATEMENT_UPLOAD !== 'true') { res.status(400).json({ error: 'DATA_UPLOAD_DISABLED' }); return; }
+    if (process.env.NOVA_ALLOW_STATEMENT_UPLOAD !== 'true') { res.status(400).json({ error: 'DATA_UPLOAD_DISABLED', code: 'DATA_UPLOAD_DISABLED' }); return; }
     receive(req,res,error => { if (error) res.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'DATA_FILE_TOO_LARGE' : 'DATA_UPLOAD_INVALID' }); else next(); });
   }, route(async (req,res) => {
     if (!req.file) throw new Error('DATA_FILE_REQUIRED');

@@ -33,7 +33,7 @@ export function simulateTransferSchedule(state: DemoState,input: ScheduleInput):
     trigger:{type:triggerType,expectedDay:triggerType==='salary_event'?25:fixedDay,executeOffsetDays:1,executeTime:'09:00',missingEventPolicy:'skip_no_catchup',graceDay:27,minimumSalaryCents:Math.floor(state.finance.monthlyIncomeCents*9/10),maximumSalaryCents:Math.ceil(state.finance.monthlyIncomeCents*11/10),sourceAccountId:source.id},
     createdAt:`${state.clock}T12:00:00+08:00`,endDate:input.endDate ?? goal.targetDate,forecastId:input.forecastId,twinVersion:state.twinVersion,authorizationHash:'',approvalId:null,snapshotHash:null,nextEvaluationDate:state.clock};
   schedule.authorizationHash=stableHash(scheduleParameters(schedule));
-  const forecastWithTransfer=buildDatedCashflowForecast(state,{accountId:source.id,horizonEnd,scenario:'baseline',contributionCents:input.frequency==='monthly'?input.amountCents:0});
+  const forecastWithTransfer=buildDatedCashflowForecast({ ...state, transferSchedules: [...state.transferSchedules, { ...schedule, status: 'active' }] },{accountId:source.id,horizonEnd,scenario:'baseline'});
   const reserve=Math.max(0,goal.protectedCents-state.finance.emergencyCents);
   if ((input.frequency==='one_time'?source.balanceCents-input.amountCents:forecastWithTransfer.minimumBalanceCents ?? -1)<reserve) throw new Error('INSUFFICIENT_BALANCE');
   const first = new Date(`${state.clock}T00:00:00Z`);const day=triggerType==='salary_event'?26:fixedDay;

@@ -1,4 +1,3 @@
-import { MoneyMissionScreen } from './screens/MoneyMissionScreen';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ScreenId, Goal } from './types';
 import { api, cents, displayGoal, displayImpact } from './api';
@@ -15,6 +14,8 @@ import { ActivityScreen } from './screens/ActivityScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { BankingDemoScreen } from './screens/BankingDemoScreen';
 const AgentWorkspaceScreen = lazy(() => import('./screens/AgentWorkspaceScreen').then(module => ({ default: module.AgentWorkspaceScreen })));
+const MoneyMissionScreen = lazy(() => import('./screens/MoneyMissionScreen').then(module => ({ default: module.MoneyMissionScreen })));
+const DemoControlScreen = lazy(() => import('./screens/DemoControlScreen').then(module => ({ default: module.DemoControlScreen })));
 import { DataConnectionScreen } from './screens/DataConnectionScreen';
 import { OfflineScreen } from './screens/OfflineScreen';
 import { NovaMark } from './components/NovaMark';
@@ -28,7 +29,10 @@ interface InstallPromptEvent extends Event {
 interface PwaUpdateEvent extends Event { detail: { updateSW: (reloadPage?: boolean) => Promise<void> } }
 
 export default function App() {
-  const demoControl = window.location.pathname === '/demo-control';
+  const [demoControlsEnabled, setDemoControlsEnabled] = useState(false);
+  useEffect(() => { void api<{ demoControls: boolean }>('/api/capabilities')
+    .then(result => setDemoControlsEnabled(result.demoControls)).catch(() => {}); }, []);
+  const demoControl = demoControlsEnabled && window.location.pathname === '/demo-control';
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('home');
   const [previousScreen, setPreviousScreen] = useState<ScreenId>('home');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -57,7 +61,7 @@ export default function App() {
     const load = async () => {
       try {
         let live = await api<Snapshot>('/api/session');
-        if (!live.mission && live.goals.length === 0 && !demoControl) live = await api<Snapshot>('/api/mission/start', 'POST');
+        if (!live.mission && live.goals.length === 0 && window.location.pathname !== '/demo-control') live = await api<Snapshot>('/api/mission/start', 'POST');
         if (active) { setSnapshot(live); setLoadError(null); }
       } catch (error) {
         const cached = await loadOfflineSnapshot();
@@ -408,75 +412,18 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#E5E8EB] flex flex-col items-center justify-center p-0 md:py-6 text-[#1F2329] selection:bg-[#E6F2F2]">
       {/* Top Floating Switcher Pill (Quick Screen Access) */}
-      {demoControl && <aside aria-label="屏幕快速切换与调试" className="w-full max-w-[500px] px-3 mb-2 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-          <span className="font-semibold text-[#5A616B] shrink-0 text-[11px]">快速直达:</span>
-          <button
-            onClick={() => navigateTo('home')}
-            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
-              currentScreen === 'home'
-                ? 'bg-[#0F6B6D] text-white shadow-xs'
-                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
-            }`}
-          >
-            1. 首页
-          </button>
-          <button
-            onClick={() => navigateTo('create_goal')}
-            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
-              currentScreen === 'create_goal'
-                ? 'bg-[#0F6B6D] text-white shadow-xs'
-                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
-            }`}
-          >
-            2. 创建目标
-          </button>
-          <button
-            onClick={() => navigateTo('feasibility')}
-            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
-              currentScreen === 'feasibility'
-                ? 'bg-[#0F6B6D] text-white shadow-xs'
-                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
-            }`}
-          >
-            4. 目标可行性
-          </button>
-          <button
-            onClick={() => navigateTo('impact')}
-            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
-              currentScreen === 'impact'
-                ? 'bg-[#0F6B6D] text-white shadow-xs'
-                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
-            }`}
-          >
-            3. 目标影响
-          </button>
-          <button
-            onClick={() => navigateTo('workspace')}
-            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
-              currentScreen === 'workspace'
-                ? 'bg-[#0F6B6D] text-white shadow-xs'
-                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
-            }`}
-          >
-            NOVA 工作台
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0 ml-2">
-          <button
-            onClick={() => setDeviceFrame(!deviceFrame)}
-            className="p-1 rounded-md bg-white border border-[#D0D5DD] text-[#5A616B] hover:text-[#1F2329] cursor-pointer"
-            title={deviceFrame ? '切换为自适应全屏' : '切换为手机尺寸 390x844'}
-          >
-            <span className="material-symbols-outlined text-[16px]">
-              {deviceFrame ? 'fullscreen' : 'smartphone'}
-            </span>
-          </button>
-        </div>
-      </aside>}
-
-      {demoControl && <div className="w-full max-w-[500px] p-3 mb-3 bg-white rounded-xl space-y-2"><strong>Money Mission 演示后台</strong><p className="text-xs">仅操作合成数据。先创建储蓄计划，再注入工资事件。工资事件同时载入11月26日的模拟银行余额快照。</p><div className="flex flex-wrap gap-2">{[{ label: '重置旅行任务', path: 'load', body: {} }, { label: '工资到账并检查转入', path: 'demo-event', body: { kind: 'salary' } }, { label: '工资未到账', path: 'demo-event', body: { kind: 'missing_salary' } }, { label: '下次取消超时', path: 'demo-event', body: { kind: 'cancel_timeout' } }, { label: '下次取消失败', path: 'demo-event', body: { kind: 'cancel_failure' } }].map(item => <button key={item.label} className="mission-secondary" onClick={async () => { try { setSnapshot(await api<Snapshot>('/api/mission/' + item.path, 'POST', item.body)); setCurrentScreen('home'); } catch (e) { showToast(e instanceof Error ? e.message : '操作未完成'); } }}>{item.label}</button>)}</div><button className="mission-link" onClick={() => navigateTo('bills')}>打开账单流程</button><button className="mission-link ml-4" onClick={() => navigateTo('savings')}>打开储蓄计划</button></div>}
+      {demoControl && (
+        <Suspense fallback={<p>正在加载演示控制台…</p>}>
+        <DemoControlScreen
+          currentScreen={currentScreen}
+          deviceFrame={deviceFrame}
+          onNavigate={navigateTo}
+          onToggleFrame={() => setDeviceFrame(!deviceFrame)}
+          onSnapshot={setSnapshot}
+          onToast={showToast}
+        />
+        </Suspense>
+      )}
       {/* Main Screen Container (390 x 844 iPhone Frame or Responsive View) */}
       <div
         className={`bg-[#F5F7F8] relative flex flex-col overflow-hidden transition-all duration-300 ${
@@ -518,7 +465,7 @@ export default function App() {
             />
           )}
 
-          {(currentScreen === 'bills' || currentScreen === 'savings') && <MoneyMissionScreen snapshot={snapshot} onSnapshot={setSnapshot} mode={currentScreen === 'bills' ? 'bills' : 'savings'} onSavings={() => navigateTo('savings')} />}
+          {(currentScreen === 'bills' || currentScreen === 'savings') && <Suspense fallback={<p className="p-4 text-sm">正在读取旅行任务…</p>}><MoneyMissionScreen snapshot={snapshot} onSnapshot={setSnapshot} mode={currentScreen === 'bills' ? 'bills' : 'savings'} onSavings={() => navigateTo('savings')} /></Suspense>}
           {currentScreen === 'create_goal' && goal && (
             <CreateGoalScreen
               goal={goal}

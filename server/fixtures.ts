@@ -1,6 +1,6 @@
 import type { DemoState } from '../shared/contracts.ts';
 
-export const JAPAN_IMAGE = 'https://lh3.googleusercontent.com/aida/AEtjO1UrwbCWWFERF-Q6qaqJaXETXbphhrx4S6cHkreRUfDf1RmQQM91tfbxSEg6NgOztnIflKRoZqpXV6lf6TP2CDg74qhxuSZ4MnLj4PlVqIo2UirrbkvgYAlEDtm6gLrG710cn4v8VCjgrw0eOEufJdfbyWC66IgTDEtMo6fDswf29rG2NN2CGC0GXpzCDihK6lpa59ywP8FIHxxR19FOlokWcPMrCV82urfygNsMjEgntfouq79dAvkn5ema';
+export const JAPAN_IMAGE = '/japan-trip.jpg';
 
 export function createFixture(): DemoState {
   const goal: DemoState['goal'] = {

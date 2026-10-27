@@ -1,6 +1,7 @@
-import type {DemoState,MissionNotification} from '../shared/contracts.ts';
+import type {DemoState,MissionNotification,MissionRepairPreview} from '../shared/contracts.ts';
 import {stableHash} from './governance.ts';
 import {missionCompletionDate} from '../shared/mission.ts';
+import {activeStatementRows} from './statement-import.ts';
 
 export function screenMissionOutcomes(state:DemoState,now=new Date(`${state.clock}T12:00:00+08:00`)):DemoState {
   if(!state.mission?.monitoringEnabled)return state;
@@ -26,5 +27,28 @@ export function screenMissionOutcomes(state:DemoState,now=new Date(`${state.cloc
     const projected=missionCompletionDate(state.clock,Math.max(0,goal.targetCents-goal.savedCents),schedule.amountCents);
     if(projected&&projected>goal.targetDate)add('goal_changed',stableHash([goal.id,goal.targetCents,goal.targetDate]),goal.id,'目标条件变化后，当前储蓄节奏可能晚于目标日期。请比较新的计划，原授权上限不会自动扩大。',['replan']);
   }
+  for(const subscription of state.subscriptions.filter(item=>item.status==='active')){
+    const lastCharge=activeStatementRows(state).filter(row=>row.title===subscription.title&&row.category==='subscription'&&row.amountCents<0).sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
+    if(lastCharge&&-lastCharge.amountCents<subscription.monthlyCents)
+      add('subscription_price',subscription.id,state.goal.id,'订阅金额高于最近一次已入账扣费。这不会自动改计划，请先核对商户证据。',['contact_merchant','replan']);
+  }
   return {...state,mission:{...state.mission,notifications:notifications.slice(-200)}};
+}
+
+export function previewMissionRepairs(state:DemoState):MissionRepairPreview[] {
+  const previews:MissionRepairPreview[]=[];
+  for(const execution of state.transferExecutions.filter(item=>['failed','unknown','skipped_missing_trigger'].includes(item.status))){
+    const schedule=state.transferSchedules.find(item=>item.id===execution.scheduleId);
+    if(!schedule)continue;
+    if(execution.status==='unknown')previews.push({id:`repair:query:${execution.id}`,sourceId:execution.id,kind:'query_operation',label:'查询原转入结果',explanation:'先核对原操作，不要重复转账。查询不会改写计划。',appliesImmediately:false});
+    if(execution.status==='skipped_missing_trigger'){
+      previews.push({id:`repair:skip:${execution.id}`,sourceId:execution.id,kind:'skip_period',label:'保持本期跳过',explanation:'工资未按时到账，本期已跳过。确认后仍不补扣。',appliesImmediately:false});
+      previews.push({id:`repair:date:${execution.id}`,sourceId:execution.id,kind:'adjust_date',label:'预览调整下一期日期',explanation:'只生成新的预览，不会在确认前改写原计划。',appliesImmediately:false});
+    }
+    if(['failed','skipped_missing_trigger'].includes(execution.status)){
+      previews.push({id:`repair:pause:${execution.id}`,sourceId:execution.id,kind:'pause_schedule',label:'预览暂停储蓄计划',explanation:'暂停需单独确认。确认前计划保持原状态。',appliesImmediately:false});
+      previews.push({id:`repair:replan:${execution.id}`,sourceId:execution.id,kind:'replan',label:'预览重新规划',explanation:'重新比较三种节奏。原授权金额和频率不会自动扩大。',appliesImmediately:false});
+    }
+  }
+  return previews;
 }

@@ -2,6 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
 import { createJapanMoneyMissionFixture } from './money-mission-fixture.ts';
+import { simulateTransferSchedule } from './transfer-schedules.ts';
+
+test('previews preserve other goals, fixed dates, authorized ceilings and completed periods', () => {
+  const state = createJapanMoneyMissionFixture();
+  const forecast = buildDatedCashflowForecast(state, { accountId: 'checking', horizonEnd: state.goal.targetDate, scenario: 'baseline' });
+  const prepared = simulateTransferSchedule(state, { goalId: state.goal.id, sourceAccountId: 'checking', destinationAccountId: 'goal-wallet', amountCents: 100000, frequency: 'monthly', forecastId: forecast.forecastId!, triggerType: 'fixed_day', fixedDay: 10 });
+  const otherGoal = { ...state.goal, id: 'other-goal', targetCents: 250000, savedCents: 200000 };
+  state.goals.push(otherGoal);
+  const schedule = { ...prepared.preview, id: 'other-schedule', goalId: otherGoal.id, status: 'active' as const, targetCents: 250000 };
+  state.transferSchedules.push(schedule);
+  const preview = buildDatedCashflowForecast(state, { accountId: 'checking', horizonEnd: '2027-01-30', scenario: 'baseline', contributionCents: 75000 });
+  const otherEvents = preview.events.filter(event => event.sourceRefs.includes(schedule.id));
+  assert.equal(otherEvents.length, 1);
+  assert.equal(otherEvents[0].date, '2026-11-10');
+  assert.equal(otherEvents[0].amountCents, -50000);
+  assert.ok(preview.events.some(event => event.sourceRefs.includes('preview')));
+  state.transferExecutions.push({ id: 'done', scheduleId: schedule.id, periodKey: `schedule:${schedule.id}:2026-11`, operationId: 'done-op', status: 'succeeded', amountCents: 50000, createdAt: '2026-11-10T01:00:00Z', reason: 'done', triggerTransactionId: null });
+  const replay = buildDatedCashflowForecast(state, { accountId: 'checking', horizonEnd: '2026-11-30', scenario: 'baseline' });
+  assert.equal(replay.events.some(event => event.sourceRefs.includes(schedule.id)), false);
+});
 
 test('dated cashflow uses authoritative balance and exact frozen bill dates', () => {
   const state = createJapanMoneyMissionFixture();

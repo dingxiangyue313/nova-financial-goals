@@ -78,10 +78,11 @@ export async function parseStatementBuffer(input: { buffer: Buffer; fileName: st
     return normalize(records, templateId, 'xlsx');
   }
   if (extension === 'pdf' && mimeType === 'application/pdf' && buffer.subarray(0, 5).toString() === '%PDF-') {
+    if (buffer.includes(Buffer.from('/Encrypt'))) throw new Error('DATA_PDF_ENCRYPTED');
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
     try {
       const pdfRoot=path.dirname(createRequire(import.meta.url).resolve('pdfjs-dist/package.json'));
-      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer), useSystemFonts: false, standardFontDataUrl: path.join(pdfRoot,'standard_fonts/') });
+      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer), useSystemFonts: false, standardFontDataUrl: `${path.join(pdfRoot,'standard_fonts')}/` });
       const document = await loadingTask.promise;
       if (document.numPages > 30) { await loadingTask.destroy(); throw new Error('DATA_PAGE_LIMIT'); }
       const lines: string[] = [];

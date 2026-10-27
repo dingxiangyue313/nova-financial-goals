@@ -114,7 +114,7 @@ export function DataConnectionScreen({ connections, onboarding, busy, onConnect,
         {busy ? '正在读取模拟流水…' : onboarding ? '连接并开始智能守护' : '应用连接设置'}
       </button>
       <p className="pb-3 text-center text-[11px] leading-relaxed text-[#8F959E]">
-        撤销后会停止未来同步；已用于目标判断和审计的历史依据会保留。
+        撤销后会停止未来同步；已用于目标判断和审计的历史依据会保留。账单核对请走日本旅行 Money Mission 的合成样例导入，不在这里选择个人文件。
       </p>
     </div>
   );

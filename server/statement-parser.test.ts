@@ -17,9 +17,10 @@ test('malformed values become blocking issues without fabricating usable evidenc
   assert.deepEqual(result.issues.map(i => i.kind).sort(), ['invalid_amount', 'invalid_date']);
   assert.ok(result.issues.every(i => i.severity === 'blocking'));
 });
-test('oversized files, MIME spoofing and unknown templates fail closed', async () => {
+test('oversized files, MIME spoofing, encrypted PDFs and unknown templates fail closed', async () => {
   await assert.rejects(() => parseStatementBuffer({ buffer: Buffer.alloc(5 * 1024 * 1024 + 1), fileName: 'x.csv', mimeType: 'text/csv', templateId: 'nova-synthetic-v1' }), /DATA_FILE_TOO_LARGE/);
   await assert.rejects(() => parseStatementBuffer({ buffer: Buffer.from('not a PDF'), fileName: 'x.pdf', mimeType: 'application/pdf', templateId: 'nova-synthetic-v1' }), /DATA_FILE_TYPE_MISMATCH/);
+  await assert.rejects(() => parseStatementBuffer({ buffer: Buffer.from('%PDF-1.4\ntrailer\n<< /Encrypt 4 0 R >>\n%%EOF'), fileName: 'x.pdf', mimeType: 'application/pdf', templateId: 'nova-synthetic-v1' }), /DATA_PDF_ENCRYPTED/);
   await assert.rejects(() => parseStatementBuffer({ buffer: Buffer.from('a'), fileName: 'x.csv', mimeType: 'text/csv', templateId: '../../secret' }), /DATA_TEMPLATE_UNSUPPORTED/);
 });
 

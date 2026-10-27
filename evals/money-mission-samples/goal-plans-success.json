@@ -1,0 +1,7 @@
+{
+  "plans": [
+    { "label": "稳健", "monthlyCents": 75000, "occurrences": 8, "projectedDate": "2027-06-26" },
+    { "label": "平衡", "monthlyCents": 100000, "occurrences": 6, "projectedDate": "2027-04-26" },
+    { "label": "加速", "upfrontCents": 120000, "monthlyCents": 120000, "occurrences": 4, "projectedDate": "2027-02-26" }
+  ]
+}

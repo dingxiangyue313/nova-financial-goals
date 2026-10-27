@@ -13,11 +13,21 @@ import {executeWorkspaceAction} from './workspace.ts';
 import {reconcileSubscriptionCancellation,prepareSubscriptionAction} from './subscription-service.ts';
 import {processTransferSchedule,reconcileTransferExecution,tickTransferWorker} from './transfer-worker.ts';
 import {buildHandoffCasePack} from './handoff.ts';
+import {previewMissionRepairs} from './mission-monitor.ts';
+import {recordProductEvent} from './product-events.ts';
 import {appendAuditEvent} from './governance.ts';
 
 export function registerMoneyMissionRoutes(app:Express,sessionId:(req:Request,res:Response)=>string,route:(fn:(req:Request,res:Response)=>unknown)=>RequestHandler){
   app.get('/api/money-mission',route((req,res)=>res.json(readMoneyMission(getState(sessionId(req,res))))));
-  app.post('/api/mission/start',route((req,res)=>res.json(snapshot(mutateState(sessionId(req,res),s=>s.mission||s.goals.length?s:createJapanMoneyMissionFixture())))));
+  app.get('/api/money-mission/repairs',route((req,res)=>res.json({repairs:previewMissionRepairs(getState(sessionId(req,res)))})));
+  app.post('/api/product-events',route((req,res)=>{
+    const body=z.object({name:z.string(),properties:z.record(z.string(),z.unknown()).default({})}).parse(req.body);
+    res.json(recordProductEvent(sessionId(req,res),body.name,body.properties));
+  }));
+  app.post('/api/mission/start',route((req,res)=>{
+    const input=z.object({includeHistory:z.boolean().default(true)}).strict().parse(req.body??{});
+    res.json(snapshot(mutateState(sessionId(req,res),s=>s.mission||s.goals.length?s:createJapanMoneyMissionFixture(input.includeHistory))));
+  }));
   app.post('/api/mission/load',route((req,res)=>res.json(snapshot(mutateState(sessionId(req,res),s=>appendAuditEvent({...createJapanMoneyMissionFixture(),twinVersion:s.twinVersion+1},'mission_loaded','ready','已载入合成旅行任务'))))));
   app.get('/api/mission/forecast',route((req,res)=>{
     const s=getState(sessionId(req,res)),amount=z.coerce.number().int().min(0).max(10000000).default(100000).parse(req.query.amount),horizonEnd=addIsoDays(s.clock,62);

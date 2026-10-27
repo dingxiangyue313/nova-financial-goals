@@ -23,7 +23,7 @@ test('data connection APIs persist, isolate, revoke and reset simulated sources'
   const testSessionSecret = Array.from({ length: 48 }, (_, index) => String(index % 10)).join('');
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
     cwd: process.cwd(), stdio: 'ignore', env: { ...process.env, PORT: String(port),
-      NOVA_DB_PATH: join(directory, 'demo.sqlite'), DEEPSEEK_API_KEY: '', NODE_ENV: 'production',
+      NOVA_DB_PATH: join(directory, 'demo.sqlite'), DEEPSEEK_API_KEY: '', NODE_ENV: 'production', NOVA_DEMO_CONTROLS: 'true',
       NOVA_SESSION_SECRET: testSessionSecret },
   });
   try {

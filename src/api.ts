@@ -1,6 +1,17 @@
 import { SnapshotSchema, type Snapshot } from '../shared/contracts';
 import type { Goal, ImpactScenario } from './types';
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(status: number, message: string, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
 export async function api<T = Snapshot>(url: string, method = 'GET', body?: unknown): Promise<T> {
   let response: Response;
   try {
@@ -8,14 +19,15 @@ export async function api<T = Snapshot>(url: string, method = 'GET', body?: unkn
       method,
       cache: 'no-store',
       credentials: 'same-origin',
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: body === undefined || body instanceof FormData ? undefined : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
     });
   } catch {
-    throw new Error('暂时无法连接本地服务。请稍后重试，已输入的内容会保留。');
+    throw new ApiError(0, '暂时无法连接本地服务。请稍后重试，已输入的内容会保留。', 'OFFLINE');
   }
-  const json = await response.json();
-  if (!response.ok) throw new Error(json.error || '请求失败，请稍后重试');
+  const json = await response.json().catch(() => ({})) as T & { error?: string; code?: string };
+  if (!response.ok) throw new ApiError(response.status, json.error || '请求失败，请稍后重试', json.code || json.error);
+  if (url === '/api/capabilities') return json as T;
   return url.startsWith('/api/money-mission') || url.startsWith('/api/statement-import') || url.startsWith('/api/account-snapshots') || url === '/api/mission/forecast' || url.startsWith('/api/mission/forecast?') || url === '/api/goal/interpret' || url === '/api/goals' || url === '/api/ui/cards' || url === '/api/mcp/token' || url.startsWith('/api/operations/') || url.startsWith('/api/agent') || url.startsWith('/api/risk/') || url.startsWith('/api/data-connections') || url.startsWith('/api/demo/data-connections/')
     ? json as T : SnapshotSchema.parse(json) as T;
 }

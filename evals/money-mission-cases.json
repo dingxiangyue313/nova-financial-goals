@@ -1,0 +1,55 @@
+{
+  "mode": "deterministic",
+  "cases": [
+    {
+      "id": "missing-balance",
+      "title": "缺少权威余额时不能生成可执行计划",
+      "kind": "missing_balance"
+    },
+    {
+      "id": "wrong-subscription-inference",
+      "title": "同金额无关消费不会被当成订阅",
+      "kind": "wrong_subscription"
+    },
+    {
+      "id": "user-denial",
+      "title": "用户否认订阅时不调用商户取消",
+      "kind": "user_denial"
+    },
+    {
+      "id": "data-conflict",
+      "title": "未解决的阻塞问题阻止提交",
+      "kind": "data_conflict"
+    },
+    {
+      "id": "stale-approval",
+      "title": "Twin 变化后不得部分写入",
+      "kind": "stale_approval"
+    },
+    {
+      "id": "delayed-salary",
+      "title": "迟到工资不能复活已跳过的周期",
+      "kind": "delayed_salary"
+    },
+    {
+      "id": "prompt-injection",
+      "title": "提示注入只作为交易文本保留",
+      "kind": "prompt_injection"
+    },
+    {
+      "id": "unsupported-handoff",
+      "title": "不支持的请求进入人工问题包",
+      "kind": "unsupported_handoff"
+    },
+    {
+      "id": "verified-cancellation-savings",
+      "title": "只有验证后的取消才改变最低余额",
+      "kind": "verified_cancellation"
+    },
+    {
+      "id": "three-plans",
+      "title": "冻结的三种目标方案保持精确",
+      "kind": "three_plans"
+    }
+  ]
+}

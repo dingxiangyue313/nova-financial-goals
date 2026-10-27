@@ -1,6 +1,12 @@
 # NOVA Agent 分阶段实施记录
 
-更新日期：2026-10-21。依据 `PRODUCT.md`、`AGENTS.md` 和用户提供的《NOVA Agent 分阶段开发提示词》（2026-10-20 重写版）。阶段 0 至 7 的离线实现与验收已完成；真实模型质量评测须单独启用。
+更新日期：2026-10-27。依据 `PRODUCT.md`、`AGENTS.md` 和用户提供的《NOVA Agent 分阶段开发提示词》（2026-10-20 重写版）。阶段 0 至 7 的离线实现与验收已完成；真实模型质量评测须单独启用。
+
+## v0.6 Money Mission 产品轨
+
+当前逐项实施和发布结果以 [V06_RELEASE_STATUS.md](V06_RELEASE_STATUS.md) 为准。下面历史日期的依赖故障、测试数量和“未运行模型”说明仅代表当时状态。
+
+客户端现将首页消费卡、七阶段壳、账单证据、CloudBox 确认、三方案、工资到账转账、监测交接和 `/demo-control` 接到 `snapshot.moneyMission` / `GET /api/money-mission`。界面不再用流水重算金额。主路径 E2E 仍使用既有按钮文案；无障碍补充见 `tests/e2e/money-mission-accessibility.spec.ts`。Skills 6–7 保持关闭。
 
 ## 阶段状态
 

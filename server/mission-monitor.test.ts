@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createJapanMoneyMissionFixture} from './money-mission-fixture.ts';
-import {screenMissionOutcomes} from './mission-monitor.ts';
+import {previewMissionRepairs,screenMissionOutcomes} from './mission-monitor.ts';
 import {buildHandoffCasePack} from './handoff.ts';
 test('monitor is opt-in, defers quiet hours and deduplicates the same material outcome',()=>{
   const state=createJapanMoneyMissionFixture();
@@ -19,4 +19,17 @@ test('handoff excludes raw files, account identifiers and merchant free text',()
   const state=createJapanMoneyMissionFixture();state.goal.title='PRIVATE_ACCOUNT_123456';state.normalizedStatementRows[0].rawDescription='PRIVATE_RAW_FILE_CONTENT';
   const pack=buildHandoffCasePack(state,{problem:'import_conflict',evidenceIds:['foreign-private-evidence']});
   assert.equal(JSON.stringify(pack).includes('PRIVATE_'),false);assert.deepEqual(pack.evidenceIds,[]);
+});
+test('monitor records a subscription price change once and repair previews stay read-only',()=>{
+  const state=createJapanMoneyMissionFixture();
+  state.mission!.monitoringEnabled=true;
+  state.subscriptions.find(item=>item.title==='CloudBox Plus')!.monthlyCents=8800;
+  const first=screenMissionOutcomes(state);
+  assert.equal(first.mission!.notifications!.filter(item=>item.kind==='subscription_price').length,1);
+  assert.equal(screenMissionOutcomes(first).mission!.notifications!.filter(item=>item.kind==='subscription_price').length,1);
+  state.transferSchedules.push({id:'schedule',goalId:state.goal.id} as typeof state.transferSchedules[number]);
+  state.transferExecutions.push({id:'unknown',scheduleId:'schedule',periodKey:'schedule:2026-11',operationId:'op-1',status:'unknown',amountCents:100000,createdAt:'2026-11-26T12:00:00+08:00',reason:'timeout',triggerTransactionId:null});
+  const repairs=previewMissionRepairs(state);
+  assert.ok(repairs.every(item=>item.appliesImmediately===false));
+  assert.ok(repairs.some(item=>item.kind==='query_operation'));
 });

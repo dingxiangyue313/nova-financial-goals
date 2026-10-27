@@ -90,12 +90,21 @@ export const SkillIdSchema = z.enum(['statement_ingestion_and_reconciliation', '
 export const SkillDefinitionSchema = z.object({ id: SkillIdSchema, version: z.literal('1.0.0'), enabled: z.boolean(), release: z.enum(['p0', 'p1_stretch']), description: z.string(), tools: z.array(z.string()), maxToolCalls: z.number().int().positive(), confirmationRequired: z.boolean() });
 export const MissionSkillResultSchema = z.object({skillId:SkillIdSchema,artifactId:z.string(),stage:z.enum(['data','bills','planning','transfer','monitoring','handoff']),summary:z.string().max(1000),claims:z.array(z.object({claimType:z.enum(['fact','assumption','prediction','limitation']),text:z.string().max(400),sourceRefs:z.array(z.string()).min(1)})).max(30),requiresConfirmation:z.boolean()}).strict();
 export const MissionNotificationSchema=z.object({id:z.string(),subjectKey:z.string(),goalId:z.string(),sourceId:z.string(),kind:z.enum(['transfer_failed','transfer_unknown','missing_salary','goal_changed','subscription_price']),status:z.enum(['unread','read','deferred','resolved']),createdAt:z.string(),body:z.string().max(400),proposedActions:z.array(z.enum(['query','pause','replan','contact_merchant']))});
+export const MissionStageSchema = z.enum(['goal', 'data', 'bills', 'subscription', 'planning', 'transfer', 'monitoring']);
+export const MissionNextCtaSchema = z.object({ id: z.string(), label: z.string().max(80), stage: MissionStageSchema });
+export const MissionRepairPreviewSchema = z.object({
+  id: z.string(), sourceId: z.string(), kind: z.enum(['skip_period', 'adjust_date', 'pause_schedule', 'query_operation', 'replan']),
+  label: z.string().max(80), explanation: z.string().max(300), appliesImmediately: z.literal(false),
+});
 export const MoneyMissionReadModelSchema = z.object({
   monitoringEnabled:z.boolean(),notifications:z.array(MissionNotificationSchema),handoffCasePacks:z.array(HandoffCasePackSchema),
-  stage: z.enum(['data', 'bills', 'subscription', 'planning', 'transfer', 'monitoring']), twinVersion: z.number().int(), dataAsOf: date,
+  stage: MissionStageSchema, twinVersion: z.number().int(), dataAsOf: date,
   batches: z.array(StatementImportBatchSchema), issues: z.array(ImportIssueSchema), billBrief: BillBriefSchema.nullable(),
   forecast: DatedCashflowForecastSchema.nullable(), plans: z.array(GoalPlanOptionSchema), subscriptionActions: z.array(SubscriptionActionSchema),
   schedules: z.array(TransferScheduleSchema.omit({ authorizationHash: true, snapshotHash: true })), executions: z.array(TransferExecutionSchema),
+  completedStages: z.array(MissionStageSchema).optional(),
+  nextCta: MissionNextCtaSchema.nullable().optional(),
+  repairPreviews: z.array(MissionRepairPreviewSchema).optional(),
 });
 
 export type AccountSnapshot = z.infer<typeof AccountSnapshotSchema>;
@@ -116,5 +125,7 @@ export type SkillId = z.infer<typeof SkillIdSchema>;
 export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>;
 
 export type MoneyMissionReadModel = z.infer<typeof MoneyMissionReadModelSchema>;
-
+export type MissionStage = z.infer<typeof MissionStageSchema>;
+export type MissionNextCta = z.infer<typeof MissionNextCtaSchema>;
+export type MissionRepairPreview = z.infer<typeof MissionRepairPreviewSchema>;
 export type MissionNotification=z.infer<typeof MissionNotificationSchema>;

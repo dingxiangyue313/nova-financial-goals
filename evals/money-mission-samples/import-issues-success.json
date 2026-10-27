@@ -1,0 +1,31 @@
+{
+  "batch": {
+    "id": "22222222-2222-4222-8222-222222222222",
+    "revision": 0,
+    "templateId": "nova-synthetic-v1",
+    "format": "csv",
+    "status": "needs_review",
+    "coverageStart": "2026-10-06",
+    "coverageEnd": "2026-10-06",
+    "recordCount": 2,
+    "duplicateCount": 0,
+    "issueIds": ["issue-date"],
+    "rowIds": ["row-bad-date"],
+    "createdAt": "2026-10-26T12:00:00+08:00",
+    "committedAt": null,
+    "twinVersion": 1
+  },
+  "issues": [
+    {
+      "id": "issue-date",
+      "batchId": "22222222-2222-4222-8222-222222222222",
+      "rowId": "row-bad-date",
+      "kind": "invalid_date",
+      "severity": "blocking",
+      "field": "date",
+      "originalValue": "2026-02-30",
+      "correctedValue": null,
+      "resolved": false
+    }
+  ]
+}

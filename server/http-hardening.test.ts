@@ -37,6 +37,7 @@ test('HTTP hardening adds CSP, separates sensitive limits, and redacts logs', { 
       NOVA_DB_PATH: join(directory, 'demo.sqlite'),
       DEEPSEEK_API_KEY: '',
       NODE_ENV: 'production',
+      NOVA_DEMO_CONTROLS: 'false',
       NOVA_SESSION_SECRET: Buffer.alloc(48, 7).toString('hex'),
       NOVA_EXTERNAL_AGENT_SECRET: Buffer.alloc(48, 11).toString('hex'),
       NOVA_API_RATE_LIMIT: '5',
@@ -57,6 +58,7 @@ test('HTTP hardening adds CSP, separates sensitive limits, and redacts logs', { 
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     assert.equal(ready, true, 'production server must start');
+    assert.equal((await fetch(`${base}/demo-control`)).status, 404, 'production debug controller is disabled by default');
 
     const initial = await fetch(`${base}/api/session`);
     assert.equal(initial.status, 200);

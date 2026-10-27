@@ -13,6 +13,7 @@ test('preview and corrected commit never derive balances from historical stateme
   assert.throws(() => commitStatementImport(preview.state, preview.batch.id, state.twinVersion), /UNRESOLVED/);
   const issue = preview.issues.find(i => i.kind === 'invalid_date')!;
   const resolved = resolveImportIssue(preview.state, preview.batch.id, issue.id, { value: '2026-10-07' });
+  assert.equal(resolved.statementImportBatches.at(-1)!.coverageEnd, '2026-10-07');
   const committed = commitStatementImport(resolved, preview.batch.id, state.twinVersion);
   assert.equal(committed.transactions.length, 2);
   assert.equal(committed.finance.checkingCents, 724000); assert.equal(committed.goal.savedCents, 200000);
@@ -24,6 +25,8 @@ test('preview and corrected commit never derive balances from historical stateme
   assert.ok(verifyAuditChain(committed.audit));
   assert.equal(committed.approvals.at(-1)!.status, 'consumed');
   const revoked = revokeStatementImport(committed, preview.batch.id, committed.twinVersion);
+  assert.equal(revoked.approvals.at(-1)!.action, 'revoke_statement_import');
+  assert.equal(revoked.approvals.at(-1)!.status, 'consumed');
   assert.equal(revoked.transactions.length, 0); assert.equal(revoked.finance.checkingCents, 724000);
 });
 test('refund pairs, repeated external IDs and internal transfer legs remain evidence without spending', async () => {

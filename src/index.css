@@ -12,6 +12,27 @@
 button:disabled { cursor: default; opacity: .65; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #39A5A8; outline-offset: 3px; }
 
+.mission-shell { display: flex; flex-direction: column; gap: 12px; }
+.mission-stepper { display: flex; gap: 4px; overflow-x: auto; list-style: none; margin: 0; padding: 0; }
+.mission-stepper button { min-height: 44px; min-width: max-content; padding: 6px 8px; border-radius: 999px; border: 1px solid #D0D5DD; background: white; color: #5A616B; font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.mission-stepper .is-current { background: #0F6B6D; color: white; border-color: #0F6B6D; }
+.mission-stepper .is-done { background: #E6F2F2; color: #0F6B6D; border-color: #B9D9D8; }
+.mission-step-index { width: 18px; height: 18px; border-radius: 999px; display: grid; place-items: center; font-size: 10px; background: #F5F7F8; color: inherit; }
+.mission-stepper .is-current .mission-step-index { background: #084C4E; color: white; }
+.mission-claim { display: inline-flex; align-items: center; min-height: 20px; padding: 0 6px; border-radius: 6px; font-size: 10px; font-weight: 700; margin-right: 4px; }
+.mission-claim-fact { background: #E6F2F2; color: #0F6B6D; }
+.mission-claim-assumption { background: #FFF7E6; color: #8A5A00; }
+.mission-claim-prediction { background: #E8F0FE; color: #1A56A8; }
+.mission-claim-limitation { background: #F0F2F5; color: #5A616B; }
+.mission-state { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: white; border: 1px solid #E5E8EB; border-radius: 18px; }
+@media (min-width: 1024px) {
+  .mission-shell { display: grid; grid-template-columns: 168px minmax(0, 1fr); align-items: start; }
+  .mission-stepper { flex-direction: column; overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;

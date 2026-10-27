@@ -60,7 +60,8 @@ export function resolveImportIssue(state: DemoState, batchId: string, issueId: s
   else throw new Error('IMPORT_ISSUE_NOT_EDITABLE');
   const issues = state.importIssues.map(i => i.id === issueId ? { ...i, correctedValue: value, resolved: true } : i);
   const rows = state.normalizedStatementRows.map(r => r.id === issue.rowId ? { ...r, ...correction } : r);
-  return { ...state, normalizedStatementRows: rows, importIssues: issues, statementImportBatches: state.statementImportBatches.map(b => b.id === batchId ? { ...b, revision:(b.revision??0)+1, status: issues.some(i => i.batchId === batchId && !i.resolved && i.severity !== 'info') ? 'needs_review' : 'ready' } : b) };
+  const dates = rows.filter(r => r.batchId === batchId && validDate(r.date)).map(r => r.date).sort();
+  return { ...state, normalizedStatementRows: rows, importIssues: issues, statementImportBatches: state.statementImportBatches.map(b => b.id === batchId ? { ...b, coverageStart: dates[0] ?? null, coverageEnd: dates.at(-1) ?? null, revision:(b.revision??0)+1, status: issues.some(i => i.batchId === batchId && !i.resolved && i.severity !== 'info') ? 'needs_review' : 'ready' } : b) };
 }
 
 export function commitStatementImport(state: DemoState, batchId: string, expectedTwinVersion: number, expectedBatchRevision?:number): DemoState {
@@ -86,5 +87,9 @@ export function revokeStatementImport(state: DemoState, batchId: string, expecte
   if (expectedTwinVersion !== state.twinVersion) throw new Error('TWIN_VERSION_CHANGED');
   if (batch.status !== 'committed') throw new Error('IMPORT_BATCH_NOT_COMMITTED');
   const ids = new Set(batch.rowIds);
-  return appendAuditEvent(syncLegacyProjection({ ...state, twinVersion: state.twinVersion + 1, transactions: state.transactions.filter(t => !ids.has(t.id)), evidenceRefs: state.evidenceRefs.filter(e => !ids.has(e.sourceId)), statementImportBatches: state.statementImportBatches.map(b => b.id === batchId ? { ...b, status: 'revoked' } : b) }), 'statement_import', 'revoked', '仅撤销本批次历史证据；账户余额未改变');
+  const parameters = { batchId, rowsHash: stableHash(state.normalizedStatementRows.filter(row => ids.has(row.id))) };
+  const prepared = createApprovalSnapshot(state, 'revoke_statement_import', parameters, `${state.clock}T12:05:00.000Z`);
+  const approved = confirmApproval(prepared.state, prepared.approval.id, prepared.approval.snapshotHash);
+  const next = consumeApproval(approved.state, approved.token, 'revoke_statement_import', parameters);
+  return appendAuditEvent(syncLegacyProjection({ ...next, twinVersion: next.twinVersion + 1, transactions: next.transactions.filter(t => !ids.has(t.id)), evidenceRefs: next.evidenceRefs.filter(e => !e.transactionIds.some(id => ids.has(id))), statementImportBatches: next.statementImportBatches.map(b => b.id === batchId ? { ...b, status: 'revoked' } : b) }), 'statement_import', 'revoked', '仅撤销本批次历史证据；账户余额未改变', { approvalId: prepared.approval.id });
 }

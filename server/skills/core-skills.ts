@@ -3,6 +3,7 @@ import { buildBillBrief } from '../bill-analysis.ts';
 import { buildDatedCashflowForecast,addIsoDays } from '../cashflow-forecast.ts';
 import { buildMoneyMissionPlans } from '../money-mission-plans.ts';
 import { buildHandoffCasePack } from '../handoff.ts';
+import { previewMissionRepairs } from '../mission-monitor.ts';
 import { CoreSkillInputSchema,CoreSkillOutputSchema,getEnabledSkill,assertSkillToolAllowed } from './registry.ts';
 
 const yuan=(cents:number)=>`¥${(cents/100).toLocaleString('zh-CN')}`;
@@ -29,6 +30,7 @@ export function runCoreSkill(state:DemoState,id:SkillId,input:unknown={}) {
     call('get_transfer_schedule_status',()=>{stage='transfer';const schedules=state.transferSchedules.filter(s=>!args.artifactId||s.id===args.artifactId);if(args.artifactId&&!schedules.length)throw new Error('SCHEDULE_NOT_FOUND');artifactId=schedules.at(-1)?.id??'transfer-builder';summary=schedules.length?`储蓄计划状态：${({active:'进行中',paused:'已暂停',completed:'已完成',cancelled:'已取消',awaiting_confirmation:'待确认',draft:'草稿',simulated:'预览',failed:'需处理'})[schedules.at(-1)!.status]}。请核对触发条件和执行回执。`:'尚未创建储蓄计划。请在计划页选择金额、账户和频率，再核对确认。创建月度计划时不会立即扣款。';});
   }else if(id==='outcome_monitor_and_replanner'){
     call('read_material_outcomes',()=>{stage='monitoring';const outcomes=state.transferExecutions.filter(e=>['failed','unknown','skipped_missing_trigger'].includes(e.status));artifactId=outcomes.at(-1)?.id??'monitoring';summary=outcomes.length?'检测到需要核对的转入结果。可以查询原操作，或预览暂停及重新规划；不会自动补扣。':'目前没有新的显著执行问题。';claims.push({claimType:'fact',text:summary,sourceRefs:outcomes.length?outcomes.map(e=>e.id):['monitoring']});});
+    call('search_repair_options',()=>{const repairs=previewMissionRepairs(state);if(repairs.length)claims.push({claimType:'limitation',text:`有${repairs.length}个只读修复预览，确认前不会改写计划。`,sourceRefs:repairs.map(item=>item.id)});});
   }else if(id==='human_handoff_case_pack'){
     const pack=call('prepare_case_pack',()=>buildHandoffCasePack(state,{problem:state.subscriptionActions.some(a=>a.status==='requires_merchant')?'subscription_requires_merchant':state.importIssues.some(i=>!i.resolved)?'import_conflict':state.transferExecutions.some(e=>e.status==='failed')?'transfer_failed':'unsupported'}));next={...state,handoffCasePacks:[...state.handoffCasePacks,pack]};stage='handoff';artifactId=pack.id;summary=`已整理人工问题包：${pack.problem}。包含必要事实、已尝试步骤与待确认问题，尚未向任何人发送。`;
   }

@@ -3,6 +3,7 @@ import type { AgentComponent, GoalAssumptions, RiskPreferences } from '../../sha
 import { api } from '../api';
 import { normalizeAgentComponent } from '../../shared/generative';
 import type { ScreenId } from '../types';
+import { ClaimBadge } from './money-mission/ClaimBadge';
 
 const money = (cents: number) => `¥${(cents / 100).toLocaleString('zh-CN')}`;
 const sourceName = { bank: '银行卡', wechat_pay: '微信支付', alipay: '支付宝' } as const;
@@ -153,7 +154,7 @@ export function AgentComponentRenderer({ value, onAction, onCancel, onSelectCand
   onUpdateRiskPreferences?: (changes: Partial<RiskPreferences>) => void;
 }) {
   const component = normalizeAgentComponent(value);
-  if(component.type==='mission_skill_result')return <article className="mission-card"><h4 className="text-sm font-bold">{component.title}</h4><p>{component.result.summary}</p>{component.result.claims.map((claim,i)=><div key={i} className="text-xs border-t border-[#E5E8EB] pt-2"><strong className="text-[#0F6B6D]">{({fact:'事实',assumption:'假设',prediction:'预测',limitation:'限制'})[claim.claimType]}</strong><p>{claim.text}</p><span className="text-[10px] text-[#697386]">{claim.sourceRefs.length}项来源可核对</span></div>)}<button className="mission-primary" onClick={()=>onNavigate(component.result.stage==='planning'||component.result.stage==='transfer'?'savings':'bills')}>查看依据与下一步</button></article>;
+  if(component.type==='mission_skill_result')return <article className="mission-card"><h4 className="text-sm font-bold">{component.title}</h4><p>{component.result.summary}</p>{component.result.claims.map((claim,i)=><div key={i} className="text-xs border-t border-[#E5E8EB] pt-2"><ClaimBadge kind={claim.claimType} /><p>{claim.text}</p><span className="text-[10px] text-[#697386]">{claim.sourceRefs.length}项来源可核对</span></div>)}<button className="mission-primary" onClick={()=>onNavigate(component.result.stage==='planning'||component.result.stage==='transfer'?'savings':'bills')}>查看依据与下一步</button></article>;
 
   if (component.type === 'data_connection_prompt') return <article className="rounded-2xl border border-[#B9D9D8] bg-white p-4 shadow-sm">
     <h4 className="text-[14px] font-bold">{component.title}</h4>

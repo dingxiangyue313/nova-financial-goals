@@ -6,7 +6,7 @@ export function monthDate(year: number, month: number, day: number) {
   const last = new Date(Date.UTC(year,month + 1,0)).getUTCDate(); return new Date(Date.UTC(year,month,Math.min(day,last))).toISOString().slice(0,10);
 }
 export const addIsoDays = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000).toISOString().slice(0,10);
-export function buildDatedCashflowForecast(state: DemoState, input: { accountId: string; horizonEnd: string; scenario: 'baseline' | 'stress' | 'edited'; edits?: CashflowEdit[]; contributionCents?: number }): DatedCashflowForecast {
+export function buildDatedCashflowForecast(state: DemoState, input: { accountId: string; horizonEnd: string; scenario: 'baseline' | 'stress' | 'edited'; edits?: CashflowEdit[]; contributionCents?: number; contributionOverrides?: Record<string, number> }): DatedCashflowForecast {
   if (!validDate(input.horizonEnd) || input.horizonEnd < state.clock || input.horizonEnd > addIsoDays(state.clock,366)) throw new Error('INVALID_FORECAST_HORIZON');
   const account = state.accounts.find(a => a.id === input.accountId); if (!account) throw new Error('ACCOUNT_NOT_FOUND');
   if (account.currency !== 'CNY') throw new Error('CURRENCY_MISMATCH');
@@ -43,14 +43,27 @@ export function buildDatedCashflowForecast(state: DemoState, input: { accountId:
     if (edit.operation === 'remove' || edit.operation === 'replace') { if (!edit.eventId || !events.has(edit.eventId)) throw new Error('DATA_EVENT_NOT_FOUND'); events.delete(edit.eventId); }
     if (edit.operation !== 'remove') put({ ...base,id:edit.eventId ?? `edit:${index}`,date:edit.date,label:edit.label,amountCents:edit.amountCents,priority:edit.amountCents < 0 ? 10 : 20,claimType:'assumption',sourceRefs:[`user-edit:${index}`] });
   }
-  const contributions = input.contributionCents !== undefined ? [{ id: 'preview', amountCents: input.contributionCents, endDate: state.goal.targetDate, goalId: state.goal.id }] : state.transferSchedules.filter(s => s.status === 'active' && s.sourceAccountId === account.id);
-  const remaining = new Map(state.goals.map(g => [g.id,Math.max(0,g.targetCents-g.savedCents)]));
-  for (const salary of [...events.values()].filter(e => e.id.startsWith('salary:')).sort((a,b) => a.date.localeCompare(b.date))) {
-    for (const plan of contributions) {
-      const date = addIsoDays(salary.date,1); const gap = remaining.get(plan.goalId) ?? 0;
-      if (Number(salary.date.slice(8)) > 27 || date > plan.endDate || gap <= 0 || plan.amountCents <= 0) continue;
-      const amount = Math.min(plan.amountCents,gap); remaining.set(plan.goalId,gap-amount);
-      put({ ...base,id:`transfer:${plan.id}:${date.slice(0,7)}`,date,label:'旅行金转入（需工资实际到账）',priority:30,amountCents:-amount,sourceRefs:[plan.id] });
+  const activeSchedules = state.transferSchedules.filter(s => s.status === 'active' && s.sourceAccountId === account.id);
+  const contributions = input.contributionCents !== undefined
+    ? [...activeSchedules.filter(s => s.goalId !== state.goal.id), { id: 'preview', amountCents: input.contributionCents, endDate: state.goal.targetDate, goalId: state.goal.id }]
+    : activeSchedules;
+  for (const plan of contributions) {
+    const goal = state.goals.find(goal => goal.id === plan.goalId);
+    let gap = Math.max(0, Math.min(goal?.targetCents ?? 0, 'targetCents' in plan ? plan.targetCents : goal?.targetCents ?? 0) - (goal?.savedCents ?? 0));
+    const fixedDay = 'trigger' in plan && plan.trigger.type === 'fixed_day' ? plan.trigger.expectedDay : null;
+    const dates = fixedDay === null
+      ? [...events.values()].filter(event => event.id.startsWith('salary:') && Number(event.date.slice(8)) <= 27).map(event => addIsoDays(event.date, 1))
+      : Array.from({ length: 14 }, (_, index) => monthDate(start.getUTCFullYear(), start.getUTCMonth() + index, fixedDay));
+    for (const date of dates.sort()) {
+      if (date <= state.clock || date > input.horizonEnd || date > plan.endDate || gap <= 0 || plan.amountCents <= 0) continue;
+      if ('frequency' in plan && plan.frequency === 'one_time') continue; // Confirmed one-time transfers have already changed authoritative balances.
+      const periodKey = `schedule:${plan.id}:${date.slice(0, 7)}`;
+      if (state.transferExecutions.some(execution => execution.periodKey === periodKey)) continue;
+      const requestedAmount = plan.id === 'preview' ? input.contributionOverrides?.[date.slice(0, 7)] ?? plan.amountCents : plan.amountCents;
+      if (!Number.isSafeInteger(requestedAmount) || requestedAmount < 0) throw new Error('INVALID_CONTRIBUTION');
+      const amount = Math.min(requestedAmount, gap); gap -= amount;
+      if (amount === 0) continue;
+      put({ ...base, id: `transfer:${periodKey}`, date, label: fixedDay === null ? '旅行金转入（需工资实际到账）' : '目标转入（固定日期）', priority: 30, amountCents: -amount, sourceRefs: [plan.id] });
     }
   }
   if (input.scenario === 'stress') {

@@ -1,5 +1,6 @@
 process.env.PORT = '3177';
 process.env.NODE_ENV = 'production';
+process.env.NOVA_DEMO_CONTROLS = 'true';
 process.env.NOVA_RP_ID = 'localhost';
 process.env.NOVA_ORIGIN = 'http://localhost:3177';
 process.env.NOVA_DB_PATH = './data/e2e.sqlite';

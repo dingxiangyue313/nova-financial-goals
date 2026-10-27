@@ -1,5 +1,7 @@
 # v0.6 本次实现范围
 
+> 此页保留早期增量记录。2026-10-27 继续开发后的当前状态见 [V06_RELEASE_STATUS.md](V06_RELEASE_STATUS.md)。下列“尚未实现”和旧测试数量不代表当前版本。
+
 基础分支：远端重新获取的 `origin/docs/nova-v06-team-handoff`（5ea1af1）。开发分支：`codex/v06-money-mission`。未合并到main。
 
 ## 已实现

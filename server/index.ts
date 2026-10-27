@@ -1,5 +1,6 @@
 import { registerMoneyMissionRoutes } from './money-mission-routes.ts';
 import { tickTransferWorker } from './transfer-worker.ts';
+import { tickMoneyMissionMonitor } from './mission-monitor-worker.ts';
 import { registerStatementRoutes } from './statement-upload.ts';
 import 'dotenv/config';
 import express from 'express';
@@ -47,6 +48,14 @@ if (production && (!process.env.NOVA_SESSION_SECRET || process.env.NOVA_SESSION_
 installRequestHardening(app);
 app.use(express.json({ limit: '256kb' }));
 installApiRateLimits(app);
+const demoControlsEnabled = !production || process.env.NOVA_DEMO_CONTROLS === 'true';
+app.get('/api/capabilities', (_req, res) => res.json({ demoControls: demoControlsEnabled }));
+app.use((req, res, next) => {
+  const debugRoute = req.path === '/demo-control' || req.path.startsWith('/api/demo/')
+    || /^\/api\/mission\/demo-/.test(req.path) || req.path === '/api/mission/load';
+  if (debugRoute && !demoControlsEnabled) return res.status(404).json({ error: 'NOT_FOUND' });
+  next();
+});
 app.use('/api', (req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
   const origin = req.get('origin');
@@ -78,7 +87,10 @@ function respond(res: express.Response, state: DemoState) { return res.json(snap
 function failure(res: express.Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
   const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|IMPORT_|EVIDENCE_|SCHEDULE_|SKILL_|HANDOFF_|SUBSCRIPTION_|TRANSFER_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_|DATA_)/.test(message);
-  return res.status(bad ? 400 : 500).json({ error: bad ? message : '服务暂时不可用，请稍后重试。' });
+  return res.status(bad ? 400 : 500).json({
+    error: bad ? message : '服务暂时不可用，请稍后重试。',
+    code: bad ? message : 'SERVICE_UNAVAILABLE',
+  });
 }
 function route(fn: (req: express.Request, res: express.Response) => Promise<unknown> | unknown): express.RequestHandler {
   return (req, res) => { Promise.resolve().then(() => fn(req, res)).catch(error => failure(res, error)); };
@@ -605,7 +617,7 @@ if (production) {
   app.use(vite.middlewares);
 }
 const server = app.listen(port, '0.0.0.0', () => console.log(`NOVA original UI + new simulated backend: http://localhost:${port}`));
-function runMonitorTick() { try { tickMonitorWorker(); tickTransferWorker(); } catch { console.error('Monitor worker tick failed'); } }
+function runMonitorTick() { try { tickMonitorWorker(); tickTransferWorker(); tickMoneyMissionMonitor(); } catch { console.error('Monitor worker tick failed'); } }
 const monitorTimer = setInterval(runMonitorTick, 5_000);
 monitorTimer.unref();
 setImmediate(runMonitorTick);

@@ -1,0 +1,37 @@
+{
+  "batch": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "revision": 0,
+    "templateId": "nova-synthetic-v1",
+    "format": "csv",
+    "status": "committed",
+    "coverageStart": "2026-05-01",
+    "coverageEnd": "2026-10-26",
+    "recordCount": 18,
+    "duplicateCount": 0,
+    "issueIds": [],
+    "rowIds": ["row-a"],
+    "createdAt": "2026-10-26T12:00:00+08:00",
+    "committedAt": "2026-10-26T12:00:00+08:00",
+    "twinVersion": 1
+  },
+  "issues": [],
+  "rows": [
+    {
+      "id": "row-a",
+      "externalId": "row-a",
+      "accountId": "checking",
+      "currency": "CNY",
+      "date": "2026-10-01",
+      "title": "Shop-A",
+      "merchantId": null,
+      "amountCents": -100,
+      "category": "shopping",
+      "originalCategory": "shopping",
+      "sourceKind": "bank",
+      "confidence": 1,
+      "excludedReason": null,
+      "batchId": "11111111-1111-4111-8111-111111111111"
+    }
+  ]
+}

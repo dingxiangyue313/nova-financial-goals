@@ -25,7 +25,7 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
   const base = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
     cwd: process.cwd(), stdio: 'ignore', env: { ...process.env, PORT: String(port),
-      NOVA_DB_PATH: join(directory, 'demo.sqlite'), DEEPSEEK_API_KEY: '', NODE_ENV: 'production',
+      NOVA_DB_PATH: join(directory, 'demo.sqlite'), DEEPSEEK_API_KEY: '', NODE_ENV: 'production', NOVA_DEMO_CONTROLS: 'true',
       NOVA_SESSION_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef',
       NOVA_EXTERNAL_AGENT_SECRET: externalSecret },
   });

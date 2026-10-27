@@ -1,4 +1,5 @@
 import {migrateMoneyMissionState} from './money-mission-migration.ts';
+import { screenMissionOutcomes } from './mission-monitor.ts';
 import { StatementImportBatchSchema, ImportIssueSchema, EvidenceRefSchema, SubscriptionActionSchema, TransferScheduleSchema, TransferExecutionSchema, type StatementImportBatch, type ImportIssue, type EvidenceRef, type SubscriptionAction, type TransferSchedule, type TransferExecution } from '../shared/money-mission.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -12,10 +13,12 @@ import { AgentComponentSchema, AgentMessageSchema, AgentTaskConstraintsSchema, A
   type DemoState, type GoalDraft } from '../shared/contracts.ts';
 import { createFirstUseFixture } from './fixtures.ts';
 
-const dbPath = resolve(process.env.NOVA_DB_PATH || './data/nova.sqlite');
-mkdirSync(dirname(dbPath), { recursive: true });
+const configuredPath = process.env.NOVA_DB_PATH || './data/nova.sqlite';
+const inMemory = configuredPath === ':memory:';
+const dbPath = inMemory ? ':memory:' : resolve(configuredPath);
+if (!inMemory) mkdirSync(dirname(dbPath), { recursive: true });
 const db = new DatabaseSync(dbPath);
-db.exec('PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
+db.exec(inMemory ? 'PRAGMA busy_timeout = 5000;' : 'PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
 db.exec(`CREATE TABLE IF NOT EXISTS demo_sessions (
   id TEXT PRIMARY KEY, state_json TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
 );
@@ -245,7 +248,8 @@ export function mutateState(sessionId: string, change: (state: DemoState) => Dem
 
 function persistStateChange(sessionId: string, change: (state: DemoState) => DemoState): DemoState {
   const old = getState(sessionId);
-  const next = DemoStateSchema.parse(change(old));
+  const changed = change(old);
+  const next = DemoStateSchema.parse(changed.twinVersion !== old.twinVersion ? screenMissionOutcomes(changed) : changed);
   const newEvents = next.audit.slice(old.audit.length);
   const result = db.prepare('UPDATE demo_sessions SET state_json = ?, version = version + 1, updated_at = ? WHERE id = ?')
     .run(JSON.stringify(next), new Date().toISOString(), sessionId);
@@ -1167,6 +1171,10 @@ export function getStatementImportBatch(sessionId: string, id: string) {
   return StatementImportBatchSchema.parse(batch);
 }
 export function listStatementImportBatches(sessionId: string) { return getState(sessionId).statementImportBatches; }
+export function listMoneyMissionMonitorSessions(limit = 100): string[] {
+  return (db.prepare("SELECT id FROM demo_sessions WHERE json_extract(state_json, '$.mission.monitoringEnabled') = 1 ORDER BY updated_at LIMIT ?")
+    .all(Math.max(1, Math.min(1000, limit))) as Array<{id: string}>).map(row => row.id);
+}
 export function saveEvidenceRefs(sessionId: string, values: EvidenceRef[]) {
   const parsed = EvidenceRefSchema.array().parse(values);
   mutateState(sessionId, s => ({ ...s, evidenceRefs: [...s.evidenceRefs.filter(r => !parsed.some(x => x.id === r.id)), ...parsed] }));
