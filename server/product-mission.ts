@@ -18,6 +18,7 @@ import { resumeTransferSchedule } from './transfer-schedules.ts';
 import { prepareAccountSnapshot } from './account-snapshots.ts';
 import { syntheticStatements } from './synthetic-statements.ts';
 import { saveStatementImportPreview } from './store.ts';
+import { initializeServices } from './financial-services.ts';
 
 const categories: Record<string, string> = { 工资: 'income', 餐饮: 'dining', 住房: 'housing', 交通: 'transport', 购物: 'shopping', 订阅: 'subscriptions', 水电: 'utilities', 保险: 'insurance', 退款: 'refund', 内部转账: 'internal_transfer' };
 export async function consumerFixture(history = true) {
@@ -53,6 +54,16 @@ export async function fundedConsumerFixture(){
 
 export function registerProductMission(app: Express, sessionId: (req: Request, res: Response) => string,
   route: (fn: (req: Request, res: Response) => unknown) => RequestHandler) {
+  app.post('/api/product/goals',route((req,res)=>{
+    const body=z.object({title:z.string().trim().min(1).max(60),targetCents:z.number().int().positive().max(100000000),targetDate:z.iso.date(),protectedCents:z.number().int().nonnegative().max(100000000),expectedTwinVersion:z.number().int().positive()}).strict().parse(req.body);
+    const id=sessionId(req,res),next=mutateState(id,old=>{
+      if(old.twinVersion!==body.expectedTwinVersion)throw new Error('TWIN_VERSION_CHANGED');
+      if(body.targetDate<=old.clock)throw new Error('GOAL_DATE_MUST_BE_FUTURE');
+      const state=initializeServices(old),goal={...state.goal,id:randomUUID(),title:body.title,targetCents:body.targetCents,targetDate:body.targetDate,originalDate:body.targetDate,
+        protectedCents:body.protectedCents,savedCents:0,monthlyContributionCents:0,firstMonthContributionCents:0,selectedPlanId:null,status:'draft' as const,quote:`${body.targetDate}前准备${body.targetCents/100}元用于${body.title}`};
+      return appendAuditEvent({...state,goal,goals:[...state.goals,goal],primaryGoalId:goal.id,pendingImpact:null,twinVersion:state.twinVersion+1},'consumer_create_goal','draft','已创建目标草稿；原有账户、其他目标资金和授权保持不变。');
+    });res.json(productMission(next).snapshot);
+  }));
   app.post('/api/demo/services/scenario',route(async(req,res)=>{
     const body=z.object({scenario:z.literal('funded_trip'),expectedTwinVersion:z.number().int().positive().optional()}).strict().parse(req.body);
     const id=sessionId(req,res),fixture=await fundedConsumerFixture();

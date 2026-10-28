@@ -213,9 +213,9 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
     <div className="flex-1 overflow-y-auto px-3 py-4 no-scrollbar">
       {run && <div className="mx-auto mb-3 max-w-xl rounded-2xl border border-[#D8E7E7] bg-white p-3 text-[11px] text-[#5A616B]" aria-live="polite">
         <div className="flex items-center justify-between gap-2"><b className="text-[#1F2329]">{run.status === 'running' ? '正在调查模拟数据' : run.status === 'completed' ? '调查已完成' : run.status === 'fallback' ? '规则试算已完成' : run.status === 'awaiting_user' ? '等待补充信息' : '调查已停止'}</b>{run.status === 'running' && <button type="button" onClick={() => void stopRun()} className="rounded-lg border border-[#D0D5DD] px-2 py-1 text-[#5A616B]">停止调查</button>}</div>
-        <p className="mt-1">正在核对目标金额、可用现金和完成日期…</p>
+        <p className="mt-1">{run.status === 'running' ? '正在核对目标金额、可用现金和完成日期…' : run.status === 'completed' || run.status === 'fallback' ? '已完成本次核对，请查看下方方案；选择后仍需确认。' : run.status === 'awaiting_user' ? '补充下方信息后可以继续试算。' : '本次调查已结束，尚未应用方案。'}</p>
         <ol className="mt-2 space-y-1">{run.steps.map((step, index) =>
-          <li key={`${step.at}-${index}`} className="rounded-lg bg-[#F5F7F8] px-2 py-1.5">{step.summary}</li>)}</ol>
+          <li key={`${step.at}-${index}`} className="rounded-lg bg-[#F5F7F8] px-2 py-1.5">{step.summary.replace('financial_overview：ok','已核对账户与目标').replace('data_sufficiency：ok','已核对数据覆盖').replace('search_goal_options：ok','已完成目标方案试算').replace('search_goal_options：no_result','当前条件下需要调整方案')}</li>)}</ol>
       </div>}
       {!messages.length && <div className="mx-auto max-w-md pt-6 text-center"><div className="mx-auto flex h-16 items-center justify-center"><NovaMark size={64} /></div><h2 className="mt-4 text-[16px] font-bold">你想完成什么财务目标？</h2><p className="mt-1 text-[12px] text-[#5A616B]">NOVA 会把理解结果变成可以核对和确认的界面。</p></div>}
       <div className="mx-auto max-w-xl space-y-4">{messages.map(message => <div key={message.id} className={message.role === 'user' ? 'ml-10' : 'mr-5'}>

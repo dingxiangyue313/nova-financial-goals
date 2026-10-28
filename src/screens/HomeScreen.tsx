@@ -85,7 +85,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </section>
 
-      {brief && <button type="button" aria-label="查看账单与消费" onClick={onNavigateToMoneyMission} className="rounded-2xl bg-[#0F6B6D] text-white p-4 text-left shadow-md"><span className="text-[11px]">消费趋势 · 合成账单 · 截至 {brief.dataAsOf}</span><strong className="block text-[20px] mt-1">{Number(brief.periodStart.slice(5,7))}月花了 ¥{(brief.totalExpenseCents/100).toLocaleString('zh-CN')}</strong><span className="grid grid-cols-3 gap-2 mt-3"><span className="rounded-xl bg-white/15 p-2 text-[10px]">餐饮变化<strong className="block text-[13px]">¥{((brief.changes.find(c=>c.category==='dining')?.increaseCents??0)/100).toLocaleString('zh-CN')}/月</strong></span><span className="rounded-xl bg-white/15 p-2 text-[10px]">即将续费<strong className="block text-[13px]">¥{((brief.subscriptionCandidates[0]?.monthlyCents??0)/100).toLocaleString('zh-CN')}</strong></span><span className="rounded-xl bg-white/15 p-2 text-[10px]">工资前低谷<strong className="block text-[13px]">{snapshot.moneyMission?.forecast?.minimumBalanceCents==null?'待核对':'¥'+(snapshot.moneyMission.forecast.minimumBalanceCents/100).toLocaleString('zh-CN')}</strong></span></span><span className="block text-xs mt-3">处理续费，核对并安排工资到账后转入 →</span></button>}
+      {brief && <button type="button" aria-label="查看账单与消费" onClick={onNavigateToMoneyMission} className="rounded-2xl bg-[#0F6B6D] text-white p-4 text-left shadow-md"><span className="text-[11px]">消费趋势 · 合成账单 · 截至 {brief.dataAsOf}</span><strong className="block text-[20px] mt-1">{Number(brief.periodStart.slice(5,7))}月花了 ¥{(brief.totalExpenseCents/100).toLocaleString('zh-CN')}</strong><span className="grid grid-cols-3 gap-2 mt-3"><span className="rounded-xl bg-white/15 p-2 text-[10px]">餐饮变化<strong className="block text-[12px] whitespace-nowrap">¥{((brief.changes.find(c=>c.category==='dining')?.increaseCents??0)/100).toLocaleString('zh-CN')}</strong></span><span className="rounded-xl bg-white/15 p-2 text-[10px]">即将续费<strong className="block text-[13px]">¥{((brief.subscriptionCandidates[0]?.monthlyCents??0)/100).toLocaleString('zh-CN')}</strong></span><span className="rounded-xl bg-white/15 p-2 text-[10px]">工资前低谷<strong className="block text-[13px]">{snapshot.moneyMission?.forecast?.minimumBalanceCents==null?'待核对':'¥'+(snapshot.moneyMission.forecast.minimumBalanceCents/100).toLocaleString('zh-CN')}</strong></span></span><span className="block text-xs mt-3">处理续费，核对并安排工资到账后转入 →</span></button>}
+      {!brief&&<button type="button" aria-label="查看账单与消费" onClick={onNavigateToMoneyMission} className="rounded-2xl bg-[#0F6B6D] text-white p-4 text-left"><strong className="block text-lg">账单与订阅</strong><span className="block mt-2 text-xs">连接模拟来源或导入账单后，查看消费趋势与续费提醒 →</span></button>}
       <div className="flex items-center gap-1.5 rounded-lg border border-[#E5E8EB] bg-white px-3 py-2 text-[11px] text-[#5A616B]">
         <span className="material-symbols-outlined text-[15px] text-[#0F6B6D]">sync</span>
         {connectedSources.length
@@ -254,10 +255,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <span>查看计划</span>
         </button>
       </section>
-      <button type="button" onClick={onNavigateToMoneyMission}
-        className="min-h-11 rounded-xl border border-[#B9D9D8] bg-white px-4 py-3 text-left text-[13px] font-semibold text-[#0F6B6D] focus-visible:outline-2 focus-visible:outline-offset-2">
-        继续日本旅行 Money Mission
-      </button>
       <button type="button" className="mission-secondary" onClick={onNavigateToServices}>金融任务：转账、AA、理财、卡片与旅行预订</button>
     </div>
   );

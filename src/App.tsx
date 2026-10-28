@@ -7,6 +7,7 @@ import { TopBar } from './components/TopBar';
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './screens/HomeScreen';
 import { CreateGoalScreen } from './screens/CreateGoalScreen';
+import { NewGoalScreen } from './screens/NewGoalScreen';
 import { FeasibilityScreen } from './screens/FeasibilityScreen';
 import { GoalImpactScreen } from './screens/GoalImpactScreen';
 import { GoalsListScreen } from './screens/GoalsListScreen';
@@ -393,6 +394,8 @@ export default function App() {
     switch (currentScreen) {
       case 'create_goal':
         return '创建目标';
+      case 'money_mission':
+        return '账单与消费';
       case 'feasibility':
         return '目标可行性';
       case 'data_connections':
@@ -522,7 +525,7 @@ export default function App() {
 
         {/* Content Body */}
         <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar relative w-full bg-[#F5F7F8]"><Suspense fallback={<p role="status" className="p-4">正在打开任务…</p>}>
-          {!goal && ['home', 'create_goal', 'feasibility', 'profile'].includes(currentScreen) && (
+          {!goal && ['home', 'feasibility', 'profile'].includes(currentScreen) && (
             <section className="m-4 rounded-2xl border border-[#D8E7E7] bg-white p-5 shadow-sm">
               <h1 className="text-[17px] font-bold text-[#1F2329]">还没有财务目标</h1>
               <p className="mt-2 text-[13px] leading-relaxed text-[#5A616B]">创建目标后，这里会显示首页进度、可行性分析和智能守护提醒。你也可以载入日本旅行模拟数据，查看完整的原版页面。</p>
@@ -538,7 +541,7 @@ export default function App() {
               hasImpactPending={hasImpactPending}
               onNavigateToFeasibility={() => navigateTo('feasibility')}
               onNavigateToImpact={() => navigateTo('impact')}
-              onNavigateToCreate={() => { setWorkspaceStarter('我想创建一个新的财务目标'); navigateTo('workspace'); }}
+              onNavigateToCreate={() => { setDraftChanges({}); navigateTo('create_goal'); }}
               onNavigateToMoneyMission={() => navigateTo('money_mission')}
               onNavigateToServices={() => navigateTo('financial_services')}
             />
@@ -551,7 +554,8 @@ export default function App() {
           {currentScreen === 'financial_services' && <FinancialServicesScreen initialMessage={financialStarter} onBills={() => navigateTo('money_mission')}
             onChanged={() => { void api<Snapshot>('/api/session').then(setSnapshot).catch(error => showToast(error.message)); }} />}
 
-          {currentScreen === 'create_goal' && goal && (
+          {currentScreen === 'create_goal' && !demoControl && <NewGoalScreen snapshot={snapshot} onSnapshot={setSnapshot} onDone={()=>navigateTo('home')} />}
+          {currentScreen === 'create_goal' && demoControl && goal && (
             <CreateGoalScreen
               goal={goal}
               onUpdateGoal={handleUpdateGoal}
@@ -605,7 +609,7 @@ export default function App() {
               primaryGoalId={snapshot.primaryGoalId}
               emergencyCents={snapshot.finance.emergencyCents}
               onSelectGoal={async id => { const next = await mutate(`/api/goals/${id}/set-primary`, 'POST'); setSnapshot(next); navigateTo('home'); }}
-              onNavigateToCreate={() => { setWorkspaceStarter('我想创建一个新的财务目标'); navigateTo('workspace'); }}
+              onNavigateToCreate={() => { setDraftChanges({}); navigateTo('create_goal'); }}
               onNavigateToImpact={() => navigateTo('impact')}
               hasImpactPending={hasImpactPending}
             />

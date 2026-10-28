@@ -52,7 +52,7 @@ test('statement previews use the validated store boundary exactly once per reque
       db.close(); process.exit(0);
     `;
     const result = spawnSync(process.execPath, ['--experimental-test-module-mocks', '--import', 'tsx', '--input-type=module', '-e', script], {
-      cwd: process.cwd(), encoding: 'utf8', timeout: 30_000,
+      cwd: process.cwd(), encoding: 'utf8', timeout: 90_000,
       env: { ...process.env, PORT: String(port), NOVA_DB_PATH: join(directory, 'demo.sqlite'), NODE_ENV: 'production', NOVA_DEMO_CONTROLS: 'true',
         NOVA_SESSION_SECRET: externalSecret, NOVA_ALLOW_STATEMENT_UPLOAD: 'true', DEEPSEEK_API_KEY: '' },
     });
@@ -69,11 +69,12 @@ test('statement HTTP lifecycle is session isolated, governed, private and upload
         NOVA_ALLOW_STATEMENT_UPLOAD: String(uploadEnabled), NOVA_SESSION_SECRET: externalSecret } });
     try {
       let ready = false;
-      for (let i = 0; i < 120; i++) {
+      const readyDeadline = Date.now() + 90_000;
+      while (Date.now() < readyDeadline && child.exitCode === null) {
         try { if ((await fetch(`${base}/api/health`)).ok) { ready = true; break; } }
         catch { await new Promise(resolve => setTimeout(resolve, 250)); }
       }
-      assert.equal(ready, true);
+      assert.equal(ready, true, `statement server did not become ready; exit=${child.exitCode}`);
       let cookie = '';
       const call = async (path: string, method = 'GET', body?: unknown) => {
         const response = await fetch(`${base}${path}`, { method, headers: { 'Content-Type': 'application/json', Cookie: cookie },

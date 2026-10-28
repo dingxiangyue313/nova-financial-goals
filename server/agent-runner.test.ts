@@ -311,8 +311,9 @@ test('one runner claims a task; timeout, invalid tools and repeated reads termin
   const repeat = setup();
   const repeated = await runAgentTask(repeat.sessionId, repeat.threadId, repeat.run.runId,
     async () => ({ type: 'tool_call', tool: 'financial_overview', input: {} }));
-  assert.equal(repeated.status, 'failed');
+  assert.equal(repeated.status, 'fallback');
   assert.equal(repeated.reasonCode, 'AGENT_RUN_NO_PROGRESS');
+  assert.ok(repeated.recommendedResultIds.length>0);
 });
 
 test('model outage uses labelled deterministic fallback with only verified evidence', async () => {

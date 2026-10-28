@@ -181,11 +181,11 @@ test('只读调查在刷新后保留真实步骤，并适配工作台宽度', as
     .fill('我想年底去日本旅行，预算 ¥8,000，已经存了 ¥0，每月最多存 ¥2,000');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByText('规则试算已完成')).toBeVisible();
-  await expect(page.getByText('search_goal_options：ok').first()).toBeVisible();
+  await expect(page.getByText('已完成目标方案试算').first()).toBeVisible();
   await page.reload();
   await openWorkspace(page);
   await expect(page.getByText('规则试算已完成')).toBeVisible();
-  await expect(page.getByText('search_goal_options：ok').first()).toBeVisible();
+  await expect(page.getByText('已完成目标方案试算').first()).toBeVisible();
   const overflow = await page.evaluate(() => ({ amount: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     elements: [...document.querySelectorAll('*')].filter(element => element.getBoundingClientRect().right > window.innerWidth + 1)
       .slice(0, 8).map(element => ({ tag: element.tagName, className: element.className, text: element.textContent?.slice(0, 35) })) }));
@@ -203,7 +203,7 @@ test('未确认已存金额时先追问，补充后再开始只读调查', async
   await composer.fill('已存 0 元');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByText('规则试算已完成')).toBeVisible();
-  await expect(page.getByText('search_goal_options：ok').first()).toBeVisible();
+  await expect(page.getByText('已完成目标方案试算').first()).toBeVisible();
 });
 
 test('已验证候选单独确认后才能启用目标监测与奖金跟进', async ({ page }) => {

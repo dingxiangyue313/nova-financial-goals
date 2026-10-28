@@ -372,10 +372,13 @@ function resultComponents(run: AgentRun, sessionId: string, threadId: string, re
           targetDate: input.targetDate };
     }
   }
-  if (items.length || getAgentTaskForThread(sessionId, threadId)?.facts.targetCents) components.push({ id: randomUUID(), type: 'candidate_recommendations',
+  if (items.length) components.push({ id: randomUUID(), type: 'candidate_recommendations',
     title: fallback ? '已核验的参考方案' : '有依据的候选方案',
     body: '选一个适合自己的存钱节奏；日期由 NOVA 根据当前模拟数据计算。',
     taskThreadId: threadId, ...(conditionalPlan ? { conditionalPlan } : {}), items });
+  else if (getAgentTaskForThread(sessionId, threadId)?.facts.targetCents) components.push({
+    id: randomUUID(), type: 'clarification', title: '需要调整目标条件',
+    body: '当前条件下还没有可核验的存钱方案。请补充可用于目标的月存款，或调整目标金额和日期后重新试算。', suggestions: [] });
   if (stress) components.push(stress);
   return components;
 }
@@ -531,8 +534,7 @@ export async function runAgentTask(sessionId: string, threadId: string, runId: s
           }
           feedback.push({ ...compactResult(result), ...(autoRepairs.length ? { autoRepairs } : {}) });
           updateAgentRun(sessionId, threadId, runId, active.revision, { toolCallCount: toolCount, steps });
-          if (repeatCount >= 2) return finishRun(sessionId, threadId, runId, expectedRevision,
-            twinVersion, 'failed', 'AGENT_RUN_NO_PROGRESS', '连续重复同一查询，调查已停止。');
+           if (repeatCount >= 2) return deterministicFallback(sessionId,threadId,runId,expectedRevision,twinVersion,'AGENT_RUN_NO_PROGRESS',maxTools);
         } catch (error) {
           const code = error instanceof Error ? error.message : 'READ_TOOL_FAILED';
           if (code === 'AGENT_RUN_STOPPED' || code === 'AGENT_RUN_STALE') throw error;

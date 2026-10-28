@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { consumerFixture, productMission, fundedConsumerFixture } from './product-mission.ts';
 import { verifyAuditChain } from './governance.ts';
+import {snapshot} from './presentation.ts';
+import {connectDataSources} from './data-connections.ts';
 
 test('the consumer adapter uses the updated core without changing authoritative balances', async () => {
   const state = await consumerFixture();
@@ -14,6 +16,13 @@ test('the consumer adapter uses the updated core without changing authoritative 
   assert.equal(view.forecast.minimumBalanceCents, 317200);
   assert.equal(view.plans[1].monthlyCents, 100000);
   assert.ok(verifyAuditChain(state.audit));
+});
+test('connection response retains the imported bill summary without changing its history',async()=>{
+  const state=await consumerFixture();
+  const connected=connectDataSources(state,['bank','wechat_pay','alipay']);
+  const view=snapshot(connected.state);
+  assert.equal(view.moneyMission?.billBrief?.totalExpenseCents,477800);
+  assert.ok(view.moneyMission?.billBrief?.categories.length);
 });
 test('the funded trip is an explicit separate simulation opening, with no preselected payment result',async()=>{
   const state=await fundedConsumerFixture();

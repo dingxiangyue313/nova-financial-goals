@@ -57,5 +57,14 @@ test('consumer financial confirmations isolate sessions, reject stale approvals 
     const skills=await (await call('/api/services/skills')).json();assert.equal(skills.skills.length,13);
     assert.equal((await call('/api/services/skills/inspect',{skillId:'card_lifecycle_manager',input:{cardId:'card-main'}})).status,200);
     assert.notEqual((await call('/api/services/skills/inspect',{skillId:'card_lifecycle_manager',input:{cardId:'card-main',amountCents:1}})).status,200);
+    const beforeGoal=await (await call('/api/session')).json();
+    const beforeServices=await (await call('/api/services')).json();
+    const createdResponse=await call('/api/product/goals',{title:'课程培训',targetCents:1200000,targetDate:'2027-06-30',protectedCents:2000000,expectedTwinVersion:beforeGoal.twinVersion});
+    assert.equal(createdResponse.status,200);const created=await createdResponse.json();
+    assert.equal(created.primaryGoal.title,'课程培训');assert.equal(created.primaryGoal.savedCents,0);
+    assert.deepEqual(created.finance,beforeGoal.finance);assert.equal(created.goals.find((g:{id:string})=>g.id===beforeGoal.primaryGoalId).savedCents,beforeGoal.goal.savedCents);
+    const afterServices=await (await call('/api/services')).json();
+    assert.deepEqual(afterServices.accounts,beforeServices.accounts);
+    assert.notEqual((await call('/api/product/goals',{title:'过期重放',targetCents:1200000,targetDate:'2027-06-30',protectedCents:2000000,expectedTwinVersion:beforeGoal.twinVersion})).status,200);
   } finally {child.kill();await new Promise<void>(resolve=>{if(child.exitCode!==null)resolve();else child.once('exit',()=>resolve());});rmSync(directory,{recursive:true,force:true});}
 });

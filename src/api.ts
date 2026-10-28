@@ -18,6 +18,7 @@ export async function api<T = Snapshot>(url: string, method = 'GET', body?: unkn
   } catch {
     throw new Error('暂时无法连接本地服务。请稍后重试，已输入的内容会保留。');
   }
+  if(!response.headers.get('content-type')?.includes('application/json')) throw new ApiError(response.status,'接口未返回有效数据，请刷新页面；若仍出现，请确认打开的是当前服务端口。','INVALID_API_RESPONSE');
   const json = await response.json();
   if (!response.ok) throw new ApiError(response.status, json.error || '请求失败，请稍后重试', json.code || json.error);
   if (url === '/api/money-mission') return MoneyMissionReadModelSchema.parse(json) as T;

@@ -2,6 +2,9 @@ import { SnapshotSchema, type Assessment, type DemoState, type Snapshot, type Ui
 import { assessGoal } from './domain.ts';
 import { verifyAuditChain } from './governance.ts';
 import { moneyMissionReadModel } from './money-mission.ts';
+import { buildBillBrief } from './bill-analysis.ts';
+import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
+import { goalForecastWindow,buildMoneyMissionPlans } from './money-mission-plans.ts';
 
 function yuan(cents: number) { return `¥${(cents / 100).toLocaleString('zh-CN')}`; }
 export function generatedCards(state: DemoState, assessment: Assessment): UiCard[] {
@@ -43,6 +46,13 @@ export function generatedCards(state: DemoState, assessment: Assessment): UiCard
 }
 
 export function snapshot(state: DemoState): Snapshot {
+  // Imported evidence remains visible after connection/settings mutations too.
+  // This projection is read-only and never changes the persisted source ledger.
+  if(state.goals.length&&state.statementImportBatches.some(b=>b.status==='committed')&&state.accountSnapshots.length){
+    const forecast=buildDatedCashflowForecast(state,{accountId:'checking',horizonEnd:goalForecastWindow(state,state.goal.targetDate).horizonEnd,scenario:'baseline'});
+    state={...state,billBriefs:[buildBillBrief(state,{periodStart:state.clock.slice(0,7)+'-01',periodEnd:state.clock})],
+      datedCashflowForecasts:[...state.datedCashflowForecasts,forecast],goalPlanOptions:buildMoneyMissionPlans(state,forecast)};
+  }
   const primaryGoal = state.goals.find(goal => goal.id === state.primaryGoalId) ?? null;
   const displayState = primaryGoal ? { ...state, goal: primaryGoal } : state;
   const assessment = assessGoal(displayState);

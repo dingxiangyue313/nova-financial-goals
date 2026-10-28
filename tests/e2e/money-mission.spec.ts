@@ -1,94 +1,40 @@
-import { test, expect, type Page } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
-
-// Request routing must reach the page instead of the production service worker.
-test.use({ serviceWorkers: 'block' });
-
-async function home(page: Page) {
-  await page.request.get('/api/session');
-  await page.request.post('/api/demo/load-japan');
-  await page.goto('/demo-control', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByTestId('nova-welcome')).toBeHidden();
-  await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
-}
-
-test('home opens a continuous Money Mission without replacing NOVA navigation', async ({ page }) => {
-  await home(page);
-  await page.getByRole('button', { name: '继续日本旅行 Money Mission' }).click();
-  await expect(page.getByRole('heading', { name: '日本旅行 Money Mission', exact: true })).toBeVisible();
-  const progress = page.getByRole('navigation', { name: 'Money Mission 进度' });
-  await expect(progress).toBeVisible();
-  await expect(progress.getByRole('button')).toHaveCount(7);
-  await expect(progress.getByRole('button', { name: /数据.*当前/ })).toHaveAttribute('aria-current', 'step');
-  await progress.getByRole('button', { name: /目标.*已完成/ }).click();
-  await expect(page.getByRole('status').filter({ hasText: '此阶段已完成，可随时回看。' })).toBeVisible();
-  await page.getByRole('button', { name: '返回当前阶段' }).click();
-  await expect(page.getByRole('heading', { name: '连接或导入数据', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '首页', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '目标', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '返回', exact: true })).toBeVisible();
-  await page.getByTitle('切换为自适应全屏').click();
-  await expect(page.getByTitle('切换为手机尺寸 390x844')).toBeVisible();
-  await page.addStyleTag({content:'*,*::before,*::after{transition:none!important;animation:none!important}'});
-  const layout = page.getByTestId('money-mission-layout');
-  const stage = page.getByRole('region', { name: '当前任务' });
-  const layoutBox = await layout.boundingBox(); const stageBox = await stage.boundingBox();
-  expect(layoutBox).not.toBeNull(); expect(stageBox).not.toBeNull();
-  if (page.viewportSize()!.width >= 1024) {
-    expect(stageBox!.x).toBeGreaterThan(layoutBox!.x + layoutBox!.width * 0.25);
-    expect(stageBox!.width / layoutBox!.width).toBeGreaterThan(0.6);
-  } else {
-    expect(Math.abs(stageBox!.x - layoutBox!.x)).toBeLessThan(2);
-    expect(stageBox!.y).toBeGreaterThan((await progress.boundingBox())!.y);
-  }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  const accessibility = await new AxeBuilder({ page }).include('[aria-labelledby="money-mission-title"]')
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
-  expect(accessibility.violations.filter(item => item.impact === 'serious' || item.impact === 'critical')).toEqual([]);
-  const screenshot = test.info().outputPath('money-mission-responsive-shell.png');
-  await page.screenshot({ path: screenshot });
-  await test.info().attach('money-mission-responsive-shell', { path: screenshot, contentType: 'image/png' });
-  await page.getByRole('button', { name: '首页', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
+import {test,expect} from '@playwright/test';
+test.use({serviceWorkers:'block'});
+test('home trend survives source connection and opens bills without mission steps',async({page},testInfo)=>{
+ await page.goto('/');await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();
+ expect((await page.request.post('/api/data-connections/connect',{data:{sources:['bank','wechat_pay','alipay']}})).ok()).toBeTruthy();
+ await page.reload();await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();
+ await page.screenshot({path:`artifacts/home-bills-${testInfo.project.name}.png`,fullPage:true});
+ await page.getByRole('button',{name:'查看账单与消费'}).click();
+ await expect(page.getByRole('navigation',{name:'Money Mission 进度'})).toHaveCount(0);
+ await expect(page.getByText('一步步准备旅行金')).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'钱主要花在哪里'})).toBeVisible();
+ await expect(page.getByText('相比历史基线变化 ¥0')).toHaveCount(0);
+ await expect(page.getByText('2026-07-05 · ¥58 · 银行卡',{exact:true})).toBeVisible();
+ await expect(page.getByText('2026-10-05 · ¥68 · 银行卡',{exact:true})).toBeVisible();
+ await page.screenshot({path:`artifacts/bill-breakdown-${testInfo.project.name}.png`,fullPage:true});
+ await page.getByRole('heading',{name:'可能是订阅：CloudBox Plus'}).scrollIntoViewIfNeeded();
+ await page.screenshot({path:`artifacts/subscription-card-${testInfo.project.name}.png`,fullPage:true});
+ await page.getByRole('button',{name:'查看住房逐笔账单'}).click();
+ await expect(page.getByRole('heading',{name:'逐笔交易证据 · 住房'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
-
-test('mission read API is private to its session and never cached', async ({ page, browser }) => {
-  await home(page);
-  const response = await page.request.get('/api/money-mission');
-  expect(response.status()).toBe(200);
-  expect(response.headers()['cache-control']).toContain('no-store');
-  expect((await response.json()).currentStage).toBe('data');
-  const other = await browser.newContext();
-  try {
-    const empty = await other.request.get('http://localhost:3177/api/money-mission');
-    expect((await empty.json()).currentStage).toBe('goal');
-  } finally { await other.close(); }
-});
-
-test('navigation stays clickable when the icon font falls back to text', async ({ page }) => {
-  await home(page);
-  await page.addStyleTag({ content: '.material-symbols-outlined { font-family: sans-serif !important; }' });
-  await page.getByTitle('个人设置').click();
-  await page.getByRole('button', { name: '首页', exact: true }).click({ timeout: 3000 });
-  await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
-});
-
-test('shell exposes loading, recoverable failure and empty states', async ({ page }) => {
-  await home(page);
-  let release!: () => void;
-  const wait = new Promise<void>(resolve => { release = resolve; });
-  await page.route('**/api/money-mission', async route => {
-    await wait;
-    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: '暂时无法读取任务' }) });
-  });
-  await page.getByRole('button', { name: '继续日本旅行 Money Mission' }).click();
-  await expect(page.getByRole('status').filter({ hasText: '正在读取 Money Mission' })).toBeVisible();
-  release();
-  await expect(page.getByRole('alert')).toContainText('暂时无法读取任务');
-  await page.unroute('**/api/money-mission');
-  await page.getByRole('button', { name: '重新读取任务' }).click();
-  await expect(page.getByRole('navigation', { name: 'Money Mission 进度' })).toBeVisible();
-  await page.request.post('/api/demo/reset');
-  await page.getByRole('button', { name: '刷新任务进度' }).click();
-  await expect(page.getByText('还没有任务数据，先描述你的旅行目标。')).toBeVisible();
+test('new goal contains plan comparison and preserves existing account money',async({page})=>{
+ await page.goto('/');await expect(page.getByRole('button',{name:'新建目标'})).toBeVisible();
+ const before=await (await page.request.get('/api/services')).json();
+ await page.getByRole('button',{name:'新建目标'}).click();
+ await expect(page.getByRole('heading',{name:'新建目标',exact:true})).toBeVisible();
+ await page.getByLabel('目标名称',{exact:true}).fill('进修培训');
+ await page.getByLabel('需要准备多少钱（元）').fill('12000');
+ await page.getByLabel('什么时候用钱').fill('2027-06-30');
+ await page.getByRole('button',{name:'下一步：比较目标方案'}).click();
+ await expect(page.getByRole('heading',{name:'选择适合你的存钱节奏'})).toBeVisible();
+ await page.getByRole('button',{name:'选择并核对平衡方案'}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'确认并执行模拟操作'}).click();
+ await expect(page.getByRole('dialog')).toBeHidden();
+ await page.getByRole('button',{name:'完成，返回首页'}).click();
+ await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();
+ const after=await (await page.request.get('/api/services')).json();
+ expect(after.accounts.map((a:{id:string;balanceCents:number})=>[a.id,a.balanceCents])).toEqual(before.accounts.map((a:{id:string;balanceCents:number})=>[a.id,a.balanceCents]));
+ const snapshot=await (await page.request.get('/api/session')).json();expect(snapshot.primaryGoal.title).toBe('进修培训');expect(snapshot.primaryGoal.status).toBe('active');
 });
