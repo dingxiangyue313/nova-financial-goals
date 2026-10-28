@@ -3,7 +3,8 @@ const money = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const quantity = z.string().regex(/^\d+$/);
 export const ServiceActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('transfer'), recipientId: z.string(), recipientVersion: z.number().int(), accountId: z.string(), amountCents: money.positive(), note: z.string().max(120).default('') }).strict(),
-  z.object({ kind: z.literal('split'), totalCents: money.positive(), participantIds: z.array(z.string()).min(2).max(20), accountId: z.string(), alreadyPaid: z.boolean(), dueDate: z.iso.date() }).strict(),
+  z.object({ kind: z.literal('split'), totalCents: money.positive(), participantIds: z.array(z.string()).min(2).max(20), accountId: z.string(), alreadyPaid: z.boolean(), dueDate: z.iso.date(), payerId:z.string().optional(), shares:z.array(z.object({recipientId:z.string(),amountCents:money}).strict()).min(2).max(20).optional() }).strict(),
+  z.object({ kind: z.literal('pay_split_share'), id: z.string(), accountId:z.string() }).strict(),
   z.object({ kind: z.literal('close_split'), id: z.string() }).strict(),
   z.object({ kind: z.literal('risk_profile'), level: z.number().int().min(1).max(4), tolerateLoss: z.boolean(), useByDate: z.iso.date() }).strict(),
   z.object({ kind: z.literal('buy'), productId: z.string(), accountId: z.string(), amountCents: money.positive() }).strict(),
@@ -17,6 +18,9 @@ export const ServiceActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('cancel_booking'), id: z.string() }).strict(),
 ]);
 export type ServiceAction = z.infer<typeof ServiceActionSchema>;
+export const MandateDraftSchema=z.object({provider:z.literal('deterministic'),status:z.enum(['draft','needs_information']),
+  missing:z.array(z.string()),explanation:z.string(),draft:z.object({merchants:z.array(z.enum(['air-demo','stay-demo'])).min(1),maxPerOrderCents:money.positive(),totalCents:money.positive(),expiresOn:z.iso.date()}).nullable()}).strict();
+export type MandateDraft=z.infer<typeof MandateDraftSchema>;
 export const FinancialServicesSchema = z.object({
   initialized: z.boolean().default(false),
   risk: z.object({ level: z.number().int(), tolerateLoss: z.boolean(), useByDate: z.iso.date(), expiresOn: z.iso.date() }).nullable().default(null),
@@ -25,7 +29,7 @@ export const FinancialServicesSchema = z.object({
   allocations: z.array(z.object({ goalId: z.string(), accountId: z.string(), amountCents: money })).default([]),
   journals: z.array(z.object({ id: z.string(), eventId: z.string(), operationId: z.string(), accountId: z.string(), amountCents: z.number().int(), date: z.iso.date(), reason: z.string() })).default([]),
   events: z.array(z.string()).default([]),
-  splits: z.array(z.object({ id: z.string(), accountId: z.string(), totalCents: money, alreadyPaid: z.boolean(), dueDate: z.iso.date(), status: z.enum(['open','partial','collected','closed']), shares: z.array(z.object({ recipientId: z.string(), amountCents: money, collectedCents: money })) })).default([]),
+  splits: z.array(z.object({ id: z.string(), accountId: z.string(), totalCents: money, alreadyPaid: z.boolean(), dueDate: z.iso.date(), payerId:z.string().optional(), status: z.enum(['open','partial','collected','closed']), shares: z.array(z.object({ recipientId: z.string(), amountCents: money, collectedCents: money })) })).default([]),
   positions: z.array(z.object({ productId: z.string(), quantityMicro: quantity, reservedMicro: quantity, acquiredOn: z.iso.date() })).default([]),
   investments: z.array(z.object({ id: z.string(), kind: z.enum(['buy','redeem']), productId: z.string(), accountId: z.string(), amountCents: money, feeCents: money, quantityMicro: quantity, status: z.enum(['pending','settled','failed','unknown']), providerStatus: z.enum(['pending','settled','failed']), settlesOn: z.iso.date(), operationId: z.string() })).default([]),
   cards: z.array(z.object({ id: z.string(), label: z.string(), suffix: z.string(), type: z.enum(['debit','credit']), accountId: z.string(), status: z.enum(['active','locked','lost']), online: z.boolean(), overseas: z.boolean(), limitCents: money, version: z.number().int() })).default([]),

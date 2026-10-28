@@ -19,6 +19,7 @@ import { prepareAccountSnapshot } from './account-snapshots.ts';
 import { syntheticStatements } from './synthetic-statements.ts';
 import { saveStatementImportPreview } from './store.ts';
 import { initializeServices } from './financial-services.ts';
+import {addSubscriptionSamples,subscriptionReminders,subscriptionDisputes} from './subscription-catalog.ts';
 
 const categories: Record<string, string> = { 工资: 'income', 餐饮: 'dining', 住房: 'housing', 交通: 'transport', 购物: 'shopping', 订阅: 'subscriptions', 水电: 'utilities', 保险: 'insurance', 退款: 'refund', 内部转账: 'internal_transfer' };
 export async function consumerFixture(history = true) {
@@ -40,7 +41,7 @@ export function productMission(state: DemoState) {
   const forecast = buildDatedCashflowForecast(state, { accountId: 'checking', horizonEnd: goalForecastWindow(state,state.goal.targetDate).horizonEnd, scenario: 'baseline' });
   const plans = buildMoneyMissionPlans(state, forecast);
   const projection = { ...state, billBriefs: [brief], datedCashflowForecasts: [forecast], goalPlanOptions: plans };
-  return { snapshot: snapshot(projection), brief, forecast, plans, subscriptions: state.subscriptions,
+  return { snapshot: snapshot(projection), brief, forecast, plans, subscriptions: state.subscriptions,subscriptionReminders:subscriptionReminders(state),subscriptionDisputes:subscriptionDisputes(state),
     migrationNotice:state.legacyProductArtifacts.requiresScheduleReconfirmation===true,
     batches: state.statementImportBatches, issues: state.importIssues,
     rows: state.normalizedStatementRows.map(({ originalValues: _o, correctedValues: _c, ...row }) => row) };
@@ -54,6 +55,13 @@ export async function fundedConsumerFixture(){
 
 export function registerProductMission(app: Express, sessionId: (req: Request, res: Response) => string,
   route: (fn: (req: Request, res: Response) => unknown) => RequestHandler) {
+  app.post('/api/product/subscription-samples',route((req,res)=>{
+    const body=z.object({expectedTwinVersion:z.number().int().positive()}).strict().parse(req.body);
+    const next=mutateState(sessionId(req,res),state=>{
+      if(body.expectedTwinVersion!==state.twinVersion)throw new Error('TWIN_VERSION_CHANGED');
+      return addSubscriptionSamples(state);
+    });res.json(productMission(next));
+  }));
   app.post('/api/product/goals',route((req,res)=>{
     const body=z.object({title:z.string().trim().min(1).max(60),targetCents:z.number().int().positive().max(100000000),targetDate:z.iso.date(),protectedCents:z.number().int().nonnegative().max(100000000),expectedTwinVersion:z.number().int().positive()}).strict().parse(req.body);
     const id=sessionId(req,res),next=mutateState(id,old=>{

@@ -1,0 +1,24 @@
+import {test,expect} from '@playwright/test';
+test.use({serviceWorkers:'block'});
+test('twelve subscriptions keep annual terms, explicit decisions and original-operation recovery',async({page})=>{
+ await page.goto('/');await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();
+ const before=await (await page.request.get('/api/session')).json();
+ await page.getByRole('button',{name:'查看账单与消费'}).click();
+ await page.getByText('数据覆盖与账单导入',{exact:true}).click();
+ await page.getByRole('button',{name:'载入12个订阅样例（不改余额）'}).click();
+ const movie=page.getByRole('article',{name:'MoviePass订阅处理'});
+ await expect(movie).toContainText('每年扣费 ¥198');
+ await movie.getByRole('button',{name:'续费前提醒'}).click();await expect(movie).toContainText('续费前提醒，不会自动取消');
+ const shop=page.getByRole('article',{name:'ShopPattern订阅处理'});
+ await shop.getByRole('button',{name:'这不是订阅'}).click();await expect(shop.getByRole('button',{name:'不再使用，准备取消'})).toHaveCount(0);
+ const design=page.getByRole('article',{name:'DesignKit订阅处理'});
+ await design.getByRole('button',{name:'不再使用，准备取消'}).click();
+ await expect(page.getByRole('dialog')).toContainText('每年 ¥299.00');
+ await page.getByRole('dialog').getByRole('button',{name:'确认并执行模拟操作'}).click();
+ await expect(design).toContainText('结果待核对');await design.getByRole('button',{name:'查询商户结果'}).click();
+ await expect(design).toContainText('已关闭自动续费：DesignKit');
+ await page.reload();await page.getByRole('button',{name:'查看账单与消费'}).click();
+ await expect(page.getByRole('article',{name:'DesignKit订阅处理'})).toContainText('已关闭自动续费');
+ const after=await (await page.request.get('/api/session')).json();
+ expect(after.finance).toEqual(before.finance);
+});

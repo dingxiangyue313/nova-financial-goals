@@ -1,0 +1,27 @@
+import {test,expect} from '@playwright/test';
+test.use({serviceWorkers:'block'});
+test('custom AA with another payer records liability, then confirms only my exact share',async({page})=>{
+ await page.goto('/');await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();
+ await page.getByRole('button',{name:'转账与AA',exact:true}).click();
+ const before=await (await page.request.get('/api/services')).json();
+ await page.getByLabel('总额（元）',{exact:true}).fill('400');
+ await page.getByLabel('谁已垫付').selectOption('contact-1');
+ await page.getByLabel('自定义每人份额').check();
+ const fields=page.getByLabel(/的份额（元）/);
+ await fields.nth(0).fill('110');await fields.nth(1).fill('100');await fields.nth(2).fill('90');await fields.nth(3).fill('100');
+ await page.getByRole('button',{name:'预览整数分拆分'}).click();
+ const dialog=page.getByRole('dialog');await expect(dialog).toContainText('同行已垫付');
+ await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(dialog).toBeHidden();
+ const split=page.getByRole('region',{name:'AA ¥400'});
+ await expect(split).toContainText('本人应付款');
+ expect((await (await page.request.get('/api/services')).json()).accounts).toEqual(before.accounts);
+ await split.getByRole('button',{name:'核对并支付本人份额'}).click();
+ await expect(dialog).toContainText('支付本人AA份额¥110');await expect(dialog).toContainText('尾号1001');
+ await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(dialog).toBeHidden();
+ await expect(split.getByRole('button',{name:'核对并支付本人份额'})).toHaveCount(0);
+ const after=await (await page.request.get('/api/services')).json();
+ expect(after.accounts.find((a:{id:string})=>a.id==='checking').balanceCents).toBe(before.accounts.find((a:{id:string})=>a.id==='checking').balanceCents-11000);
+ expect(after.splits[0].shares.find((s:{recipientId:string})=>s.recipientId==='self').collectedCents).toBe(11000);
+ await page.reload();await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();await page.getByRole('button',{name:'转账与AA',exact:true}).click();
+ await expect(page.getByRole('region',{name:'AA ¥400'})).toContainText('已结算¥110');
+});

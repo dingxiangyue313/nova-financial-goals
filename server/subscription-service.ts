@@ -3,6 +3,7 @@ import { SubscriptionActionInputSchema, SubscriptionActionPreviewSchema, Subscri
   type DemoState, type Receipt, type SubscriptionAction, type SubscriptionActionPreview,
   type SubscriptionMerchant } from '../shared/contracts.ts';
 import { appendAuditEvent, consumeApproval, stableHash } from './governance.ts';
+import {subscriptionCharge,subscriptionCycleLabel} from '../shared/subscription-cycle.ts';
 
 const timestamp = (state: DemoState) => `${state.clock}T12:00:00.000Z`;
 const previousDate = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
@@ -18,6 +19,7 @@ function merchant(state: DemoState, subscriptionId: string): SubscriptionMerchan
   if (existing) return existing;
   const item = subscription(state, subscriptionId);
   return { subscriptionId, merchantId: subscriptionId, monthlyCents: item.monthlyCents,
+    ...(item.billingCycle?{billingCycle:item.billingCycle,chargeCents:subscriptionCharge(item)}:{}),
     paidThrough: previousDate(item.nextChargeDate), effectiveAt: item.nextChargeDate, renewalEnabled: true,
     cancellationBehavior: subscriptionId === 'cloudbox-plus' ? 'succeeded' : 'requires_merchant',
     status: 'active', operationId: null, cancelledAt: null };
@@ -25,6 +27,7 @@ function merchant(state: DemoState, subscriptionId: string): SubscriptionMerchan
 
 export function subscriptionCancellationParameters(action: SubscriptionAction) {
   return { subscriptionId: action.subscriptionId, merchantId: action.merchantId, monthlyCents: action.monthlyCents,
+    ...(action.billingCycle?{billingCycle:action.billingCycle,chargeCents:action.chargeCents}:{}),
     effectiveAt: action.effectiveAt, paidThrough: action.paidThrough, twinVersion: action.twinVersion,
     actionHash: action.actionHash };
 }
@@ -49,6 +52,7 @@ export function prepareSubscriptionAction(state: DemoState,
   const action: SubscriptionAction = { id: randomUUID(), subscriptionId: item.id, merchantId: terms.merchantId,
     action: input.action, status: input.action === 'cancel' ? 'awaiting_confirmation' : 'succeeded',
     monthlyCents: item.monthlyCents, paidThrough: terms.paidThrough, effectiveAt: terms.effectiveAt,
+    ...(item.billingCycle?{billingCycle:item.billingCycle,chargeCents:subscriptionCharge(item)}:{}),
     nextChargeSuppressed: false, refundCents: 0, twinVersion: state.twinVersion, actionHash: '',
     merchantOperationId: null, receiptOperationId: null,
     reminderAt: input.action === 'remind' ? previousDate(item.nextChargeDate) : null,
@@ -58,11 +62,11 @@ export function prepareSubscriptionAction(state: DemoState,
   action.actionHash = actionHash(action);
   return SubscriptionActionPreviewSchema.parse({ action,
     approvalParameters: input.action === 'cancel' ? subscriptionCancellationParameters(action) : null,
-    potentialMonthlySavingsCents: input.action === 'cancel' ? item.monthlyCents : 0,
+    potentialMonthlySavingsCents: input.action === 'cancel' && item.billingCycle!=='once' ? item.monthlyCents : 0,
     verifiedMonthlySavingsCents: 0,
     consequences: input.action === 'cancel'
-      ? [`${item.title}：每月 ¥${(item.monthlyCents / 100).toFixed(2)}，下次续费 ${item.nextChargeDate}。`,
-        `不退款；服务可使用至 ${terms.paidThrough}。商户验证成功后，${terms.effectiveAt} 起停止续费，预计每月可节省 ¥${(item.monthlyCents / 100).toFixed(2)}。`]
+      ? [`${item.title}：${subscriptionCycleLabel(item)} ¥${(subscriptionCharge(item) / 100).toFixed(2)}，下次扣费 ${item.nextChargeDate}。`,
+        `不退款；服务可使用至 ${terms.paidThrough}。商户验证成功后，${terms.effectiveAt} 起停止后续扣费；当前账户不会增加余额。${item.necessary?'这是必要代扣，请先确认替代安排。':''}`]
       : [input.action === 'keep' ? '保留服务与续费。' : input.action === 'remind'
         ? `续费前 ${action.reminderAt} 提醒核对，不取消服务。` : '已标记为非订阅，不继续准备取消。'] });
 }
@@ -77,6 +81,7 @@ function storedAction(state: DemoState, id: string, cancellationOnly = true) {
 
 function matchingTerms(action: SubscriptionAction, item: SubscriptionMerchant) {
   return item.subscriptionId === action.subscriptionId && item.merchantId === action.merchantId
+    && (!action.billingCycle || action.billingCycle === (item.billingCycle??'monthly') && action.chargeCents === (item.chargeCents??item.monthlyCents))
     && item.monthlyCents === action.monthlyCents && item.paidThrough === action.paidThrough && item.effectiveAt === action.effectiveAt;
 }
 
@@ -123,11 +128,11 @@ function cancelAtMerchant(state: DemoState, current: SubscriptionMerchant, opera
   const mode = current.cancellationBehavior;
   const cancelled = mode === 'succeeded' || mode === 'unknown';
   const result: SubscriptionMerchant = { ...current, operationId, renewalEnabled: !cancelled,
-    status: cancelled ? 'cancelled' : mode === 'pending' ? 'pending' : mode,
+    status: cancelled ? 'cancelled' : mode === 'pending' ? 'pending' : mode === 'not_submitted' ? 'failed' : mode,
     cancelledAt: cancelled ? timestamp(state) : null };
   return { state: { ...state, subscriptionMerchants: [...state.subscriptionMerchants.filter(item =>
     item.subscriptionId !== result.subscriptionId), result] }, merchant: result,
-    status: mode === 'pending' ? 'unknown' : mode };
+    status: mode === 'pending' ? 'unknown' : mode === 'not_submitted' ? 'failed' : mode };
 }
 
 function verifySuccess(state: DemoState, action: SubscriptionAction, authoritative: SubscriptionMerchant,
@@ -171,6 +176,7 @@ export function executeSubscriptionCancellation(state: DemoState, raw: { actionI
   const item = subscription(state, action.subscriptionId); const terms = merchant(state, action.subscriptionId);
   if (!matchingTerms(action, terms) || item.monthlyCents !== action.monthlyCents || item.nextChargeDate !== action.effectiveAt)
     throw new Error('SUBSCRIPTION_TERMS_CHANGED');
+  if(action.billingCycle && (action.billingCycle!==(item.billingCycle??'monthly') || action.chargeCents!==subscriptionCharge(item)))throw new Error('SUBSCRIPTION_TERMS_CHANGED');
   if (item.status !== 'active' || !terms.renewalEnabled) throw new Error('SUBSCRIPTION_ALREADY_CANCELLED');
   if (state.subscriptionActions.some(other => other.id !== action.id && other.subscriptionId === item.id
     && ['unknown', 'executing'].includes(other.status))) throw new Error('SUBSCRIPTION_STATUS_REQUIRED');
@@ -179,6 +185,13 @@ export function executeSubscriptionCancellation(state: DemoState, raw: { actionI
   const links = cancellationAuditLinks(next, action, operationId);
   next = appendAuditEvent(next, 'permission', 'checked', '用户已确认本次订阅的准确取消参数。', links);
   next = appendAuditEvent(next, 'risk', 'checked', '商户、金额、付费期、版本和取消状态已核对。', links);
+  if(terms.cancellationBehavior==='not_submitted'){
+    const failed={...action,status:'failed' as const,updatedAt:timestamp(state)};
+    next=saveAction({...next,twinVersion:state.twinVersion+1},failed);
+    next=appendAuditEvent(next,'execute','failed','连接在提交前失败，未创建商户操作。',links);
+    next=appendAuditEvent(next,'verify','failed','续费仍有效；重新尝试必须重新核对和确认。',links);
+    return {state:appendAuditEvent(next,'audit','recorded','提交前失败已记录，未计入节省。',links),action:failed,receipt:null};
+  }
   const executed = cancelAtMerchant(next, terms, operationId);
   next = { ...executed.state, twinVersion: state.twinVersion + 1 };
   const updated: SubscriptionAction = { ...action, status: executed.status,
@@ -221,6 +234,7 @@ export function subscriptionSavingsEligible(state: DemoState, actionId: string):
   const authoritative = state.subscriptionMerchants.find(item => item.subscriptionId === action.subscriptionId);
   const item = state.subscriptions.find(item => item.id === action.subscriptionId);
   return Boolean(authoritative && item && item.monthlyCents === action.monthlyCents && matchingTerms(action, authoritative)
+    && (!action.billingCycle || action.billingCycle===(item.billingCycle??'monthly') && action.chargeCents===subscriptionCharge(item))
     && authoritative.operationId === action.merchantOperationId && authoritative.status === 'cancelled'
     && !authoritative.renewalEnabled && authoritative.cancelledAt);
 }

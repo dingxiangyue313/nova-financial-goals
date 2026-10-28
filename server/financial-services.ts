@@ -1,4 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import {serviceIssues} from './service-monitor.ts';
 import { ServiceActionSchema } from '../shared/financial-services.ts';
 import type { DemoState } from '../shared/contracts.ts';
 import { appendAuditEvent, stableHash } from './governance.ts';
@@ -85,8 +86,28 @@ export function describeServiceAction(input:DemoState,raw:unknown,now=Date.now()
   let label='',amountCents=0;let details:Record<string,unknown>={};
   switch(action.kind){
     case 'transfer':{const r=d.recipients.find(r=>r.id===action.recipientId&&r.id!=='self');if(!r||r.version!==action.recipientVersion)throw new Error('SERVICE_RECIPIENT_CHANGED');requireFunds(state,action.accountId,action.amountCents);amountCents=action.amountCents;details={recipient:r,feesCents:0};label=`向${r.name}（尾号${r.suffix}，${r.alias}）转入¥${amountCents/100}，手续费¥0。备注只作说明。`;break;}
-    case 'split':{if(new Set(action.participantIds).size!==action.participantIds.length||!action.participantIds.includes('self')||action.participantIds.some(id=>!d.recipients.some(r=>r.id===id)))throw new Error('SERVICE_INVALID_SPLIT');if(action.dueDate<state.clock)throw new Error('SERVICE_SPLIT_DATE_PASSED');account(state,action.accountId);if(!action.alreadyPaid)requireFunds(state,action.accountId,action.totalCents);amountCents=action.alreadyPaid?0:action.totalCents;const base=Math.floor(action.totalCents/action.participantIds.length),extra=action.totalCents%action.participantIds.length;details={shares:action.participantIds.map((id,i)=>({recipientId:id,amountCents:base+(i<extra?1:0),collectedCents:id==='self'?base+(i<extra?1:0):0}))};label=`总额¥${action.totalCents/100}，${action.participantIds.length}人AA。${action.alreadyPaid?'你声明已经垫付，本次仅创建模拟收款请求，不再扣款。':'本次先垫付全额，再创建收款请求。'}待收不计入余额。`;break;}
-    case 'close_split':if(!d.splits.some(s=>s.id===action.id&&['open','partial'].includes(s.status)))throw new Error('SERVICE_SPLIT_NOT_OPEN');label='关闭剩余收款请求，已收款和凭证保留。';break;
+    case 'split':{
+      const ids=action.participantIds,payerId=action.payerId??'self';
+      if(new Set(ids).size!==ids.length||!ids.includes('self')||!ids.includes(payerId)||ids.some(id=>!d.recipients.some(r=>r.id===id)))throw new Error('SERVICE_INVALID_SPLIT');
+      if(action.dueDate<state.clock)throw new Error('SERVICE_SPLIT_DATE_PASSED');
+      if(payerId!=='self'&&!action.alreadyPaid)throw new Error('SERVICE_OTHER_PAYER_NOT_PAID');
+      const base=Math.floor(action.totalCents/ids.length),extra=action.totalCents%ids.length;
+      const shares=action.shares??ids.map((recipientId,i)=>({recipientId,amountCents:base+(i<extra?1:0)}));
+      if(shares.length!==ids.length||new Set(shares.map(s=>s.recipientId)).size!==ids.length||shares.some(s=>!ids.includes(s.recipientId))||shares.reduce((sum,s)=>sum+BigInt(s.amountCents),0n)!==BigInt(action.totalCents))throw new Error('SERVICE_SPLIT_SHARES_MISMATCH');
+      account(state,action.accountId);if(!action.alreadyPaid)requireFunds(state,action.accountId,action.totalCents);
+      amountCents=action.alreadyPaid?0:action.totalCents;
+      details={payer:d.recipients.find(r=>r.id===payerId),shares:ids.map(id=>{const share=shares.find(s=>s.recipientId===id)!;return {...share,collectedCents:id===payerId?share.amountCents:0};})};
+      label=`总额¥${action.totalCents/100}，${ids.length}人AA。${payerId!=='self'?'同行已垫付，本次只登记本人应付款；不会代同行收款或增加你的余额。':action.alreadyPaid?'你声明已经垫付，本次仅创建模拟收款请求，不再扣款。':'本次先垫付全额，再创建收款请求。'}待收不计入余额。`;break;
+    }
+    case 'pay_split_share':{
+      const split=d.splits.find(s=>s.id===action.id),own=split?.shares.find(s=>s.recipientId==='self');
+      if(!split||!['open','partial'].includes(split.status)||!split.payerId||split.payerId==='self'||!own||own.collectedCents>=own.amountCents)throw new Error('SERVICE_SPLIT_NOT_PAYABLE');
+      if(d.receipts.some(r=>r.kind==='pay_split_share'&&r.status==='unknown'&&d.events.includes(`split-share-target:${r.operationId}:${split.id}`)))throw new Error('SERVICE_SPLIT_STATUS_REQUIRED');
+      amountCents=own.amountCents-own.collectedCents;requireFunds(state,action.accountId,amountCents);
+      const payer=d.recipients.find(r=>r.id===split.payerId);if(!payer)throw new Error('SERVICE_RECIPIENT_CHANGED');
+      details={payer,splitId:split.id};label=`向垫付人${payer.name}（尾号${payer.suffix}，${payer.alias}）支付本人AA份额¥${amountCents/100}，来源${action.accountId}，手续费¥0。其他人的欠款不会由你支付。`;break;
+    }
+    case 'close_split':if(!d.splits.some(s=>s.id===action.id&&['open','partial'].includes(s.status)))throw new Error('SERVICE_SPLIT_NOT_OPEN');if(d.receipts.some(r=>r.kind==='pay_split_share'&&r.status==='unknown'&&d.events.includes(`split-share-target:${r.operationId}:${action.id}`)))throw new Error('SERVICE_SPLIT_STATUS_REQUIRED');label='关闭剩余收款请求，已收款和凭证保留；不撤销已经结算的本人付款。';break;
     case 'risk_profile':if(action.useByDate<=state.clock)throw new Error('SERVICE_USE_DATE_PASSED');label=`保存模拟风险等级R${action.level}，${action.tolerateLoss?'可以承受范围内的波动':'不接受本金损失'}，最早用钱日${action.useByDate}。`;break;
     case 'buy':{const p=product(action.productId),r=d.risk;if(!r||r.expiresOn<state.clock)throw new Error('SERVICE_RISK_PROFILE_REQUIRED');if(p.paused)throw new Error('SERVICE_PRODUCT_PAUSED');if(!r.tolerateLoss||r.level<p.risk||shift(state.clock,p.lockDays+2)>r.useByDate)throw new Error('SERVICE_PRODUCT_NOT_SUITABLE');requireFunds(state,action.accountId,action.amountCents);const fees=fee(action.amountCents,p.buyFeeBps);if(action.amountCents<=fees)throw new Error('SERVICE_AMOUNT_TOO_SMALL');const q=(BigInt(action.amountCents-fees)*1000000000000n/BigInt(p.navScaled)).toString();if(BigInt(q)===0n)throw new Error('SERVICE_AMOUNT_TOO_SMALL');amountCents=action.amountCents;details={product:p,feeCents:fees,quantityMicro:q,settlesOn:nextTradingDay(state.clock)};label=`${p.name}：申购总额¥${amountCents/100}，内含费用¥${fees/100}；固定模拟净值成交，${nextTradingDay(state.clock)}确认份额，最低持有${p.lockDays}天。非保本，预测收益不是现金。`;break;}
     case 'redeem':{const p=product(action.productId),position=d.positions.find(x=>x.productId===p.id);if(p.paused)throw new Error('SERVICE_PRODUCT_PAUSED');if(!position||BigInt(action.quantityMicro)<=0n||BigInt(action.quantityMicro)>BigInt(position.quantityMicro)-BigInt(position.reservedMicro))throw new Error('SERVICE_INSUFFICIENT_SHARES');if(shift(position.acquiredOn,p.lockDays)>state.clock)throw new Error('SERVICE_POSITION_LOCKED');account(state,action.accountId);const gross=valuation(action.quantityMicro,p.navScaled),fees=fee(gross,p.feeBps);amountCents=gross-fees;details={product:p,feeCents:fees,grossCents:gross,settlesOn:nextTradingDay(state.clock)};label=`赎回${Number(action.quantityMicro)/1000000}份${p.name}，毛额¥${gross/100}、费用¥${fees/100}、净额¥${amountCents/100}；预计${nextTradingDay(state.clock)}到账，未到账不可支付。`;break;}
@@ -127,7 +148,18 @@ export function executeServiceAction(input:DemoState,raw:unknown,operationId:str
       else post(s,a.accountId,-a.amountCents,operationId,`transfer:${operationId}`,'联系人转账');break;
     case 'split':
       if(!a.alreadyPaid)post(s,a.accountId,-a.totalCents,operationId,`split-pay:${operationId}`,'AA垫付');
-      d.splits.push({id:operationId,accountId:a.accountId,totalCents:a.totalCents,alreadyPaid:a.alreadyPaid,dueDate:a.dueDate,status:'open',shares:preview.details.shares as typeof d.splits[number]['shares']});break;
+      d.splits.push({id:operationId,accountId:a.accountId,totalCents:a.totalCents,alreadyPaid:a.alreadyPaid,dueDate:a.dueDate,...(a.payerId?{payerId:a.payerId}:{}),status:'open',shares:preview.details.shares as typeof d.splits[number]['shares']});break;
+    case 'pay_split_share':{
+      if(fault==='decline'){status='failed';break;}
+      if(fault.startsWith('timeout')){
+        d.holds.push({id:randomUUID(),operationId,accountId:a.accountId,goalId:null,amountCents:preview.amountCents,status:'active'});
+        d.events.push(`transfer-provider:${operationId}:${fault==='timeout_after'?'committed':'not_committed'}`,`split-share-target:${operationId}:${a.id}`);
+        status='unknown';break;
+      }
+      post(s,a.accountId,-preview.amountCents,operationId,`split-share:${operationId}`,'支付本人AA份额');
+      const split=d.splits.find(x=>x.id===a.id)!,own=split.shares.find(x=>x.recipientId==='self')!;own.collectedCents=own.amountCents;
+      split.status=split.shares.every(x=>x.collectedCents===x.amountCents)?'collected':'partial';break;
+    }
     case 'close_split':d.splits.find(x=>x.id===a.id)!.status='closed';break;
     case 'risk_profile':d.risk={level:a.level,tolerateLoss:a.tolerateLoss,useByDate:a.useByDate,expiresOn:shift(s.clock,180)};break;
     case 'buy':{
@@ -179,9 +211,15 @@ export function reconcileServices(input:DemoState,id?:string):DemoState{
     d.receipts.filter(r=>r.operationId===a.operationId).forEach(r=>r.status=a.status==='approved'?'succeeded':'failed');changed=true;
   }
   for(const b of d.bookings.filter(b=>b.status==='unknown'&&(!id||b.id===id||b.operationId===id))){if(b.providerStatus==='confirmed')captureBooking(s,b);else if(b.providerStatus==='failed')failBooking(s,b);else continue;changed=true;}
-  for(const r of d.receipts.filter(r=>r.kind==='transfer'&&r.status==='unknown'&&(!id||r.operationId===id))){
+  for(const r of d.receipts.filter(r=>['transfer','pay_split_share'].includes(r.kind)&&r.status==='unknown'&&(!id||r.operationId===id))){
     const h=d.holds.find(h=>h.operationId===r.operationId&&h.status==='active');if(!h)continue;const committed=d.events.includes(`transfer-provider:${r.operationId}:committed`);h.status=committed?'consumed':'released';
     if(committed)post(s,h.accountId,-h.amountCents,r.operationId,`transfer:${r.operationId}`,'联系人转账',null,true);r.status=committed?'succeeded':'failed';changed=true;
+    if(committed&&r.kind==='pay_split_share'){
+      const prefix=`split-share-target:${r.operationId}:`,splitId=d.events.find(e=>e.startsWith(prefix))?.slice(prefix.length);
+      const split=d.splits.find(s=>s.id===splitId);if(!split)throw new Error('SERVICE_SPLIT_NOT_FOUND');
+      const own=split.shares.find(s=>s.recipientId==='self')!;own.collectedCents=own.amountCents;
+      if(split.status!=='closed')split.status=split.shares.every(s=>s.collectedCents===s.amountCents)?'collected':'partial';
+    }
   }
   for(const o of d.investments.filter(o=>['pending','unknown'].includes(o.status)&&(!id||o.id===id))){
     if(o.providerStatus==='failed'){
@@ -204,10 +242,11 @@ export function reconcileServices(input:DemoState,id?:string):DemoState{
 
 export function collectSplit(input:DemoState,id:string){
   const s=initializeServices(input),d=s.financialServices,split=d.splits.find(x=>x.id===id);if(!split)throw new Error('SERVICE_SPLIT_NOT_FOUND');if(['closed','collected'].includes(split.status))return input;
+  if(split.payerId&&split.payerId!=='self')return input;
   let changed=false;
   // Two fixed synthetic participants have paid; the remainder is outstanding.
   // Queries never message or charge real contacts and are safe to repeat.
-  for(const share of split.shares.filter(x=>x.recipientId!=='self').slice(0,2)){if(share.collectedCents)continue;post(s,split.accountId,share.amountCents,split.id,`collection:${split.id}:${share.recipientId}`,'模拟AA到账');share.collectedCents=share.amountCents;changed=true;}
+  for(const share of split.shares.filter(x=>x.recipientId!=='self').slice(0,2)){if(share.collectedCents>=share.amountCents)continue;post(s,split.accountId,share.amountCents,split.id,`collection:${split.id}:${share.recipientId}`,'模拟AA到账');share.collectedCents=share.amountCents;changed=true;}
   if(!changed)return input;split.status=split.shares.every(x=>x.collectedCents===x.amountCents)?'collected':'partial';s.twinVersion++;return appendAuditEvent(s,'aa_collection','verified','已核对模拟同行收款，未收部分不计入余额。',{operationId:id});
 }
 
@@ -232,7 +271,7 @@ export function validateServiceBalances(old:DemoState,next:DemoState){
 export function financialServicesView(input:DemoState){
   const s=initializeServices(input),d=s.financialServices;
   const goals=s.goals.map(g=>{const cash=d.allocations.filter(a=>a.goalId===g.id).reduce((n,a)=>n+a.amountCents,0),held=d.holds.filter(h=>h.goalId===g.id&&h.status==='active').reduce((n,h)=>n+h.amountCents,0),booked=d.bookings.filter(b=>b.goalId===g.id&&b.payment==='captured'&&b.status==='confirmed').reduce((n,b)=>n+b.amountCents,0);return {id:g.id,title:g.title,targetCents:g.targetCents,cashCents:cash,heldCents:held,spendableCents:cash-held,bookedCents:booked,coveredCents:cash+booked,funded:cash+booked>=g.targetCents,bookingReady:['air-demo','stay-demo'].every(m=>d.bookings.some(b=>b.goalId===g.id&&b.merchantId===m&&b.status==='confirmed'))};});
-  return {simulated:true,clock:s.clock,twinVersion:s.twinVersion,goals,
+  return {simulated:true,clock:s.clock,twinVersion:s.twinVersion,goals,issues:serviceIssues(s),
     accounts:s.accounts.filter(a=>!a.protected&&['checking','goal'].includes(a.type)).map(a=>{const owner=a.id==='goal-wallet'?walletOwner(s):null,available=spendableFunds(s,a.id,owner);return {...a,goalId:owner,availableCents:available??0,balanceCurrent:available!==null};}),
     recipients:d.recipients,products:investmentProducts.map(p=>({...p,suitable:!!d.risk&&d.risk.expiresOn>=s.clock&&d.risk.tolerateLoss&&d.risk.level>=p.risk&&!p.paused&&shift(s.clock,p.lockDays+2)<=d.risk.useByDate})),risk:d.risk,
     positions:d.positions.map(p=>({...p,valueCents:valuation((BigInt(p.quantityMicro)-BigInt(p.reservedMicro)).toString(),product(p.productId).navScaled)})),investments:d.investments.map(({providerStatus:_p,...o})=>o),

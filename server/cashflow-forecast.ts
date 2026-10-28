@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { DatedCashflowForecastInputSchema, DatedCashflowForecastSchema,
   type CashflowEdit, type DatedCashflowForecast, type DatedCashflowForecastInput, type DemoState } from '../shared/contracts.ts';
 import { subscriptionSavingsEligible } from './subscription-service.ts';
+import {subscriptionCharge,subscriptionChargeDates} from '../shared/subscription-cycle.ts';
 
 export type { CashflowEdit } from '../shared/contracts.ts';
 type Event = DatedCashflowForecast['events'][number];
@@ -83,10 +84,10 @@ export function buildDatedCashflowForecast(state: DemoState, rawInput: DatedCash
       evidenceRefs.add(action.id); action.evidenceRefs.forEach(ref => evidenceRefs.add(ref));
       if (action.merchantOperationId) evidenceRefs.add(action.merchantOperationId);
     }
-    for (const date of monthlyDates(subscription.nextChargeDate, generationEnd, Number(subscription.nextChargeDate.slice(-2)))) {
+    for (const date of subscriptionChargeDates(subscription,generationEnd)) {
       if (verified.some(action => date >= action.effectiveAt)) continue;
       add({ id: `subscription-${subscription.id}-${date}`, date, label: subscription.title, kind: 'subscription',
-        amountCents: -subscription.monthlyCents, sourceRefs: [subscription.id] });
+        amountCents: -subscriptionCharge(subscription), sourceRefs: [subscription.id] });
     }
   }
   const salaryRecords = state.transactions.filter(item => item.accountId === account.id &&

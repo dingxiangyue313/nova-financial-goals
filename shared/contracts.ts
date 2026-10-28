@@ -175,6 +175,8 @@ export type Bill = z.infer<typeof BillSchema>;
 export const SubscriptionSchema = z.object({
   id: z.string(), title: z.string(), monthlyCents: MoneySchema, nextChargeDate: IsoDateSchema,
   status: z.enum(['active', 'cancelled']),
+  billingCycle: z.enum(['monthly','annual','once']).optional(), chargeCents: MoneySchema.optional(),
+  classification: z.enum(['confirmed','candidate']).optional(), necessary: z.boolean().optional(),
 });
 export type Subscription = z.infer<typeof SubscriptionSchema>;
 
@@ -372,6 +374,7 @@ export const SubscriptionActionSchema = z.object({
   status: z.enum(['prepared', 'awaiting_confirmation', 'executing', 'succeeded', 'failed',
     'requires_merchant', 'unknown', 'reconciled', 'cancelled']),
   monthlyCents: MoneySchema, paidThrough: IsoDateSchema, effectiveAt: IsoDateSchema,
+  billingCycle: z.enum(['monthly','annual','once']).optional(), chargeCents: MoneySchema.optional(),
   nextChargeSuppressed: z.boolean(), refundCents: MoneySchema,
   twinVersion: z.number().int().positive(), actionHash: z.string(),
   merchantOperationId: z.string().nullable(), receiptOperationId: z.string().nullable(),
@@ -386,6 +389,7 @@ export const SubscriptionCancellationInputSchema = z.object({ actionId: Artifact
   approvalToken: z.string().min(1) }).strict();
 export const SubscriptionCancellationParametersSchema = z.object({ subscriptionId: ArtifactIdSchema,
   merchantId: ArtifactIdSchema, monthlyCents: MoneySchema, effectiveAt: IsoDateSchema, paidThrough: IsoDateSchema,
+  billingCycle: z.enum(['monthly','annual','once']).optional(), chargeCents: MoneySchema.optional(),
   twinVersion: z.number().int().positive(), actionHash: z.string().min(1) }).strict();
 export const SubscriptionActionPreviewSchema = z.object({ action: SubscriptionActionSchema,
   approvalParameters: SubscriptionCancellationParametersSchema.nullable(),
@@ -396,7 +400,8 @@ export type SubscriptionActionPreview = z.infer<typeof SubscriptionActionPreview
 // Private simulator state. A prepared action or an optimistic client result cannot change this ledger.
 export const SubscriptionMerchantSchema = z.object({ subscriptionId: ArtifactIdSchema, merchantId: ArtifactIdSchema,
   monthlyCents: MoneySchema, paidThrough: IsoDateSchema, effectiveAt: IsoDateSchema, renewalEnabled: z.boolean(),
-  cancellationBehavior: z.enum(['succeeded', 'failed', 'unknown', 'requires_merchant', 'pending']),
+  billingCycle: z.enum(['monthly','annual','once']).optional(), chargeCents: MoneySchema.optional(),
+  cancellationBehavior: z.enum(['succeeded', 'failed', 'unknown', 'requires_merchant', 'pending', 'not_submitted']),
   status: z.enum(['active', 'cancelled', 'failed', 'requires_merchant', 'pending']),
   operationId: z.string().nullable(), cancelledAt: TimestampSchema.nullable() });
 export type SubscriptionMerchant = z.infer<typeof SubscriptionMerchantSchema>;

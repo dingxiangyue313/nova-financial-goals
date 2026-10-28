@@ -1,0 +1,25 @@
+import {test,expect} from '@playwright/test';
+test.use({serviceWorkers:'block'});
+test('unknown payments expose a local case pack and resolve only the original operation',async({page,request})=>{
+ await page.goto('/');await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();
+ const before=await (await page.request.get('/api/services')).json();
+ expect((await page.request.post('/api/demo/services/fault',{data:{fault:'timeout_after'}})).ok()).toBe(true);
+ await page.getByRole('button',{name:'转账与AA',exact:true}).click();
+ await page.getByLabel('明确选择收款人').selectOption('contact-1');await page.getByLabel('转账金额（元）',{exact:true}).fill('100');
+ await page.getByRole('button',{name:'预览联系人转账'}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'确认此模拟金融操作'}).click();
+ const summary=page.getByText('需要核对的金融事项 · 1',{exact:true});await summary.click();
+ await expect(page.getByRole('heading',{name:'付款结果待核对'})).toBeVisible();
+ await page.getByRole('button',{name:'查看处理依据与问题包'}).click();
+ const pack=page.getByRole('region',{name:'人工处理问题包'});await expect(pack).toContainText('金额 ¥100.00');
+ const pending=await (await page.request.get('/api/services')).json();
+ expect(pending.accounts.find((a:{id:string})=>a.id==='checking').balanceCents).toBe(before.accounts.find((a:{id:string})=>a.id==='checking').balanceCents);
+ const path='/api/services/cases/'+encodeURIComponent(pending.issues[0].id);
+ expect((await request.get(path)).ok()).toBe(false);
+ const downloadPromise=page.waitForEvent('download');await pack.getByRole('button',{name:'下载模拟问题包 JSON'}).click();
+ const download=await downloadPromise;expect(download.suggestedFilename()).toMatch(/^nova-service-case-.*\.json$/);
+ await page.getByRole('button',{name:'查询原处理结果'}).click();await expect(summary).toHaveCount(0);
+ const final=await (await page.request.get('/api/services')).json();
+ expect(final.accounts.find((a:{id:string})=>a.id==='checking').balanceCents).toBe(before.accounts.find((a:{id:string})=>a.id==='checking').balanceCents-10000);
+ expect((await page.request.get(path)).ok()).toBe(false);
+});

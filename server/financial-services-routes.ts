@@ -7,8 +7,15 @@ import { collectSplit, describeServiceAction, executeServiceAction, financialSer
 import { containsPromptInjection } from './security.ts';
 import { listSkillDefinitions } from './skills/registry.ts';
 import { executeMoneyMissionSkill } from './skills/core-skills.ts';
+import {serviceCasePack} from './service-monitor.ts';
+import {buildMandateDraft} from './mandate-draft.ts';
 
 export function registerFinancialServices(app:Express,sessionId:(req:Request,res:Response)=>string,route:(fn:(req:Request,res:Response)=>unknown)=>RequestHandler){
+  app.get('/api/services/cases/:id',route((req,res)=>res.json(serviceCasePack(getState(sessionId(req,res)),req.params.id))));
+  app.post('/api/services/mandate-draft',route((req,res)=>{
+    const input=z.object({message:z.string().trim().min(1).max(1000)}).strict().parse(req.body);
+    res.json(buildMandateDraft(input.message));
+  }));
   app.get('/api/services/skills',route((_req,res)=>res.json({skills:listSkillDefinitions().map(({inputSchema:_i,outputSchema:_o,...definition})=>definition)})));
   app.post('/api/services/skills/inspect',route(async(req,res)=>{
     const body=z.object({skillId:z.enum(['recipient_and_split_coordinator','investment_lifecycle_manager','card_lifecycle_manager','mandate_builder','external_agent_request_inbox']),input:z.record(z.string(),z.unknown())}).strict().parse(req.body);
