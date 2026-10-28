@@ -6,6 +6,11 @@ test('six thousand deterministic history rows commit without overwriting authori
   for(const profile of ['travel','flex','longterm'] as const){const parsed=syntheticStatements(profile,'2026-10-26');assert.deepEqual(parsed,syntheticStatements(profile,'2026-10-26'));total+=parsed.rows.length;
     const preview=previewStatementImport(createJapanMoneyMissionFixture(),parsed),state=commitStatementImport(preview.state,preview.batch.id,preview.state.twinVersion,preview.contentHash);
     assert.equal(state.finance.checkingCents,724000);assert.equal(state.goal.savedCents,200000);
+    assert.ok(parsed.rows.some(r=>r.category==='income'&&(r.amountCents??0)>0));
+    assert.ok(state.normalizedStatementRows.some(r=>r.excludedReason==='refund_match'));
+    assert.ok(state.normalizedStatementRows.some(r=>r.excludedReason==='duplicate'));
+    assert.ok(state.normalizedStatementRows.some(r=>r.excludedReason==='internal_transfer'));
+    assert.ok(new Set(parsed.rows.filter(r=>(r.amountCents??0)<0).map(r=>r.rawDescription.split(' · ')[0])).size>=40);
     const annual=buildBillBrief(state,{periodStart:'2025-01-01',periodEnd:'2025-12-31'});assert.ok(annual.totalExpenseCents>0);assert.ok(annual.claims.every(c=>c.sourceRefs.length>0));
   }assert.equal(total,6000);
 });

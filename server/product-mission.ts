@@ -3,13 +3,13 @@ import { readFile } from 'node:fs/promises';
 import { parse } from 'csv-parse/sync';
 import type { Express, Request, Response, RequestHandler } from 'express';
 import { z } from 'zod';
-import { BillPeriodInputSchema, type DemoState } from '../shared/contracts.ts';
+import { BillPeriodInputSchema, DatedCashflowForecastInputSchema, type DemoState } from '../shared/contracts.ts';
 import { createJapanMoneyMissionFixture } from './money-mission-fixture.ts';
 import { previewStatementImport, commitStatementImport, statementImportContentHash } from './statement-import.ts';
 import type { ParsedStatement } from './statement-parser.ts';
 import { buildBillBrief } from './bill-analysis.ts';
 import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
-import { buildMoneyMissionPlans } from './money-mission-plans.ts';
+import { buildMoneyMissionPlans, goalForecastWindow } from './money-mission-plans.ts';
 import { createAgentAction, createAgentThread, getAgentAction, getState, mutateState, finishAgentAction } from './store.ts';
 import { prepareSubscriptionConfirmation, prepareTransferScheduleConfirmation, executeWorkspaceAction } from './workspace.ts';
 import { appendAuditEvent, createApprovalSnapshot, confirmApproval, consumeApproval, stableHash } from './governance.ts';
@@ -36,7 +36,7 @@ export async function consumerFixture(history = true) {
 
 export function productMission(state: DemoState) {
   const brief = buildBillBrief(state, { periodStart: `${state.clock.slice(0, 7)}-01`, periodEnd: state.clock });
-  const forecast = buildDatedCashflowForecast(state, { accountId: 'checking', horizonEnd: state.goal.targetDate, scenario: 'baseline' });
+  const forecast = buildDatedCashflowForecast(state, { accountId: 'checking', horizonEnd: goalForecastWindow(state,state.goal.targetDate).horizonEnd, scenario: 'baseline' });
   const plans = buildMoneyMissionPlans(state, forecast);
   const projection = { ...state, billBriefs: [brief], datedCashflowForecasts: [forecast], goalPlanOptions: plans };
   return { snapshot: snapshot(projection), brief, forecast, plans, subscriptions: state.subscriptions,
@@ -45,9 +45,23 @@ export function productMission(state: DemoState) {
     rows: state.normalizedStatementRows.map(({ originalValues: _o, correctedValues: _c, ...row }) => row) };
 }
 export type ProductMission = ReturnType<typeof productMission>;
+export async function fundedConsumerFixture(){
+  const fixture=await consumerFixture(),goal={...fixture.goal,savedCents:800000,status:'active' as const};
+  return {...fixture,goal,goals:[goal],accounts:fixture.accounts.map(a=>a.id==='goal-wallet'?{...a,balanceCents:800000}:a),
+    accountSnapshots:fixture.accountSnapshots.map(a=>a.accountId==='goal-wallet'?{...a,balanceCents:800000,sourceId:'funded-trip-synthetic-opening'}:a)};
+}
 
 export function registerProductMission(app: Express, sessionId: (req: Request, res: Response) => string,
   route: (fn: (req: Request, res: Response) => unknown) => RequestHandler) {
+  app.post('/api/demo/services/scenario',route(async(req,res)=>{
+    const body=z.object({scenario:z.literal('funded_trip'),expectedTwinVersion:z.number().int().positive().optional()}).strict().parse(req.body);
+    const id=sessionId(req,res),fixture=await fundedConsumerFixture();
+    const next=mutateState(id,old=>{
+      if(body.expectedTwinVersion!==undefined&&body.expectedTwinVersion!==old.twinVersion)throw new Error('TWIN_VERSION_CHANGED');
+      return {...fixture,twinVersion:old.twinVersion+1};
+    });
+    res.json(productMission(next).snapshot);
+  }));
   app.post('/api/product/synthetic-preview',route((req,res)=>{
     const {profile}=z.object({profile:z.enum(['travel','flex','longterm'])}).strict().parse(req.body),id=sessionId(req,res);
     const result=previewStatementImport(getState(id),syntheticStatements(profile,getState(id).clock));
@@ -62,6 +76,11 @@ export function registerProductMission(app: Express, sessionId: (req: Request, r
   }));
   app.get('/api/product/mission', route((req, res) => res.json(productMission(getState(sessionId(req, res))))));
   app.post('/api/product/bill',route((req,res)=>res.json(buildBillBrief(getState(sessionId(req,res)),BillPeriodInputSchema.parse(req.body)))));
+  app.post('/api/product/forecast',route((req,res)=>{
+    const input=DatedCashflowForecastInputSchema.parse(req.body),state=getState(sessionId(req,res));
+    // This endpoint simulates only. It does not save authority or create an action.
+    res.json(buildDatedCashflowForecast(state,input));
+  }));
   app.post('/api/product/evidence/:id/category',route((req,res)=>{
     const body=z.object({category:z.enum(['dining','housing','transport','shopping','subscriptions','utilities','insurance','health','education','entertainment','unclassified']),expectedTwinVersion:z.number().int().positive()}).strict().parse(req.body);
     const id=sessionId(req,res);

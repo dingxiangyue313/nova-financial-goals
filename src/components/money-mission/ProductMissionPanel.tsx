@@ -3,6 +3,8 @@ import type { ProductMission } from '../../../server/product-mission';
 import type { Snapshot, StatementImportBatch, ImportIssue, BillEvidenceDetail, BillBrief } from '../../../shared/contracts';
 import { api } from '../../api';
 import { money } from '../../lib/format';
+import { amountCents } from '../../../shared/amount';
+import { CashflowTimeline } from './CashflowTimeline';
 
 type Preview = { batch: StatementImportBatch; issues: ImportIssue[]; contentHash: string; twinVersion: number };
 type Confirmation = { actionId: string; title: string; body: string };
@@ -69,7 +71,7 @@ export function ProductMissionPanel({ stage, onSnapshot, onChanged }: { stage: s
         {preview.issues.filter(i => i.severity !== 'info' && i.correctedValue === null).map(issue => <Correction key={issue.id} issue={issue} disabled={busy} onCorrect={value => void run(async () => { setPreview(await api<Preview>(`/api/statement-imports/${preview.batch.id}/issues/${issue.id}`, 'PATCH', { correctedValue: value })); })} />)}
         <button className="mission-primary" disabled={busy || preview.batch.status !== 'ready'} onClick={() => void run(async () => { await api(`/api/statement-imports/${preview.batch.id}/commit`, 'POST', { expectedTwinVersion: preview.twinVersion, expectedContentHash: preview.contentHash }); setPreview(null); })}>提交并去重</button>
       </div>}
-      <div className="mission-card"><h3 className="font-bold">独立确认工资卡余额</h3><label>截至 {view.snapshot.clock} 的余额（元）<input className="mission-input" type="number" value={balance} onChange={e => setBalance(e.target.value)} min="0" step="0.01" /></label><button className="mission-secondary" disabled={busy || !Number.isFinite(Number(balance)) || Number(balance) < 0} onClick={() => void prepare('balance', undefined, { balanceCents: Math.round(Number(balance) * 100), asOf: view.snapshot.clock })}>准备确认余额</button></div>
+      <div className="mission-card"><h3 className="font-bold">独立确认工资卡余额</h3><label>截至 {view.snapshot.clock} 的余额（元）<input className="mission-input" type="text" inputMode="decimal" value={balance} onChange={e => setBalance(e.target.value)} /></label><button className="mission-secondary" disabled={busy || !balance.trim()} onClick={() => {try{void prepare('balance',undefined,{balanceCents:amountCents(balance),asOf:view.snapshot.clock});}catch(e){setError(e instanceof Error?e.message:'金额格式不正确');}}}>准备确认余额</button></div>
       {view.batches.filter(b => b.status === 'committed').map(batch => <div key={batch.id} className="mission-card"><p>{batch.coverageStart}—{batch.coverageEnd} · {batch.importedCount} 条已导入历史证据</p><button className="mission-secondary" disabled={busy} onClick={() => { setRevokeBatch(batch.id); }}>撤销这次导入</button></div>)}
     </>}
     {(stage === 'bill' || stage === 'subscription') && <>
@@ -88,6 +90,7 @@ export function ProductMissionPanel({ stage, onSnapshot, onChanged }: { stage: s
     </>}
     {stage === 'monitoring' && <div className="mission-card"><h3 className="font-bold">监测与处理结果</h3><p>新流水、未到账工资和执行问题会改变任务状态；不会自动扩大授权或追补扣款。</p><button className="mission-secondary" onClick={() => { void run(() => api('/api/risk/preferences', 'PATCH', { weeklySummaryEnabled: !view.snapshot.riskPreferences.weeklySummaryEnabled })); }}>每周摘要：{view.snapshot.riskPreferences.weeklySummaryEnabled ? '已开启' : '已关闭'}</button></div>}
     {view.snapshot.transferExecutions.map(item => <div className="mission-card" key={item.id}><strong>{item.period} · {item.status === 'succeeded' || item.status === 'reconciled' ? '已核对' : item.status === 'skipped_missing_trigger' ? '本期跳过' : item.status === 'unknown' ? '结果待核对' : item.status === 'failed' ? '未完成' : '已安排'}</strong><p>{item.reason}</p><p className="text-xs break-all">凭证 {item.receiptOperationId ?? item.id}</p></div>)}
+    {['bill','subscription','plan','transfer','monitoring'].includes(stage)&&<CashflowTimeline baseline={view.forecast} />}
     {view.brief.limitations.slice(0, 3).map((line,i) => <p className="text-xs text-[#5A616B]" key={i}>限制 · {line}</p>)}
     {revokeBatch&&<div className="mission-card" role="alert"><p>确认撤销这批历史证据？账户余额保持不变，账单与预测将重新计算。</p><button className="mission-secondary" disabled={busy} onClick={()=>setRevokeBatch(null)}>保留导入</button><button className="mission-primary" disabled={busy} onClick={()=>void run(async()=>{await api('/api/statement-imports/'+revokeBatch+'/revoke','POST',{expectedTwinVersion:view.snapshot.twinVersion});setRevokeBatch(null);setReport(null);})}>确认撤销证据</button></div>}
     {confirmation && <div className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4"><div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="product-confirm-title" className="mission-card w-full max-w-[350px] max-h-[80vh] overflow-auto shadow-xl"><h2 id="product-confirm-title" className="text-lg font-bold">{confirmation.title}</h2><p>{confirmation.body}</p><p>所有操作仅使用模拟数据。本确认5分钟有效，数据变化需重新准备。</p>{error && <p role="alert">{error}</p>}<button className="mission-primary" disabled={busy} onClick={() => void confirm('confirm')}>确认并执行模拟操作</button><button className="mission-secondary" disabled={busy} onClick={() => void confirm('cancel')}>暂不操作</button></div></div>}

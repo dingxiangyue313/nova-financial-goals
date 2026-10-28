@@ -27,3 +27,22 @@ test('empty-history import preserves authoritative balances',async({page})=>{
  expect(state.statementImportBatches.some((b:{status:string})=>b.status==='committed')).toBe(true);
  expect(state.finance.checkingCents).toBe(724000);expect(state.goal.savedCents).toBe(200000);
 });
+
+test('dated cashflow explains salary stress and editable expense without changing money or authorization',async({page})=>{
+ await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();
+ const timeline=page.getByRole('region',{name:'日期现金流试算'});
+ await expect(timeline).toContainText('最低余额 ¥3,172');
+ const before=await (await page.request.get('/api/session')).json();
+ await timeline.getByRole('button',{name:'工资晚到三天'}).click();
+ await expect(timeline.getByText(/工资延迟三天/)).toBeVisible();
+ await timeline.getByRole('button',{name:'基准假设',exact:true}).click();
+ await timeline.getByLabel('额外支出日期').fill('2026-11-02');
+ await timeline.getByLabel('额外支出（元）').fill('500');
+ await timeline.getByRole('button',{name:'只试算这笔支出的影响'}).click();
+ await expect(timeline).toContainText('最低余额 ¥2,672');
+ await timeline.getByText('查看逐日余额表',{exact:true}).click();
+ await expect(timeline.getByRole('table')).toBeVisible();
+ const after=await (await page.request.get('/api/session')).json();
+ expect(after.twinVersion).toBe(before.twinVersion);expect(after.finance).toEqual(before.finance);
+ expect(after.transferSchedules).toEqual(before.transferSchedules);expect(after.approvalSummaries).toEqual(before.approvalSummaries);
+});

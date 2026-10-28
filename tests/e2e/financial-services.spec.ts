@@ -6,6 +6,7 @@ test('six scenario entry preserves goal-first home and explicit money confirmati
   await page.goto('/');
   await expect(page.getByRole('heading',{name:'早上好，Alex'})).toBeVisible();
   await expect(page.getByText('快速直达:')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'模拟数据',exact:true})).toBeDisabled();
   await expect(page.getByText('10月花了 ¥4,778')).toBeVisible();
   await page.screenshot({path:`artifacts/home-${testInfo.project.name}.png`,fullPage:true});
   await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();
@@ -28,4 +29,36 @@ test('six scenario entry preserves goal-first home and explicit money confirmati
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
   const report=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
   expect(report.violations.filter(v=>['critical','serious'].includes(v.impact??''))).toEqual([]);
+});
+
+test('funded trip checks card controls, bounded mandate, signed orders and refund pending',async({page},testInfo)=>{
+  test.setTimeout(120000);
+  await page.goto('/demo-control');
+  await page.getByRole('button',{name:'载入旅行付款样例（重置模拟会话）'}).click();
+  await expect(page.getByRole('heading',{name:'金融任务',exact:true})).toBeVisible();
+  const confirm=async()=>{const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(dialog).toBeHidden();};
+  await page.getByRole('button',{name:'卡片',exact:true}).click();
+  const card=page.locator('section').filter({has:page.getByRole('heading',{name:'旅行借记卡 · 尾号2002'})});
+  await card.getByRole('button',{name:'开启线上交易'}).click();await confirm();
+  await card.getByRole('button',{name:'开启境外交易'}).click();await confirm();
+  await page.getByRole('button',{name:'旅行请求',exact:true}).click();
+  await page.getByRole('button',{name:'获取签名机票与住宿报价'}).click();
+  await page.getByRole('button',{name:'核对创建授权'}).click();await confirm();
+  const flight=page.getByRole('checkbox',{name:/樱旅航空 · 往返机票/}),hotel=page.getByRole('checkbox',{name:/京都旅宿 · 三晚住宿/});
+  await flight.uncheck();await hotel.uncheck();
+  await expect(page.getByRole('button',{name:'预览订单与资金预留'})).toBeDisabled();
+  await flight.check();await hotel.check();
+  await page.getByRole('button',{name:'预览订单与资金预留'}).click();await confirm();
+  await expect(page.getByText('机票 · 已确认 · ¥2,800',{exact:true})).toBeVisible();
+  await expect(page.getByText('住宿 · 已确认 · ¥2,200',{exact:true})).toBeVisible();
+  const view=await (await page.request.get('/api/services')).json();
+  expect(view.accounts.find((a:{id:string})=>a.id==='goal-wallet').balanceCents).toBe(300000);
+  expect(view.goals[0].coveredCents).toBe(800000);expect(view.goals[0].bookingReady).toBe(true);
+  expect(view.mandates[0].spentCents).toBe(500000);expect(view.mandates[0].reservedCents).toBe(0);
+  const hotelOrder=page.locator('section').filter({hasText:'住宿 · 已确认 · ¥2,200'});
+  await hotelOrder.getByRole('button',{name:'预览取消与退款'}).click();await confirm();
+  await expect(page.getByText('住宿 · 退款在途 · ¥2,200',{exact:true})).toBeVisible();
+  const pending=await (await page.request.get('/api/services')).json();
+  expect(pending.accounts.find((a:{id:string})=>a.id==='goal-wallet').balanceCents).toBe(300000);
+  await page.screenshot({path:`artifacts/travel-checkout-${testInfo.project.name}.png`,fullPage:true});
 });

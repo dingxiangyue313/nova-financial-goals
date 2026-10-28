@@ -435,6 +435,7 @@ export default function App() {
       {demoControl && <aside aria-label="屏幕快速切换与调试" className="w-full max-w-[500px] px-3 mb-2 flex items-center justify-between text-xs">
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
           <span className="font-semibold text-[#5A616B] shrink-0 text-[11px]">快速直达:</span>
+            <button className="shrink-0 rounded-full border border-[#D0D5DD] bg-white px-2.5 py-1 text-[11px]" onClick={()=>{void mutate('/api/demo/services/scenario','POST',{scenario:'funded_trip'}).then(()=>navigateTo('financial_services'));}}>载入旅行付款样例（重置模拟会话）</button>
           <button
             onClick={() => navigateTo('home')}
             className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
@@ -515,7 +516,7 @@ export default function App() {
           isHome={isHomeScreen}
           title={getScreenTitle()}
           onBack={handleBack}
-          onOpenSimulateModal={() => setShowSimulateModal(true)}
+          onOpenSimulateModal={demoControl ? () => setShowSimulateModal(true) : undefined}
           onOpenProfile={() => navigateTo('profile')}
         />
 
@@ -627,7 +628,7 @@ export default function App() {
               goal={goal}
               onNavigate={navigateTo}
               onResetData={handleResetData}
-              onBankingDemo={() => navigateTo('banking_demo')}
+              onBankingDemo={() => navigateTo(demoControl ? 'banking_demo' : 'financial_services')}
               onDataConnections={() => navigateTo('data_connections')}
               installState={installState}
               onInstall={() => void handleInstall()}
@@ -678,7 +679,7 @@ export default function App() {
         )}
 
         {/* Modal: 模拟数据控制器 */}
-        {showSimulateModal && (
+        {demoControl && showSimulateModal && (
           <div className="absolute inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-end justify-center p-3">
             <div className="w-full bg-white rounded-2xl p-4 space-y-3 shadow-2xl animate-slideUp">
               <div className="flex items-center justify-between pb-2 border-b border-[#E5E8EB]">

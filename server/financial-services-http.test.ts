@@ -18,6 +18,7 @@ test('consumer financial confirmations isolate sessions, reject stale approvals 
     const a=await cookie(),b=await cookie();
     const call=(path:string,data?:unknown,c=a)=>fetch(base+path,{method:data===undefined?'GET':'POST',headers:{Cookie:c,'Content-Type':'application/json'},...(data===undefined?{}:{body:JSON.stringify(data)})});
     assert.equal((await call('/api/demo/reset',{})).status,404);
+    assert.equal((await call('/api/demo/services/scenario',{scenario:'funded_trip'})).status,404);
     assert.equal((await call('/api/product/start',{})).status,200);
     const first=await (await call('/api/services')).json();assert.match((await call('/api/services')).headers.get('cache-control')! ,/no-store/);
     const before=first.accounts.find((x:{id:string})=>x.id==='checking').balanceCents;
@@ -47,6 +48,12 @@ test('consumer financial confirmations isolate sessions, reject stale approvals 
     assert.equal(corrected.snapshot.finance.checkingCents,before-30000);assert.equal(corrected.brief.totalExpenseCents,mission.brief.totalExpenseCents);
     assert.notEqual((await call(`/api/product/evidence/${row.id}/category`,correction)).status,200);
     const annual=await call('/api/product/bill',{periodStart:'2026-01-01',periodEnd:'2026-10-26'});assert.equal(annual.status,200);assert.ok((await annual.json()).claims.every((c:{sourceRefs:unknown[]})=>c.sourceRefs.length));
+    const beforeForecast=await (await call('/api/session')).json();
+    const baseline=await (await call('/api/product/forecast',{accountId:'checking',horizonEnd:'2027-06-30',scenario:'baseline'})).json();
+    const edited=await (await call('/api/product/forecast',{accountId:'checking',horizonEnd:'2027-06-30',scenario:'edited',edits:[{type:'add',event:{id:'consumer-what-if-expense',date:'2026-11-02',label:'额外支出',kind:'purchase',amountCents:-50000,currency:'CNY',sourceRefs:['user:what-if-expense']}}]})).json();
+    assert.equal(edited.minimumBalanceCents,baseline.minimumBalanceCents-50000);
+    const afterForecast=await (await call('/api/session')).json();assert.equal(afterForecast.twinVersion,beforeForecast.twinVersion);assert.deepEqual(afterForecast.accounts,beforeForecast.accounts);assert.deepEqual(afterForecast.finance,beforeForecast.finance);
+    assert.notEqual((await call('/api/product/forecast',{accountId:'emergency',horizonEnd:'2027-06-30',scenario:'baseline'})).status,200);
     const skills=await (await call('/api/services/skills')).json();assert.equal(skills.skills.length,13);
     assert.equal((await call('/api/services/skills/inspect',{skillId:'card_lifecycle_manager',input:{cardId:'card-main'}})).status,200);
     assert.notEqual((await call('/api/services/skills/inspect',{skillId:'card_lifecycle_manager',input:{cardId:'card-main',amountCents:1}})).status,200);

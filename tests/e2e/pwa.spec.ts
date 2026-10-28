@@ -1,11 +1,17 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-test.setTimeout(90_000);
+test.setTimeout(120_000);
 
 async function openDemo(page: Page): Promise<void> {
   await page.goto('/demo-control');
   await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  // Do not abort Chrome's first worker-script fetch with the fixture reload.
+  // Actual activation is still required before the offline assertions run.
+  await expect.poll(() => page.evaluate(async () => {
+    const registration=await navigator.serviceWorker.getRegistration();
+    return registration?.active?.state??registration?.installing?.state??registration?.waiting?.state??'registering';
+  }), { timeout: 60_000, message: 'wait for actual local Service Worker installation and cache activation' }).toBe('activated');
   await page.request.post('/api/demo/load-japan');
   await page.reload();
   await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();

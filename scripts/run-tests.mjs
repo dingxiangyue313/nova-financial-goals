@@ -8,7 +8,9 @@ const parent=realpathSync(tmpdir()),temporary=resolve(mkdtempSync(join(parent,'n
 if(dirname(temporary)!==parent)throw new Error('Unexpected test directory');
 const tests=['server','server/skills','src'].flatMap(dir=>readdirSync(dir).filter(name=>name.endsWith('.test.ts')).map(name=>resolve(dir,name)));
 try{
-  const result=spawnSync(process.execPath,['--import','tsx','--test','--test-concurrency=2',...tests],{stdio:'inherit',env:{...process.env,NOVA_DB_PATH:join(temporary,'tests.sqlite')}});
+  // HTTP suites spawn their own application and OCR runtimes. Keep file-level
+  // execution serial so readiness limits measure the app, not host contention.
+  const result=spawnSync(process.execPath,['--import','tsx','--test','--test-concurrency=1',...tests],{stdio:'inherit',env:{...process.env,NOVA_DB_PATH:join(temporary,'tests.sqlite')}});
   if(result.error)throw result.error;
   process.exitCode=result.status??1;
 }finally{rmSync(temporary,{recursive:true,force:true});}

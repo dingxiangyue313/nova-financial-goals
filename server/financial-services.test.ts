@@ -12,6 +12,26 @@ function funded(){const s=base();s.accounts.find(a=>a.id==='goal-wallet')!.balan
 function authorized(s:DemoState){s=requestTravelQuotes(s);return apply(s,{kind:'mandate',goalId:s.goal.id,accountId:'goal-wallet',maxPerOrderCents:300000,totalCents:500000,merchants:['air-demo','stay-demo'],expiresAt:new Date(Date.now()+86400000).toISOString()},'mandate');}
 function booking(s:DemoState){return {kind:'book',quoteIds:s.financialServices.quotes.slice(-2).map(q=>q.id),accountId:'goal-wallet',cardId:'card-travel',goalId:s.goal.id,mandateId:'mandate'};}
 
+test('consumer available balance matches the dated cashflow gate and stale authority is not spendable',()=>{
+  const s=base(),view=financialServicesView(s),checking=view.accounts.find(a=>a.id==='checking')!;
+  assert.equal(checking.availableCents,317200);assert.equal(checking.balanceCurrent,true);
+  const input={kind:'transfer',recipientId:'contact-1',recipientVersion:1,accountId:'checking',amountCents:checking.availableCents};
+  assert.doesNotThrow(()=>describeServiceAction(s,input));assert.throws(()=>describeServiceAction(s,{...input,amountCents:checking.availableCents+1}),/INSUFFICIENT_AVAILABLE_FUNDS/);
+  s.accountSnapshots=s.accountSnapshots.map(x=>x.accountId==='checking'?{...x,balanceCents:x.balanceCents+1}:x);
+  assert.equal(financialServicesView(s).accounts.find(a=>a.id==='checking')!.availableCents,0);
+  assert.throws(()=>describeServiceAction(s,input),/BALANCE_STALE/);
+});
+test('changing the primary goal cannot reassign a funded wallet or spend another goal cash',()=>{
+  let s=authorized(funded()),owner=s.goal;
+  const second={...owner,id:'training-goal',title:'培训金',savedCents:0,targetCents:1200000};
+  s={...s,goal:second,primaryGoalId:second.id,goals:[owner,second]};
+  const payload=booking(s);payload.goalId=owner.id;
+  assert.throws(()=>describeServiceAction(s,{...payload,goalId:second.id}),/MANDATE_SCOPE/);
+  s=apply(s,payload,'owner-trip');assert.equal(s.goal.id,second.id);assert.equal(s.goal.savedCents,0);
+  assert.equal(s.goals.find(g=>g.id===owner.id)!.savedCents,300000);
+  const view=financialServicesView(s);assert.equal(view.goals.find(g=>g.id===owner.id)!.coveredCents,800000);assert.equal(view.goals.find(g=>g.id===second.id)!.coveredCents,0);
+});
+
 test('a new purchase cannot borrow the unlocked holding period of older shares',()=>{
   let s=apply(base(),{kind:'risk_profile',level:2,tolerateLoss:true,useByDate:'2027-09-30'});
   s=apply(s,{kind:'buy',productId:'steady',accountId:'checking',amountCents:10000},'first-lot');

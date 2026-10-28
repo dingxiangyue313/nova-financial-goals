@@ -20,6 +20,7 @@ const fee = (amount: number, bps: number) => Number((BigInt(amount) * BigInt(bps
 const valuation = (quantity: string, nav: string) => integer(Number(BigInt(quantity) * BigInt(nav) / 1000000000000n));
 const product = (id: string) => { const p = investmentProducts.find(p => p.id === id); if (!p) throw new Error('SERVICE_PRODUCT_NOT_FOUND'); return p; };
 const account = (s: DemoState, id: string) => { const a = s.accounts.find(a => a.id === id); if (!a || a.protected || !['checking','goal'].includes(a.type) || a.currency !== 'CNY') throw new Error('SERVICE_PROTECTED_ACCOUNT'); return a; };
+const walletOwner=(s:DemoState)=>s.financialServices.allocations.find(a=>a.accountId==='goal-wallet')?.goalId??s.goal.id;
 
 export function initializeServices(input: DemoState): DemoState {
   const s = structuredClone(input), d = s.financialServices;
@@ -42,17 +43,29 @@ export function availableFunds(s: DemoState, id: string, goalId: string | null =
   return Math.max(0,a.balanceCents-held-other-(a.type==='checking'?Math.max(0,s.goal.protectedCents-s.finance.emergencyCents):0));
 }
 function requireFunds(s: DemoState,id:string,amount:number,goalId:string|null=null) {
-  const a=account(s,id); if(a.type==='goal'&&s.goal.id!==goalId)throw new Error('SERVICE_GOAL_FUNDS_PROTECTED');
-  if(!s.accountSnapshots.some(x=>x.accountId===id&&x.asOf===s.clock))throw new Error('SERVICE_BALANCE_STALE');
-  let available=availableFunds(s,id,goalId);
-  if(a.type==='checking'&&s.accountSnapshots.length){const f=buildDatedCashflowForecast(s,{accountId:id,horizonEnd:shift(s.clock,32),scenario:'baseline'});if(f.precision!=='exact'||f.minimumBalanceCents===null)throw new Error('SERVICE_BALANCE_STALE');available=Math.min(available,Math.max(0,f.minimumBalanceCents-(a.balanceCents-available)));}
+  const a=account(s,id); if(a.type==='goal'&&walletOwner(s)!==goalId)throw new Error('SERVICE_GOAL_FUNDS_PROTECTED');
+  const available=spendableFunds(s,id,goalId);
+  if(available===null)throw new Error('SERVICE_BALANCE_STALE');
   if(!Number.isSafeInteger(amount)||amount<0||available<amount)throw new Error('SERVICE_INSUFFICIENT_AVAILABLE_FUNDS');
+}
+/** Same conservative amount for consumer previews and execution gates. */
+function spendableFunds(s:DemoState,id:string,goalId:string|null=null):number|null{
+  const a=account(s,id);
+  const latest=s.accountSnapshots.filter(x=>x.accountId===id&&x.asOf<=s.clock).sort((a,b)=>b.asOf.localeCompare(a.asOf)||b.twinVersion-a.twinVersion||b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id))[0];
+  if(!latest||latest.asOf!==s.clock||latest.balanceCents!==a.balanceCents||latest.currency!==a.currency||latest.twinVersion>s.twinVersion)return null;
+  let available=availableFunds(s,id,goalId);
+  if(a.type==='checking'){
+    const f=buildDatedCashflowForecast(s,{accountId:id,horizonEnd:shift(s.clock,32),scenario:'baseline'});
+    if(f.precision!=='exact'||f.minimumBalanceCents===null)return null;
+    available=Math.min(available,Math.max(0,f.minimumBalanceCents-(a.balanceCents-available)));
+  }
+  return available;
 }
 function post(s:DemoState,id:string,delta:number,op:string,eventId:string,reason:string,goalId:string|null=null,settlingReserved=false){
   const d=s.financialServices;if(d.events.includes(eventId))return;const a=account(s,id);
   if(delta<0){if(settlingReserved){if(a.balanceCents < -delta)throw new Error('SERVICE_RESERVED_FUNDS_MISSING');}else requireFunds(s,id,-delta,goalId);}a.balanceCents=integer(a.balanceCents+delta);
   if(id==='checking'){s.finance.checkingCents=a.balanceCents;s.finance.updatedAt=s.clock;}
-  if(id==='goal-wallet'){s.goal={...s.goal,savedCents:a.balanceCents};s.goals=s.goals.map(g=>g.id===s.goal.id?s.goal:g);}
+  if(id==='goal-wallet'){const owner=walletOwner(s);s.goals=s.goals.map(g=>g.id===owner?{...g,savedCents:a.balanceCents}:g);if(s.goal.id===owner)s.goal={...s.goal,savedCents:a.balanceCents};}
   if(goalId&&delta<0)d.allocations=d.allocations.map(x=>x.accountId===id&&x.goalId===goalId?{...x,amountCents:Math.max(0,x.amountCents+delta)}:x);
   s.accountSnapshots.push({id:randomUUID(),accountId:id,balanceCents:a.balanceCents,currency:'CNY',asOf:s.clock,sourceKind:'simulated_connection',sourceId:`service:${eventId}`,twinVersion:s.twinVersion+1,createdAt:`${s.clock}T12:00:00+08:00`});
   d.events.push(eventId);journal(s,id,delta,op,eventId,reason);
@@ -206,8 +219,9 @@ export function validateServiceBalances(old:DemoState,next:DemoState){
     const before=old.accounts.find(b=>b.id===a.id)?.balanceCents??0;
     const recorded=d.journals.slice(old.financialServices.journals.length).filter(j=>j.accountId===a.id).reduce((n,j)=>n+j.amountCents,0);
     const opening=old.financialServices.initialized?0:before,remainder=a.balanceCents-before-(recorded-opening);
+    if(remainder&&a.id==='goal-wallet'&&next.goal.id!==walletOwner(next))throw new Error('SERVICE_GOAL_FUNDS_PROTECTED');
     if(remainder)journal(next,a.id,remainder,`bridge:${old.twinVersion}:${next.twinVersion}`,`bridge:${old.twinVersion}:${next.twinVersion}:${a.id}:${d.journals.length}`,'共享银行工具入账');
-    if(a.id==='goal-wallet')d.allocations.filter(x=>x.accountId===a.id&&x.goalId===next.goal.id).forEach(x=>x.amountCents=a.balanceCents);
+    if(a.id==='goal-wallet')d.allocations.filter(x=>x.accountId===a.id&&x.goalId===walletOwner(next)).forEach(x=>x.amountCents=a.balanceCents);
     const assigned=d.allocations.filter(x=>x.accountId===a.id).reduce((n,x)=>n+x.amountCents,0);
     const unassignedHolds=d.holds.filter(h=>h.accountId===a.id&&h.status==='active'&&!d.allocations.some(x=>x.accountId===a.id&&x.goalId===h.goalId)).reduce((n,h)=>n+h.amountCents,0);
     if(assigned+unassignedHolds>a.balanceCents)throw new Error('SERVICE_ALLOCATION_CONFLICT');
@@ -219,7 +233,7 @@ export function financialServicesView(input:DemoState){
   const s=initializeServices(input),d=s.financialServices;
   const goals=s.goals.map(g=>{const cash=d.allocations.filter(a=>a.goalId===g.id).reduce((n,a)=>n+a.amountCents,0),held=d.holds.filter(h=>h.goalId===g.id&&h.status==='active').reduce((n,h)=>n+h.amountCents,0),booked=d.bookings.filter(b=>b.goalId===g.id&&b.payment==='captured'&&b.status==='confirmed').reduce((n,b)=>n+b.amountCents,0);return {id:g.id,title:g.title,targetCents:g.targetCents,cashCents:cash,heldCents:held,spendableCents:cash-held,bookedCents:booked,coveredCents:cash+booked,funded:cash+booked>=g.targetCents,bookingReady:['air-demo','stay-demo'].every(m=>d.bookings.some(b=>b.goalId===g.id&&b.merchantId===m&&b.status==='confirmed'))};});
   return {simulated:true,clock:s.clock,twinVersion:s.twinVersion,goals,
-    accounts:s.accounts.filter(a=>!a.protected&&['checking','goal'].includes(a.type)).map(a=>({...a,availableCents:availableFunds(s,a.id,a.id==='goal-wallet'?s.goal.id:null)})),
+    accounts:s.accounts.filter(a=>!a.protected&&['checking','goal'].includes(a.type)).map(a=>{const owner=a.id==='goal-wallet'?walletOwner(s):null,available=spendableFunds(s,a.id,owner);return {...a,goalId:owner,availableCents:available??0,balanceCurrent:available!==null};}),
     recipients:d.recipients,products:investmentProducts.map(p=>({...p,suitable:!!d.risk&&d.risk.expiresOn>=s.clock&&d.risk.tolerateLoss&&d.risk.level>=p.risk&&!p.paused&&shift(s.clock,p.lockDays+2)<=d.risk.useByDate})),risk:d.risk,
     positions:d.positions.map(p=>({...p,valueCents:valuation((BigInt(p.quantityMicro)-BigInt(p.reservedMicro)).toString(),product(p.productId).navScaled)})),investments:d.investments.map(({providerStatus:_p,...o})=>o),
     cards:d.cards,applications:d.applications,splits:d.splits,quotes:d.quotes.map(q=>{let identityVerified=true;try{verifyQuote(q,Math.min(Date.now(),Date.parse(q.expiresAt)-1));}catch{identityVerified=false;}const {signature:_s,...fields}=q;return {...fields,identityVerified,expired:Date.parse(q.expiresAt)<=Date.now()};}),

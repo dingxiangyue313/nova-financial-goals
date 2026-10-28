@@ -1,5 +1,7 @@
 # NOVA v0.6 Agent & Skill Specification
 
+> 2026-10-28 实现增补：方案 B 的 Registry 已扩展为 13 项，当前权威契约为 `shared/contracts.ts`、`server/skills/registry.ts`。新增 `recipient_and_split_coordinator`、`investment_lifecycle_manager`、`card_lifecycle_manager`。Mandate 与外部旅行请求已提供有会话、引用和预算校验的只读适配器；所有 13 项都不能直接执行金融写入。新增输入只接受对象引用，不接受任意金额、工具名、原始指令或批准 Token。写操作从消费者精确确认进入统一审批链路。具体交付边界见 [六场景实现说明](docs/SIX_SCENARIO_IMPLEMENTATION.md)。以下十项内容保留为原 v0.6 设计历史，不代表新版 Registry 仍限于十项。
+
 > 状态：提案稿，须与 v0.6 PRD 和 `USER_FLOW.md` 一同审批
 > 适用范围：NOVA 应用内 Agent，不是 Codex 开发技能
 > 原则：Skill 负责可重复任务；确定性服务负责财务事实、计算、权限和写入

@@ -254,7 +254,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <span>查看计划</span>
         </button>
       </section>
-
+      <button type="button" onClick={onNavigateToMoneyMission}
+        className="min-h-11 rounded-xl border border-[#B9D9D8] bg-white px-4 py-3 text-left text-[13px] font-semibold text-[#0F6B6D] focus-visible:outline-2 focus-visible:outline-offset-2">
+        继续日本旅行 Money Mission
+      </button>
+      <button type="button" className="mission-secondary" onClick={onNavigateToServices}>金融任务：转账、AA、理财、卡片与旅行预订</button>
     </div>
   );
 };
