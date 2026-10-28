@@ -143,7 +143,7 @@ export function ActivityScreen({ snapshot, mutate, hasImpactPending, onNavigateT
     <div><h2 className="text-[18px] font-bold">动态</h2><p className="text-[12px] text-[#5A616B]">先处理需要确认的事项，再查看目标变化</p></div>
     {platformAvailable === false && needsAttention.some(item => item.status === 'manual_review') && <p className="rounded-xl bg-amber-50 p-3 text-[11px] text-amber-800">当前环境不能调用系统设备验证；该请求会保持未执行。公网手机端需使用 HTTPS。</p>}
     {securityMessage && <p role="status" className="rounded-xl bg-[#F1F8F8] p-3 text-[11px] text-[#5A616B]">{securityMessage}</p>}
-    <div className="flex items-center justify-between"><h3 className="text-[14px] font-bold">需要你处理</h3>{!snapshot.mission && <button onClick={onNavigateToBanking} className="text-[11px] font-semibold text-[#0F6B6D]">演示请求</button>}</div>
+    <div className="flex items-center justify-between"><h3 className="text-[14px] font-bold">需要你处理</h3>{!snapshot.moneyMission && <button onClick={onNavigateToBanking} className="text-[11px] font-semibold text-[#0F6B6D]">演示请求</button>}</div>
     {needsAttention.length === 0 && <div className="rounded-xl border bg-white p-4 text-[12px] text-[#5A616B]">目前没有待确认事项。</div>}
     {needsAttention.map(operation => <OperationCard key={operation.operationId} operation={operation} events={grouped.get(operation.operationId) || []} snapshot={snapshot} mutate={mutate} passkey={passkey} onPasskeyChanged={register}/>) }
     <h3 className="pt-1 text-[14px] font-bold">目标变化</h3>
@@ -153,9 +153,8 @@ export function ActivityScreen({ snapshot, mutate, hasImpactPending, onNavigateT
       <h4 className="text-[14px] font-bold mt-1">{activityLabel[event.action] || 'NOVA 已更新目标状态'}</h4><p className="text-[12px] text-[#5A616B]">{event.detail}</p>
       {hasImpactPending && event.action === 'simulate_expense' && <button onClick={onNavigateToImpact} className="mt-2 w-full py-2 bg-[#E6F2F2] text-[#0F6B6D] rounded-lg text-[12px] font-semibold">查看影响与解决方案</button>}
     </div>)}
-    {(snapshot.moneyMission?.schedules.length || snapshot.mission?.receipts.length) ? <h3 className="pt-1 text-[14px] font-bold">Money Mission 结果</h3> : null}
-    {snapshot.mission?.receipts.map(r => <div key={r.id} className="mission-card"><strong className="text-sm">{r.date} · {({ succeeded: '已完成', failed: '未完成', unknown: '结果待核实', skipped: '本期跳过' })[r.status]}</strong><p>{r.detail}</p><span className="text-[10px] text-[#697386] break-all">凭证 {r.id}</span></div>)}
-    {snapshot.moneyMission?.executions.map(item => <div key={item.id} className="mission-card"><strong className="text-sm">{item.periodKey} · {item.status === 'succeeded' ? '已完成' : item.status === 'failed' ? '未完成' : item.status === 'unknown' ? '结果待核实' : item.status === 'skipped_missing_trigger' ? '本期跳过' : '已安排'}</strong><p>{item.reason}</p><span className="text-[10px] text-[#697386] break-all">转账凭证 {item.id}</span></div>)}
+    {(snapshot.transferSchedules.length || snapshot.transferExecutions.length) ? <h3 className="pt-1 text-[14px] font-bold">Money Mission 结果</h3> : null}
+    {snapshot.transferExecutions.map(item => <div key={item.id} className="mission-card"><strong className="text-sm">{item.period} · {item.status === 'succeeded' ? '已完成' : item.status === 'failed' ? '未完成' : item.status === 'unknown' ? '结果待核实' : item.status === 'skipped_missing_trigger' ? '本期跳过' : '已安排'}</strong><p>{item.reason}</p><span className="text-[10px] text-[#697386] break-all">转账凭证 {item.id}</span></div>)}
     <h3 className="pt-1 text-[14px] font-bold">最近完成</h3>
     {completed.length === 0 && <div className="rounded-xl border bg-white p-4 text-[12px] text-[#5A616B]">还没有已完成或已拦截的请求。</div>}
     {completed.map(operation => <OperationCard key={operation.operationId} operation={operation} events={grouped.get(operation.operationId) || []} snapshot={snapshot} mutate={mutate} passkey={passkey} onPasskeyChanged={register}/>) }

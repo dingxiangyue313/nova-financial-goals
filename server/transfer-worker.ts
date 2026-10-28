@@ -1,95 +1,216 @@
-import {screenMissionOutcomes} from './mission-monitor.ts';
 import { randomUUID } from 'node:crypto';
-import type { DemoState, Transaction, TransferExecution, TransferSchedule } from '../shared/contracts.ts';
-import { appendAuditEvent, confirmApproval, createApprovalSnapshot, stableHash } from './governance.ts';
+import { TransferScheduleInputSchema, type DemoState, type Transaction, type TransferExecution,
+  type TransferSchedule, type TransferScheduleInput } from '../shared/contracts.ts';
 import { runBankingTool } from './banking.ts';
-import { addIsoDays, buildDatedCashflowForecast } from './cashflow-forecast.ts';
-import { assertScheduleAccounts, scheduleParameters } from './transfer-schedules.ts';
-import { claimTransferLease,getState,listActiveTransferSchedules,mutateState,releaseTransferLease } from './store.ts';
+import { appendAuditEvent, createApprovalSnapshot, stableHash } from './governance.ts';
+import { transferScheduleApprovalParameters } from './transfer-schedules.ts';
+import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
+import { forecastHasExecutionAuthority } from './money-mission-plans.ts';
+import { claimTransferSchedule, commitTransferSchedule, dueTransferSchedules, getState,
+  getTransferScheduleAuthority, transferScheduleAuthority } from './store.ts';
 
-function shanghaiTime(now:Date) {
-  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));
-  return {date:`${parts.year}-${parts.month}-${parts.day}`,time:`${parts.hour}:${parts.minute}`};
+const localDate = (now: Date) => new Date(now.getTime() + 8 * 3600000).toISOString().slice(0, 10);
+const shift = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
+const periodOf = (schedule: TransferSchedule) => (schedule.nextEvaluationAt ?? schedule.startDate).slice(0, 7);
+const parameters = (schedule: DemoState['transferSchedulePreviews'][number] | TransferSchedule) => TransferScheduleInputSchema.parse(Object.fromEntries(
+  Object.keys(TransferScheduleInputSchema.shape).map(key => [key, schedule[key as keyof TransferScheduleInput]])));
+
+/** Titles are normalized classification labels, never substring matches against descriptions.
+ * The current transaction contract stores posting dates, so same-day ties use the ID. */
+export function matchSalaryEvent(schedule: TransferSchedule, transactions: Transaction[]): Transaction | null {
+  if (schedule.trigger.type !== 'salary_event') return null;
+  const period = periodOf(schedule);
+  const trigger = schedule.trigger;
+  const tolerance = Math.min(1000, trigger.toleranceBps);
+  return transactions.filter(item => item.accountId === 'checking' && item.sourceKind === 'bank' &&
+    item.category === 'income' && ['工资', 'salary'].includes(item.title.normalize('NFKC').trim().toLowerCase()) &&
+    item.amountCents >= 765000 && item.amountCents <= 935000 && item.date.slice(0, 7) === period &&
+    Math.abs(item.amountCents - trigger.expectedAmountCents) * 10000 <= trigger.expectedAmountCents * tolerance &&
+    Number(item.date.slice(8, 10)) >= 23 && Number(item.date.slice(8, 10)) <= 27)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0] ?? null;
 }
-export function matchSalaryEvent(schedule:TransferSchedule,transactions:Transaction[],period?:string):Transaction|null {
-  return transactions.filter(t=>t.accountId===schedule.sourceAccountId&&t.sourceKind==='bank'&&t.provenance==='connected_data'&&t.category==='income'&&/工资|\bsalary\b/i.test(t.title)&&t.amountCents>=schedule.trigger.minimumSalaryCents&&t.amountCents<=schedule.trigger.maximumSalaryCents&&Number(t.date.slice(8))>=23&&Number(t.date.slice(8))<=27&&t.date>schedule.createdAt.slice(0,10)&&(!period||t.date.startsWith(period))).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id))[0]??null;
+
+function requireAuthority(sessionId: string, state: DemoState, schedule: TransferSchedule) {
+  if (schedule.status !== 'active' || state.goal.status !== 'active' || schedule.goalId !== state.goal.id)
+    throw new Error('SCHEDULE_NOT_ACTIVE');
+  const preview = state.transferSchedulePreviews.find(item => item.id === schedule.previewId);
+  const original = state.approvals.find(item => item.status === 'consumed' && item.action === 'activate_transfer_schedule' &&
+    stableHash(item.parameters) === schedule.authorizationHash);
+  if (!preview || !original || schedule.authorizationHash !== stableHash(transferScheduleApprovalParameters(preview)) ||
+    stableHash(parameters(schedule)) !== stableHash(parameters(preview)) ||
+    schedule.authorityContextHash !== preview.authorityContextHash ||
+    stableHash(getTransferScheduleAuthority(sessionId, schedule.id)) !== stableHash(transferScheduleAuthority(state, schedule)))
+    throw new Error('SCHEDULE_AUTHORITY_CHANGED');
+  const trigger = schedule.trigger;
+  if (trigger.type !== 'salary_event' || trigger.accountId !== 'checking' || schedule.sourceAccountId !== 'checking' ||
+    trigger.expectedAmountCents !== 850000 || trigger.toleranceBps > 1000 || trigger.windowStartDay !== 23 ||
+    trigger.graceEndDay !== 27 || trigger.executeOffsetDays !== 1 || !schedule.stopAtGoal)
+    throw new Error('SCHEDULE_SALARY_RULE_INVALID');
+  return original;
 }
-function saveExecution(state:DemoState,execution:TransferExecution):DemoState {
-  return {...state,transferExecutions:[...state.transferExecutions.filter(e=>e.id!==execution.id),execution]};
+
+function saveOutcome(state: DemoState, schedule: TransferSchedule, execution: TransferExecution, now: Date,
+  stop?: TransferSchedule['status']): { state: DemoState; execution: TransferExecution } {
+  let nextEvaluationAt = schedule.nextEvaluationAt;
+  let status = stop ?? schedule.status;
+  if (execution.status !== 'scheduled') {
+    const [year, month] = execution.period.split('-').map(Number);
+    const nextPeriod = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
+    nextEvaluationAt = `${nextPeriod}-23T09:00:00+08:00`;
+    if ((execution.status === 'unknown' || execution.status === 'failed') && schedule.status === 'active') status = stop ?? 'paused';
+    if (schedule.recurrence === 'one_time' || nextPeriod > (schedule.endDate ?? state.goal.targetDate).slice(0, 7) ||
+      state.goal.savedCents >= state.goal.targetCents) status = 'completed';
+    if (status !== 'active') nextEvaluationAt = null;
+  } else nextEvaluationAt = execution.scheduledAt ?? new Date(now.getTime() + 5000).toISOString();
+  return { execution, state: { ...state,
+    transferExecutions: [...state.transferExecutions.filter(item => item.id !== execution.id), execution],
+    transferSchedules: state.transferSchedules.map(item => item.id === schedule.id ? { ...item, status, nextEvaluationAt,
+      updatedAt: now.toISOString() } : item) } };
 }
-export function executeAuthorizedScheduleTransfer(state:DemoState,schedule:TransferSchedule,key:string) {
-  const {source,goal}=assertScheduleAccounts(state,schedule);
-  if(schedule.authorizationHash!==stableHash(scheduleParameters(schedule)))throw new Error('APPROVAL_PARAMETERS_CHANGED');
-  const fresh=buildDatedCashflowForecast(state,{accountId:source.id,horizonEnd:addIsoDays(state.clock,62),scenario:'baseline'});
-  if(fresh.precision!=='exact')throw new Error('DATA_BALANCE_STALE');
-  const amountCents=Math.min(schedule.amountCents,Math.min(goal.targetCents,schedule.targetCents)-goal.savedCents);
-  if(amountCents<=0)throw new Error('GOAL_ALREADY_ACHIEVED');
-  if(source.balanceCents-amountCents<Math.max(0,goal.protectedCents-state.finance.emergencyCents))throw new Error('INSUFFICIENT_BALANCE');
-  const draft=runBankingTool(state,'prepare_transfer',{sourceAccountId:source.id,destinationAccountId:schedule.destinationAccountId,amountCents});
-  const parameters={draftId:draft.result.draftId,snapshotId:draft.result.snapshotId};
-  // Deterministic service derives this occurrence from the user's immutable plan authorization.
-  // The model cannot call this path, approve its own tools, or change these parameters.
-  const approval=createApprovalSnapshot(draft.state,'execute_transfer',parameters,`${state.clock}T12:05:00.000Z`);
-  const permitted=confirmApproval(approval.state,approval.approval.id,approval.approval.snapshotHash);
-  const executed=runBankingTool(permitted.state,'execute_transfer',{...parameters,approvalToken:permitted.token,idempotencyKey:key});
-  let next=executed.state;const saved=next.accounts.find(a=>a.id===schedule.destinationAccountId)!.balanceCents;
-  const updatedGoal={...goal,savedCents:saved,status:saved>=goal.targetCents?'achieved' as const:goal.status};
-  next={...next,goals:next.goals.map(g=>g.id===goal.id?updatedGoal:g),goal:next.goal.id===goal.id?updatedGoal:next.goal,
-    accountSnapshots:[...next.accountSnapshots,...next.accounts.filter(a=>a.id===source.id||a.id===schedule.destinationAccountId).map(a=>({id:randomUUID(),accountId:a.id,balanceCents:a.balanceCents,currency:a.currency,asOf:state.clock,source:'simulated_connection' as const,confirmed:true,twinVersion:next.twinVersion}))],
-    transactions:[...next.transactions,{id:`${executed.result.operationId}:source`,accountId:source.id,date:state.clock,title:'旅行金转入',category:'goal_transfer',amountCents:-amountCents,sourceKind:'bank',provenance:'connected_data'},{id:`${executed.result.operationId}:destination`,accountId:schedule.destinationAccountId,date:state.clock,title:'旅行金转入',category:'goal_transfer',amountCents,sourceKind:'bank',provenance:'connected_data'}],
-    transferSchedules:next.transferSchedules.map(s=>s.id===schedule.id&&(schedule.frequency==='one_time'||updatedGoal.status==='achieved'||saved>=schedule.targetCents)?{...s,status:'completed'}:s)};
-  if(next.finance.emergencyCents!==state.finance.emergencyCents||next.accounts.find(a=>a.id===source.id)!.balanceCents!==source.balanceCents-amountCents)throw new Error('OPERATION_VERIFY_MISMATCH');
-  return {state:next,operationId:String(executed.result.operationId),amountCents};
-}
-export function processTransferSchedule(sessionId:string,scheduleId:string,now:Date,outcome:'normal'|'timeout_before_commit'|'timeout_after_commit'='normal'):TransferExecution {
-  const owner=randomUUID();if(!claimTransferLease(sessionId,scheduleId,owner))throw new Error('SCHEDULE_WORKER_BUSY');
-  let result:TransferExecution|undefined;
+
+function evaluate(sessionId: string, state: DemoState, scheduleId: string, period: string, now: Date) {
+  const schedule = state.transferSchedules.find(item => item.id === scheduleId)!;
+  const existing = state.transferExecutions.find(item => item.scheduleId === scheduleId && item.period === period);
+  const at = now.toISOString();
+  let execution: TransferExecution = existing ?? { id: `schedule:${schedule.id}:${period}`, scheduleId, period,
+    status: 'scheduled', amountCents: schedule.amountCents, currency: schedule.currency, operationId: null,
+    triggerTransactionId: null, scheduledAt: null, executedAt: null, receiptOperationId: null,
+    reason: null, createdAt: at, updatedAt: at };
+  const keyedOperation = state.operations.find(item => item.idempotencyKey === execution.id);
+  if (existing?.status === 'unknown' || keyedOperation) {
+    const operation = keyedOperation ?? state.operations.find(item => item.operationId === execution.operationId);
+    const receipt = state.receipts.find(item => item.operationId === operation?.operationId && item.tool === 'execute_transfer' &&
+      item.status === 'succeeded' && item.amountCents === execution.amountCents && item.currency === execution.currency);
+    // Query the original operation only. An unknown provider result never authorizes resubmission.
+    const reconciled = Boolean(receipt && operation?.receipt && operation.receipt.operationId === receipt.operationId);
+    execution = { ...execution, status: reconciled ? 'reconciled' : 'unknown', operationId: operation?.operationId ?? execution.operationId,
+      receiptOperationId: receipt?.operationId ?? null, reason: reconciled ? 'ORIGINAL_RECEIPT_VERIFIED' : 'RECONCILIATION_REQUIRED', updatedAt: at };
+    return saveOutcome(appendAuditEvent(state, 'verify', reconciled ? 'confirmed' : 'unknown', execution.reason!,
+      { operationId: operation?.operationId }), schedule, execution, now);
+  }
   try {
-    mutateState(sessionId,state=>{
-      const schedule=state.transferSchedules.find(s=>s.id===scheduleId);if(!schedule)throw new Error('SCHEDULE_NOT_FOUND');
-      const {date,time}=shanghaiTime(now);if(date!==state.clock)throw new Error('DATA_CLOCK_MISMATCH');
-      const period=date.slice(0,7),periodKey=`schedule:${schedule.id}:${schedule.frequency==='one_time'?'one_time':period}`;
-      const existing=state.transferExecutions.find(e=>e.periodKey===periodKey);
-      if(existing&&existing.status!=='scheduled'){result=existing;return state;}
-      if(schedule.status!=='active')throw new Error('SCHEDULE_NOT_ACTIVE');
-      const execution:TransferExecution={id:`execution:${stableHash(periodKey).slice(0,32)}`,scheduleId,periodKey,operationId:null,status:'scheduled',amountCents:schedule.amountCents,createdAt:now.toISOString(),reason:'等待约定的触发事件和执行时间。',triggerTransactionId:null};
-      const finish=(status:TransferExecution['status'],reason:string,next=state)=>{result={...execution,status,reason};return screenMissionOutcomes(appendAuditEvent(saveExecution(next,result),'scheduled_transfer',status,reason));};
-      if(date>schedule.endDate)return finish('failed','计划已到期，未执行转账。',{...state,transferSchedules:state.transferSchedules.map(s=>s.id===scheduleId?{...s,status:'completed'}:s)});
-      const goal=state.goals.find(g=>g.id===schedule.goalId);
-      if(!goal||goal.savedCents>=Math.min(goal.targetCents,schedule.targetCents))return finish('failed','目标已达成或已删除，计划停止。',{...state,transferSchedules:state.transferSchedules.map(s=>s.id===scheduleId?{...s,status:'completed'}:s)});
-      let dueDate=date;
-      if(schedule.frequency==='monthly'&&schedule.trigger.type==='salary_event'){
-        const salary=matchSalaryEvent(schedule,state.transactions,period);
-        if(!salary){if(Number(date.slice(8))<=27){result=execution;return saveExecution(state,execution);}return finish('skipped_missing_trigger','27日结束前未检测到匹配工资，本期跳过且不补扣。');}
-        execution.triggerTransactionId=salary.id;dueDate=addIsoDays(salary.date,1);
-      }else if(schedule.frequency==='monthly')dueDate=`${period}-${String(schedule.trigger.expectedDay).padStart(2,'0')}`;
-      if(date<dueDate||(date===dueDate&&time<'09:00')){result=execution;return saveExecution(state,execution);}
-      if(schedule.frequency==='monthly'&&date>dueDate)return finish('failed','授权的执行时间已错过，请核对计划；不会自动追补扣款。');
-      if(outcome==='timeout_before_commit')return finish('unknown','执行服务未返回结果。请先核对状态，暂不重复转账。');
-      try{
-        const executed=executeAuthorizedScheduleTransfer(state,schedule,periodKey);
-        execution.operationId=executed.operationId;execution.amountCents=executed.amountCents;
-        return finish(outcome==='timeout_after_commit'?'unknown':'succeeded',outcome==='timeout_after_commit'?'执行结果待核对，请查询状态。':'已验证到账条件、余额和双方账户，旅行金转入成功。',executed.state);
-      }catch(error){return finish('failed',error instanceof Error?error.message:'OPERATION_FAILED');}
-    });
-    return result!;
-  } finally {releaseTransferLease(sessionId,scheduleId,owner);}
+    const date = localDate(now);
+    if (state.goal.savedCents >= state.goal.targetCents || state.goal.status === 'achieved' ||
+      date > state.goal.targetDate || date > (schedule.endDate ?? state.goal.targetDate)) {
+      execution = { ...execution, status: 'failed', reason: 'SCHEDULE_STOP_CONDITION', updatedAt: at };
+      return saveOutcome(appendAuditEvent(state, 'risk', 'stopped', execution.reason!), schedule, execution, now, 'completed');
+    }
+    const original = requireAuthority(sessionId, state, schedule);
+    const candidate = matchSalaryEvent({ ...schedule, nextEvaluationAt: `${period}-23T09:00:00+08:00` },
+      state.transactions.filter(item => item.date <= date && item.date <= state.clock));
+    const cutoff = new Date(`${period}-28T00:00:00+08:00`);
+    if ((!candidate && now >= cutoff) || date.slice(0, 7) > period) {
+      execution = { ...execution, status: 'skipped_missing_trigger', reason: 'SALARY_MISSING_SKIP_NO_CATCHUP', updatedAt: at };
+      return saveOutcome(appendAuditEvent(state, 'risk', 'skipped', execution.reason!, { approvalId: original.id }), schedule, execution, now);
+    }
+    if (!candidate) return saveOutcome(state, schedule, execution, now);
+    const dueAt = `${shift(candidate.date, 1)}T09:00:00+08:00`;
+    execution = { ...execution, triggerTransactionId: candidate.id, scheduledAt: dueAt, updatedAt: at };
+    const executionDate = dueAt.slice(0, 10);
+    if (executionDate < schedule.startDate || executionDate > (schedule.endDate ?? state.goal.targetDate))
+      throw new Error('SCHEDULE_EXECUTION_OUT_OF_SCOPE');
+    if (now < new Date(dueAt)) return saveOutcome(state, schedule, execution, now);
+    const source = state.accounts.find(item => item.id === schedule.sourceAccountId);
+    const destination = state.accounts.find(item => item.id === schedule.destinationAccountId);
+    if (!source || !destination || source.type !== 'checking' || destination.type !== 'goal' || source.protected ||
+      destination.protected || source.currency !== schedule.currency || destination.currency !== schedule.currency)
+      throw new Error('SCHEDULE_ACCOUNT_CHANGED');
+    if (Math.min(source.balanceCents, state.finance.checkingCents) < schedule.amountCents) throw new Error('INSUFFICIENT_BALANCE');
+    if (source.balanceCents - schedule.amountCents < Math.max(0, state.goal.protectedCents - state.finance.emergencyCents))
+      throw new Error('PROTECTED_FUNDS_UNAVAILABLE');
+    if (state.clock !== date || ![source, destination].every(account => state.accountSnapshots.some(item =>
+      item.accountId === account.id && item.asOf === date && item.currency === account.currency &&
+      item.balanceCents === account.balanceCents && item.twinVersion <= state.twinVersion &&
+      ['simulated_connection', 'bank'].includes(item.sourceKind)))) throw new Error('AUTHORITATIVE_BALANCE_REQUIRED');
+    // The dated ledger excludes today, so derive a hypothetical post-debit state from the
+    // current authoritative balances. Include both this debit and its goal credit exactly once.
+    // No account, snapshot or savings mutation is persisted unless the governed execution succeeds.
+    const postDebitGoal = { ...state.goal, savedCents: state.goal.savedCents + schedule.amountCents };
+    const delta = (accountId: string) => accountId === source.id ? -schedule.amountCents
+      : accountId === destination.id ? schedule.amountCents : 0;
+    const postDebit = { ...state, goal: postDebitGoal,
+      goals: state.goals.map(item => item.id === postDebitGoal.id ? postDebitGoal : item),
+      finance: { ...state.finance, checkingCents: state.finance.checkingCents - schedule.amountCents },
+      accounts: state.accounts.map(item => ({ ...item, balanceCents: item.balanceCents + delta(item.id) })),
+      accountSnapshots: state.accountSnapshots.map(item => item.asOf === date
+        ? { ...item, balanceCents: item.balanceCents + delta(item.accountId) } : item) };
+    const forecast = buildDatedCashflowForecast(postDebit, { accountId: source.id, horizonEnd: state.goal.targetDate, scenario: 'baseline' });
+    if (!forecastHasExecutionAuthority(postDebit, forecast) || forecast.minimumBalanceCents === null ||
+      forecast.minimumBalanceCents < Math.max(0, state.goal.protectedCents - state.finance.emergencyCents))
+      throw new Error('SCHEDULE_CASHFLOW_UNSAFE');
+    let next = runBankingTool(state, 'prepare_transfer', { sourceAccountId: source.id,
+      destinationAccountId: destination.id, amountCents: schedule.amountCents }).state;
+    const draft = next.toolRecords.at(-1)!;
+    const parameters = { draftId: draft.id, snapshotId: draft.data.snapshotId };
+    // Derive this exact child permission from the already consumed recurring authorization.
+    // This is delegation within the original scope, not a new user confirmation.
+    const derived = createApprovalSnapshot(next, 'execute_transfer', parameters, `${date}T23:59:59.999Z`);
+    const token = randomUUID();
+    next = { ...derived.state, approvals: derived.state.approvals.map(item => item.id === derived.approval.id
+      ? { ...item, status: 'confirmed' as const, token } : item) };
+    next = appendAuditEvent(next, 'permission', 'delegated', '原始计划授权覆盖本期固定参数；未请求新的用户确认',
+      { approvalId: original.id, requestId: execution.id });
+    if (!runBankingTool(next, 'permission_check', { action: 'execute_transfer', parameters, approvalToken: token }).result.allowed ||
+      !runBankingTool(next, 'risk_check', { sourceAccountId: source.id, amountCents: schedule.amountCents,
+        snapshotId: parameters.snapshotId }).result.allowed) throw new Error('TRANSFER_GOVERNANCE_DENIED');
+    const result = runBankingTool(next, 'execute_transfer', { ...parameters, approvalToken: token, idempotencyKey: execution.id });
+    next = result.state;
+    const operationId = String(result.result.operationId);
+    const verified = runBankingTool(next, 'get_operation_status', { operationId }).result;
+    if (verified.status !== 'executed' || !next.receipts.some(item => item.operationId === operationId) ||
+      next.accounts.find(item => item.id === source.id)?.balanceCents !== source.balanceCents - schedule.amountCents ||
+      next.accounts.find(item => item.id === destination.id)?.balanceCents !== destination.balanceCents + schedule.amountCents)
+      throw new Error('TRANSFER_VERIFICATION_FAILED');
+    const goal = { ...next.goal, savedCents: next.goal.savedCents + schedule.amountCents };
+    next = { ...next, goal, goals: next.goals.map(item => item.id === goal.id ? goal : item),
+      // Current snapshots reflect the verified simulated ledger change, never an estimated salary credit.
+      accountSnapshots: next.accountSnapshots.map(item => item.asOf === date ? { ...item,
+        balanceCents: next.accounts.find(account => account.id === item.accountId)?.balanceCents ?? item.balanceCents,
+        twinVersion: next.twinVersion } : item) };
+    execution = { ...execution, status: 'succeeded', operationId, receiptOperationId: operationId, executedAt: at, updatedAt: at };
+    return saveOutcome(next, schedule, execution, now);
+  } catch (error) {
+    execution = { ...execution, status: 'failed', reason: error instanceof Error ? error.message : 'TRANSFER_FAILED', updatedAt: at };
+    let next = state;
+    for (const [action, outcome] of [['permission', 'checked'], ['risk', 'failed'], ['execute', 'not_executed'],
+      ['verify', 'no_debit'], ['audit', 'recorded']]) next = appendAuditEvent(next, action, outcome, execution.reason!);
+    return saveOutcome(next, schedule, execution, now);
+  }
 }
-export function reconcileTransferExecution(sessionId:string,executionId:string) {
-  let result:TransferExecution|undefined;
-  mutateState(sessionId,state=>{
-    const item=state.transferExecutions.find(e=>e.id===executionId);if(!item)throw new Error('TRANSFER_EXECUTION_NOT_FOUND');
-    if(item.status!=='unknown'){result=item;return state;}
-    const operation=state.operations.find(o=>o.operationId===item.operationId);
-    result={...item,status:operation?.status==='executed'?'reconciled':'failed',reason:operation?.status==='executed'?'已核对原操作成功，没有再次转账。':'已核对原操作未执行，没有补扣。'};
-    return appendAuditEvent(saveExecution(state,result),'transfer_reconciliation',result.status,result.reason);
-  });return result!;
+
+export function processTransferSchedule(sessionId: string, scheduleId: string, now = new Date()): TransferExecution {
+  const state = getState(sessionId);
+  const schedule = state.transferSchedules.find(item => item.id === scheduleId);
+  if (!schedule) throw new Error('SCHEDULE_NOT_FOUND');
+  const currentPeriod = localDate(now).slice(0, 7);
+  const executions = state.transferExecutions.filter(item => item.scheduleId === scheduleId)
+    .sort((a, b) => b.period.localeCompare(a.period) || b.id.localeCompare(a.id));
+  // An unresolved original operation takes precedence over the calendar and lifecycle cursor.
+  // Unknown pauses clear nextEvaluationAt, which cannot identify the period to reconcile.
+  const unresolved = [...executions].reverse().find(item => item.status === 'unknown' ||
+    (item.status !== 'reconciled' && state.operations.some(operation => operation.status === 'unknown' &&
+      operation.idempotencyKey === `schedule:${scheduleId}:${item.period}`)));
+  const replay = unresolved ?? executions.find(item => item.period === currentPeriod) ??
+    (schedule.nextEvaluationAt === null ? executions[0] : undefined);
+  if (replay && !unresolved && !['scheduled', 'unknown'].includes(replay.status)) return replay;
+  const period = replay?.period ?? periodOf(schedule);
+  const token = claimTransferSchedule(sessionId, scheduleId, period, now);
+  if (!token) return replay ?? { id: `schedule:${scheduleId}:${period}`, scheduleId, period, status: 'scheduled',
+    amountCents: schedule.amountCents, currency: schedule.currency, operationId: null, triggerTransactionId: null,
+    scheduledAt: null, executedAt: null, receiptOperationId: null, reason: 'SCHEDULE_LEASE_BUSY',
+    createdAt: now.toISOString(), updatedAt: now.toISOString() };
+  return commitTransferSchedule(sessionId, scheduleId, period, token, now,
+    fresh => evaluate(sessionId, fresh, scheduleId, period, now));
 }
-export function tickTransferWorker(now?:Date,maxSchedules=100) {
-  let processed=0;
-  for(const row of listActiveTransferSchedules(maxSchedules)){
-    const state=getState(row.sessionId),before=state.transferExecutions;
-    try{const result=processTransferSchedule(row.sessionId,row.scheduleId,now??new Date(`${state.clock}T12:00:00+08:00`));if(result.status!=='scheduled'&&!before.some(e=>e.id===result.id&&e.status===result.status))processed++;}
-    catch(error){if(!(error instanceof Error)||error.message!=='SCHEDULE_WORKER_BUSY')throw error;}
-  }return processed;
+
+export function tickTransferWorker(now?: Date, maxSchedules = 10): number {
+  let count = 0;
+  const time = new Date(Date.now() + 8 * 3600000).toISOString().slice(11, 23);
+  for (const { sessionId, scheduleId } of dueTransferSchedules(now, maxSchedules)) {
+    const state = getState(sessionId);
+    // Wall-clock interval follows the explicit demo date; explicit test/API clocks retain their time.
+    const evaluation = now ?? new Date(`${state.clock}T${time}+08:00`);
+    processTransferSchedule(sessionId, scheduleId, evaluation); count++;
+  }
+  return count;
 }

@@ -1,95 +1,216 @@
 import { randomUUID } from 'node:crypto';
-import type { DemoState, ImportIssue, NormalizedStatementRow, StatementImportBatch } from '../shared/contracts.ts';
-import type { ParsedStatement } from './statement-parser.ts';
-import { parseAmount, validDate } from './statement-parser.ts';
-import { CATEGORY_MAP } from './money-mission-fixture.ts';
+import { z } from 'zod';
+import { DemoStateSchema, IsoDateSchema, type DemoState, type ImportIssue,
+  type NormalizedStatementRow, type StatementImportBatch } from '../shared/contracts.ts';
 import { appendAuditEvent, confirmApproval, consumeApproval, createApprovalSnapshot, stableHash } from './governance.ts';
+import type { ParsedIssue, ParsedStatement } from './statement-parser.ts';
+import { isRefundRow, refundMatches } from './refund-links.ts';
 
-const identity = (row: NormalizedStatementRow) => `${row.sourceKind}:${row.externalId}`;
-const merchantBase = (title: string) => title.split(/[·|]/)[0].replace(/退款|退货|订单|refund/gi, '').trim();
-export function activeStatementRows(state: DemoState) {
-  const active = new Set(state.statementImportBatches.filter(b => b.status === 'committed').map(b => b.id));
-  return state.normalizedStatementRows.filter(r => r.batchId && active.has(r.batchId));
+const at = (state: DemoState) => `${state.clock}T12:00:00.000Z`;
+const findBatch = (state: DemoState, id: string) => {
+  const batch = state.statementImportBatches.find(item => item.id === id);
+  if (!batch) throw new Error('IMPORT_BATCH_NOT_FOUND');
+  return batch;
+};
+
+/** Identifies exactly the rows, corrections, exclusions and batch metadata shown for review. */
+export function statementImportContentHash(state: DemoState, batchId: string): string {
+  return stableHash({ batch: findBatch(state, batchId),
+    rows: state.normalizedStatementRows.filter(row => row.batchId === batchId),
+    issues: state.importIssues.filter(issue => issue.batchId === batchId) });
 }
 
-function syncLegacyProjection(state: DemoState): DemoState {
-  if (!state.mission) return state;
-  const labels = Object.fromEntries(Object.entries(CATEGORY_MAP).map(([label, category]) => [category, label]));
-  const rows = activeStatementRows(state).map(r => ({ id: r.id, date: r.date, merchant: r.title, cents: r.amountCents,
-    category: (labels[r.category] ?? '待核对') as NonNullable<DemoState['mission']>['rows'][number]['category'],
-    source: ({ bank: '银行卡', wechat_pay: '微信', alipay: '支付宝' } as const)[r.sourceKind], excluded: r.excludedReason !== null }));
-  return { ...state, mission: { ...state.mission, pending: null, rows } };
+/** Reuse the approval primitives; the explicit version-bound request is the confirmation. */
+export function governStatementChange(state: DemoState, action: string, parameters: Record<string, unknown>,
+  execute: (approved: DemoState) => DemoState): DemoState {
+  const created = createApprovalSnapshot(state, action, parameters, `${state.clock}T12:05:00.000Z`);
+  const confirmed = confirmApproval(created.state, created.approval.id, created.approval.snapshotHash);
+  let next = consumeApproval(confirmed.state, confirmed.token, action, parameters);
+  next = appendAuditEvent(next, 'permission', 'checked', action, { approvalId: created.approval.id });
+  next = appendAuditEvent(next, 'risk', 'checked', '版本、账户和输入校验通过');
+  next = execute(next);
+  next = appendAuditEvent(next, 'execute', 'simulated', action);
+  DemoStateSchema.parse(next);
+  next = appendAuditEvent(next, 'verify', 'confirmed', '模拟结果与授权范围已核对');
+  return appendAuditEvent(next, 'audit', 'recorded', '操作证据已写入 Hash 链');
 }
-export function previewStatementImport(state: DemoState, parsed: ParsedStatement) {
-  const batchId = randomUUID(); const issues = parsed.issues.map(i => ({ ...i, id: randomUUID(), batchId }));
-  const existing = new Set(activeStatementRows(state).map(identity)); const seen = new Set(existing);
-  const rows: NormalizedStatementRow[] = parsed.rows.map((r, index) => {
-    const row = { ...r, id: `${batchId}:${index}`, batchId };
-    for (const issue of issues) if (issue.rowId === r.id) issue.rowId = row.id;
-    if (seen.has(identity(row))) { row.excludedReason = 'duplicate'; issues.push({ id: randomUUID(), batchId, rowId: row.id, kind: 'duplicate', severity: 'info', field: 'externalId', originalValue: row.externalId, correctedValue: null, resolved: true }); }
-    seen.add(identity(row)); return row;
-  });
-  const paired = new Set<string>();
-  for (const refund of rows.filter(r => r.amountCents > 0 && r.excludedReason !== 'duplicate' && (r.category === 'refund' || /退款|refund/i.test(r.title)))) {
-    const purchase = rows.find(r => !paired.has(r.id) && r.amountCents === -refund.amountCents && !r.excludedReason && r.sourceKind === refund.sourceKind && merchantBase(r.title) === merchantBase(refund.title) && r.date <= refund.date && Date.parse(refund.date) - Date.parse(r.date) <= 7 * 86400000);
-    if (purchase) for (const r of [purchase, refund]) { r.excludedReason = 'refund_match'; paired.add(r.id); issues.push({ id: randomUUID(), batchId, rowId: r.id, kind: 'refund_match', severity: 'info', field: 'excludedReason', originalValue: r.title, correctedValue: 'refund_match', resolved: true }); }
-    else if (!refund.excludedReason) issues.push({ id: randomUUID(), batchId, rowId: refund.id, kind: 'low_confidence', severity: 'review', field: 'category', originalValue: '未找到对应的原支出，需核对退款', correctedValue: null, resolved: false });
+
+function reconcileRows(state: DemoState, batchId: string): DemoState {
+  const automatic = new Set(['duplicate', 'refund_match', 'internal_transfer']);
+  const previous = state.importIssues.filter(issue => issue.batchId === batchId && automatic.has(issue.kind));
+  const removed = new Set(previous.map(issue => issue.id));
+  const issues = state.importIssues.filter(issue => !removed.has(issue.id));
+  const rows = state.normalizedStatementRows.map(row => row.batchId !== batchId ? row : {
+    ...row, excludedReason: null, issueIds: row.issueIds.filter(id => !removed.has(id)),
+  }) as NormalizedStatementRow[];
+  const active = new Set(state.statementImportBatches.filter(batch => batch.status === 'committed').map(batch => batch.id));
+  active.add(batchId);
+  const commitOrder = new Map(state.approvals.filter(approval => approval.action === 'commit_statement_import' &&
+    approval.status === 'consumed').map((approval, index) => [String(approval.parameters.batchId), index]));
+  const order = (row: NormalizedStatementRow) => state.statementImportBatches.some(batch => batch.id === row.batchId && batch.status === 'committed')
+    ? commitOrder.get(row.batchId) ?? -1 : Number.MAX_SAFE_INTEGER;
+  const eligible = rows.filter(row => active.has(row.batchId) && !issues.some(issue => issue.rowId === row.id &&
+    ['invalid_date', 'invalid_amount', 'missing_field'].includes(issue.kind) && issue.correctedValue === null))
+    .sort((left, right) => order(left) - order(right));
+  const exclusions = new Map<string, NonNullable<NormalizedStatementRow['excludedReason']>>();
+  const key = (row: Pick<NormalizedStatementRow, 'accountId' | 'date' | 'title' | 'amountCents'>) =>
+    JSON.stringify([row.accountId, row.date, row.title, row.amountCents]);
+  // Imported history is derived from retained evidence, including previously excluded rows.
+  // Only non-import transactions seed the keys: active import evidence is processed once below.
+  const importedIds = new Set(state.normalizedStatementRows.map(row => row.id));
+  const seen = new Set(state.transactions.filter(row => !importedIds.has(row.id)).map(key));
+  for (const row of eligible) {
+    if (seen.has(key(row))) exclusions.set(row.id, 'duplicate');
+    else if (row.title === 'Internal transfer' || row.category === 'internal_transfer') exclusions.set(row.id, 'internal_transfer');
+    seen.add(key(row));
   }
-  const dates = rows.filter(r => !issues.some(i => i.rowId === r.id && i.kind === 'invalid_date')).map(r => r.date).sort();
-  const batch: StatementImportBatch = { id: batchId, revision:0, templateId: parsed.templateId, format: parsed.format,
-    status: issues.some(i => !i.resolved && i.severity !== 'info') ? 'needs_review' : 'ready',
-    coverageStart: dates[0] ?? null, coverageEnd: dates.at(-1) ?? null, recordCount: rows.length,
-    duplicateCount: rows.filter(r => r.excludedReason === 'duplicate').length, issueIds: issues.map(i => i.id), rowIds: rows.map(r => r.id),
-    createdAt: `${state.clock}T12:00:00+08:00`, committedAt: null, twinVersion: state.twinVersion };
-  return { state: { ...state, normalizedStatementRows: [...state.normalizedStatementRows, ...rows], statementImportBatches: [...state.statementImportBatches, batch], importIssues: [...state.importIssues, ...issues] }, batch, issues };
+  for (const row of eligible) {
+    if (exclusions.has(row.id) || !isRefundRow(row)) continue;
+    const original = eligible.find(candidate => !exclusions.has(candidate.id) && candidate.accountId === row.accountId &&
+      candidate.currency === row.currency && refundMatches(row, candidate) &&
+      candidate.amountCents === -row.amountCents && candidate.date <= row.date);
+    if (original) { exclusions.set(original.id, 'refund_match'); exclusions.set(row.id, 'refund_match'); }
+  }
+  // A preview updates only its own evidence. Earlier committed history changes only during commit/revoke.
+  for (const row of rows.filter(row => row.batchId === batchId)) {
+    const kind = exclusions.get(row.id);
+    if (!kind) continue;
+    const issue: ImportIssue = previous.find(item => item.rowId === row.id && item.kind === kind) ?? {
+      id: randomUUID(), batchId, rowId: row.id, field: 'excludedReason', kind, severity: 'info',
+      originalValue: kind, correctedValue: null,
+    };
+    row.excludedReason = kind; row.issueIds.push(issue.id); issues.push(issue);
+  }
+  return { ...state, normalizedStatementRows: rows, importIssues: issues };
 }
 
-function findBatch(state: DemoState, id: string) {
-  const batch = state.statementImportBatches.find(b => b.id === id); if (!batch) throw new Error('IMPORT_BATCH_NOT_FOUND'); return batch;
-}
-export function resolveImportIssue(state: DemoState, batchId: string, issueId: string, resolution: { value: string }): DemoState {
-  const batch = findBatch(state, batchId); if (!['ready', 'needs_review', 'preview'].includes(batch.status)) throw new Error('IMPORT_BATCH_NOT_EDITABLE');
-  const issue = state.importIssues.find(i => i.id === issueId && i.batchId === batchId); if (!issue) throw new Error('IMPORT_ISSUE_NOT_FOUND');
-  const value = resolution.value.trim(); let correction: Partial<NormalizedStatementRow>;
-  if (issue.field === 'date') { if (!validDate(value)) throw new Error('INVALID_DATE'); correction = { date: value }; }
-  else if (issue.field === 'amountCents') { const amountCents = parseAmount(value, 'cents'); if (amountCents === null) throw new Error('INVALID_AMOUNT'); correction = { amountCents }; }
-  else if (issue.field === 'category') {
-    const category = CATEGORY_MAP[value] ?? (Object.values(CATEGORY_MAP).includes(value) ? value : null);
-    if (!category || category === 'unclassified') throw new Error('INVALID_CATEGORY'); correction = { category, excludedReason: category === 'income' ? 'income' : category === 'internal_transfer' ? 'internal_transfer' : null, confidence: 1 };
-  } else if (issue.field === 'title') { if (!value || value.length > 240) throw new Error('INVALID_TITLE'); correction = { title: value }; }
-  else throw new Error('IMPORT_ISSUE_NOT_EDITABLE');
-  const issues = state.importIssues.map(i => i.id === issueId ? { ...i, correctedValue: value, resolved: true } : i);
-  const rows = state.normalizedStatementRows.map(r => r.id === issue.rowId ? { ...r, ...correction } : r);
-  const dates = rows.filter(r => r.batchId === batchId && validDate(r.date)).map(r => r.date).sort();
-  return { ...state, normalizedStatementRows: rows, importIssues: issues, statementImportBatches: state.statementImportBatches.map(b => b.id === batchId ? { ...b, coverageStart: dates[0] ?? null, coverageEnd: dates.at(-1) ?? null, revision:(b.revision??0)+1, status: issues.some(i => i.batchId === batchId && !i.resolved && i.severity !== 'info') ? 'needs_review' : 'ready' } : b) };
+/** Rebuild only imported history from active evidence, preserving each transaction's owning row ID. */
+function materializeCommittedHistory(input: DemoState): DemoState {
+  let state = input;
+  const active = new Set(state.statementImportBatches.filter(batch => batch.status === 'committed').map(batch => batch.id));
+  for (const id of active) state = reconcileRows(state, id);
+  const importedIds = new Set(state.normalizedStatementRows.map(row => row.id));
+  const included = state.normalizedStatementRows.filter(row => active.has(row.batchId) && !row.excludedReason);
+  return { ...state,
+    transactions: [...state.transactions.filter(transaction => !importedIds.has(transaction.id)), ...included.map(row => ({
+      id: row.id, accountId: row.accountId, date: row.date, title: row.title, category: row.category,
+      amountCents: row.amountCents, sourceKind: row.sourceKind, provenance: 'connected_data' as const,
+    }))],
+    statementImportBatches: state.statementImportBatches.map(batch => !active.has(batch.id) ? batch : {
+      ...batch, importedCount: included.filter(row => row.batchId === batch.id).length,
+      excludedCount: state.normalizedStatementRows.filter(row => row.batchId === batch.id && row.excludedReason !== null).length,
+      issueIds: state.importIssues.filter(issue => issue.batchId === batch.id).map(issue => issue.id),
+    }),
+    evidenceRefs: state.evidenceRefs.map(evidence => {
+      const row = state.normalizedStatementRows.find(row => active.has(row.batchId) && evidence.id === `evidence-${row.id}`);
+      return row ? { ...evidence, label: `账单第 ${row.rowNumber} 行${row.excludedReason ? '（不计入支出）' : ''}` } : evidence;
+    }),
+  };
 }
 
-export function commitStatementImport(state: DemoState, batchId: string, expectedTwinVersion: number, expectedBatchRevision?:number): DemoState {
-  const batch = findBatch(state, batchId); if (batch.status === 'committed') return state;
-  if(expectedBatchRevision!==undefined&&expectedBatchRevision!==(batch.revision??0))throw new Error('IMPORT_PREVIEW_STALE');
-  if (state.twinVersion !== expectedTwinVersion || batch.twinVersion !== state.twinVersion) throw new Error('TWIN_VERSION_CHANGED');
-  if (batch.status !== 'ready' || state.importIssues.some(i => i.batchId === batchId && !i.resolved && i.severity !== 'info')) throw new Error('IMPORT_UNRESOLVED_ISSUES');
-  const existing = new Set(activeStatementRows(state).map(identity));
-  const rows = state.normalizedStatementRows.filter(r => r.batchId === batchId && r.excludedReason !== 'duplicate');
-  if (rows.some(r => existing.has(identity(r)))) throw new Error('IMPORT_PREVIEW_STALE');
-  const parameters = { batchId, rowsHash: stableHash(rows), recordCount: rows.length };
-  const prepared = createApprovalSnapshot(state, 'commit_statement_import', parameters, `${state.clock}T12:05:00.000Z`);
-  const approved = confirmApproval(prepared.state, prepared.approval.id, prepared.approval.snapshotHash);
-  let next = consumeApproval(approved.state, approved.token, 'commit_statement_import', parameters);
-  const imported = rows.map(r => ({ id: r.id, accountId: r.accountId, date: r.date, title: r.title, category: r.category, amountCents: r.amountCents, sourceKind: r.sourceKind, provenance: 'uploaded_statement' as const }));
-  const evidence = rows.map(r => ({ id: `evidence:${r.id}`, claimType: 'fact' as const, sourceKind: 'transaction' as const, sourceId: r.id, dataAsOf: state.clock, label: `${r.date} · ${r.category}`, confidence: r.confidence, transactionIds: [r.id] }));
-  next = { ...next, twinVersion: next.twinVersion + 1, transactions: [...next.transactions, ...imported], evidenceRefs: [...next.evidenceRefs, ...evidence],
-    statementImportBatches: next.statementImportBatches.map(b => b.id === batchId ? { ...b, status: 'committed', committedAt: `${state.clock}T12:00:00+08:00` } : b) };
-  return appendAuditEvent(syncLegacyProjection(next), 'statement_import', 'committed', `已确认导入 ${rows.length} 条历史证据；账户余额未改变`, { approvalId: prepared.approval.id });
+function refreshBatch(input: DemoState, batchId: string): DemoState {
+  const state = reconcileRows(input, batchId);
+  const issues = state.importIssues.filter(item => item.batchId === batchId);
+  const rows = state.normalizedStatementRows.filter(item => item.batchId === batchId);
+  const pending = issues.filter(item => item.severity !== 'info' && item.correctedValue === null);
+  return { ...state, statementImportBatches: state.statementImportBatches.map(batch => batch.id !== batchId ? batch : {
+    ...batch, status: pending.length ? 'needs_review' : 'ready', reviewCount: pending.length,
+    excludedCount: rows.filter(row => row.excludedReason !== null).length,
+    issueIds: issues.map(item => item.id),
+  }) };
 }
+
+export function previewStatementImport(state: DemoState, parsed: ParsedStatement): { state: DemoState; batch: StatementImportBatch; issues: ImportIssue[]; contentHash: string } {
+  if (!state.accounts.some(account => account.id === parsed.accountId)) throw new Error('ACCOUNT_NOT_FOUND');
+  const batchId = randomUUID(); const issues: ImportIssue[] = [];
+  const addIssue = (value: ParsedIssue, rowId: string | null): ImportIssue => {
+    const issue = { ...value, id: randomUUID(), batchId, rowId, correctedValue: null };
+    issues.push(issue); return issue;
+  };
+  parsed.issues.forEach(value => addIssue(value, null));
+  const rows: NormalizedStatementRow[] = parsed.rows.map(row => {
+    const id = randomUUID();
+    return { id, batchId, rowNumber: row.rowNumber, accountId: parsed.accountId, sourceKind: parsed.sourceKind,
+      date: row.date ?? state.clock, title: row.rawDescription, merchantId: row.merchantId, category: row.category,
+      amountCents: row.amountCents ?? 0, currency: 'CNY', confidence: row.confidence,
+      issueIds: row.issues.map(value => addIssue(value, id).id),
+      excludedReason: row.issues.some(value => value.kind === 'duplicate') ? 'duplicate' : null,
+      originalValues: { ...row.originalValues }, correctedValues: {} };
+  });
+  const dates = rows.filter(row => !row.issueIds.some(id => issues.find(issue => issue.id === id)?.kind === 'invalid_date')).map(row => row.date).sort();
+  const batch: StatementImportBatch = { id: batchId, templateId: parsed.templateId, format: parsed.format,
+    sourceKind: parsed.sourceKind, accountId: parsed.accountId, status: 'preview', coverageStart: dates[0] ?? state.clock,
+    coverageEnd: dates.at(-1) ?? state.clock, recordCount: rows.length, importedCount: 0, excludedCount: 0,
+    reviewCount: 0, issueIds: [], createdAt: at(state), committedAt: null };
+  const next = refreshBatch({ ...state, statementImportBatches: [...state.statementImportBatches, batch],
+    importIssues: [...state.importIssues, ...issues], normalizedStatementRows: [...state.normalizedStatementRows, ...rows] }, batchId);
+  return { state: DemoStateSchema.parse(next), batch: findBatch(next, batchId), issues: next.importIssues.filter(issue => issue.batchId === batchId),
+    contentHash: statementImportContentHash(next, batchId) };
+}
+
+export function resolveImportIssue(state: DemoState, batchId: string, issueId: string, resolution: unknown): DemoState {
+  const batch = findBatch(state, batchId);
+  if (!['ready', 'needs_review', 'preview'].includes(batch.status)) throw new Error('IMPORT_NOT_EDITABLE');
+  const issue = state.importIssues.find(item => item.id === issueId && item.batchId === batchId);
+  if (!issue) throw new Error('IMPORT_ISSUE_NOT_FOUND');
+  const parsed = z.object({ correctedValue: z.union([z.string(), z.number(), z.boolean()]) }).strict().safeParse(resolution);
+  if (!parsed.success) throw new Error('IMPORT_INVALID_RESOLUTION');
+  const value = parsed.data.correctedValue;
+  const valid = issue.kind === 'invalid_date' ? IsoDateSchema.safeParse(value).success
+    : issue.kind === 'invalid_amount' ? typeof value === 'number' && Number.isSafeInteger(value)
+    : issue.kind === 'missing_field' ? typeof value === 'string' && value.trim().length > 0 && value.length <= 1000
+    : issue.kind === 'low_confidence' ? value === true && state.normalizedStatementRows.some(row => row.batchId === batchId &&
+      (issue.rowId === null || row.id === issue.rowId)) : false;
+  if (!valid) throw new Error('IMPORT_INVALID_RESOLUTION');
+  const rows = state.normalizedStatementRows.map(row => row.id !== issue.rowId ? row : {
+    ...row, ...(issue.field === 'date' ? { date: String(value) } : issue.field === 'amountCents' ? { amountCents: Number(value) }
+      : issue.field === 'title' ? { title: String(value) } : {}), correctedValues: { ...row.correctedValues, [issue.field]: value } });
+  const next = refreshBatch({ ...state, normalizedStatementRows: rows, importIssues: state.importIssues.map(item => item.id !== issue.id ? item
+    : { ...item, correctedValue: value }) }, batchId);
+  const dates = rows.filter(row => row.batchId === batchId).map(row => row.date).sort();
+  return DemoStateSchema.parse({ ...next, statementImportBatches: next.statementImportBatches.map(item => item.id !== batchId ? item : {
+    ...item, coverageStart: dates[0] ?? item.coverageStart, coverageEnd: dates.at(-1) ?? item.coverageEnd }) });
+}
+
+export function commitStatementImport(input: DemoState, batchId: string, expectedTwinVersion: number, expectedContentHash: string): DemoState {
+  const batch = findBatch(input, batchId);
+  if (batch.status === 'committed') {
+    if (!input.approvals.some(approval => approval.action === 'commit_statement_import' && approval.status === 'consumed' &&
+      approval.parameters.batchId === batchId && approval.parameters.expectedTwinVersion === expectedTwinVersion &&
+      approval.parameters.expectedContentHash === expectedContentHash)) throw new Error('IMPORT_CONTENT_CHANGED');
+    return input;
+  }
+  if (input.twinVersion !== expectedTwinVersion) throw new Error('TWIN_VERSION_CHANGED');
+  if (batch.status === 'revoked' || batch.status === 'failed') throw new Error('IMPORT_NOT_READY');
+  if (statementImportContentHash(input, batchId) !== expectedContentHash) throw new Error('IMPORT_CONTENT_CHANGED');
+  const state = refreshBatch(input, batchId);
+  if (statementImportContentHash(state, batchId) !== expectedContentHash) throw new Error('IMPORT_CONTENT_CHANGED');
+  if (state.importIssues.some(issue => issue.batchId === batchId && issue.severity !== 'info' && issue.correctedValue === null))
+    throw new Error('IMPORT_UNRESOLVED');
+  if (batch.status !== 'ready') throw new Error('IMPORT_NOT_READY');
+  const rows = state.normalizedStatementRows.filter(row => row.batchId === batchId);
+  const imported = rows.filter(row => !row.excludedReason);
+  return governStatementChange(state, 'commit_statement_import', { batchId, expectedTwinVersion, expectedContentHash }, approved => {
+    const next = materializeCommittedHistory({ ...approved, twinVersion: state.twinVersion + 1,
+      statementImportBatches: approved.statementImportBatches.map(item => item.id !== batchId ? item : {
+        ...item, status: 'committed' as const, committedAt: at(state), importedCount: imported.length }),
+      evidenceRefs: [...approved.evidenceRefs, { id: `evidence-${batchId}`, claimType: 'fact' as const,
+        sourceKind: 'import_batch' as const, sourceId: batchId, dataAsOf: batch.coverageEnd, label: '已确认的模拟账单历史', confidence: 1 },
+      ...rows.map(row => ({ id: `evidence-${row.id}`, claimType: 'fact' as const, sourceKind: 'import_batch' as const,
+        sourceId: batchId, dataAsOf: row.date, label: `账单第 ${row.rowNumber} 行${row.excludedReason ? '（不计入支出）' : ''}`, confidence: row.confidence }))] });
+    if (next.finance !== state.finance || next.accounts !== state.accounts || next.goal !== state.goal)
+      throw new Error('IMPORT_AUTHORITY_VIOLATION');
+    return next;
+  });
+}
+
 export function revokeStatementImport(state: DemoState, batchId: string, expectedTwinVersion: number): DemoState {
-  const batch = findBatch(state, batchId); if (batch.status === 'revoked') return state;
-  if (expectedTwinVersion !== state.twinVersion) throw new Error('TWIN_VERSION_CHANGED');
-  if (batch.status !== 'committed') throw new Error('IMPORT_BATCH_NOT_COMMITTED');
-  const ids = new Set(batch.rowIds);
-  const parameters = { batchId, rowsHash: stableHash(state.normalizedStatementRows.filter(row => ids.has(row.id))) };
-  const prepared = createApprovalSnapshot(state, 'revoke_statement_import', parameters, `${state.clock}T12:05:00.000Z`);
-  const approved = confirmApproval(prepared.state, prepared.approval.id, prepared.approval.snapshotHash);
-  const next = consumeApproval(approved.state, approved.token, 'revoke_statement_import', parameters);
-  return appendAuditEvent(syncLegacyProjection({ ...next, twinVersion: next.twinVersion + 1, transactions: next.transactions.filter(t => !ids.has(t.id)), evidenceRefs: next.evidenceRefs.filter(e => !e.transactionIds.some(id => ids.has(id))), statementImportBatches: next.statementImportBatches.map(b => b.id === batchId ? { ...b, status: 'revoked' } : b) }), 'statement_import', 'revoked', '仅撤销本批次历史证据；账户余额未改变', { approvalId: prepared.approval.id });
+  const batch = findBatch(state, batchId);
+  if (batch.status === 'revoked') return state;
+  if (state.twinVersion !== expectedTwinVersion) throw new Error('TWIN_VERSION_CHANGED');
+  if (batch.status !== 'committed') throw new Error('IMPORT_NOT_COMMITTED');
+  return governStatementChange(state, 'revoke_statement_import', { batchId, expectedTwinVersion }, approved => materializeCommittedHistory({
+    ...approved, twinVersion: state.twinVersion + 1,
+    statementImportBatches: approved.statementImportBatches.map(item => item.id !== batchId ? item : { ...item, status: 'revoked' }),
+  }));
 }

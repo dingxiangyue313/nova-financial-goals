@@ -1,6 +1,3 @@
-import {migrateMoneyMissionState} from './money-mission-migration.ts';
-import { screenMissionOutcomes } from './mission-monitor.ts';
-import { StatementImportBatchSchema, ImportIssueSchema, EvidenceRefSchema, SubscriptionActionSchema, TransferScheduleSchema, TransferExecutionSchema, type StatementImportBatch, type ImportIssue, type EvidenceRef, type SubscriptionAction, type TransferSchedule, type TransferExecution } from '../shared/money-mission.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -10,15 +7,19 @@ import { AgentComponentSchema, AgentMessageSchema, AgentTaskConstraintsSchema, A
   AgentTaskPhaseSchema, AgentTaskPreferenceSchema, AgentTaskRunRecordSchema, AgentTaskSchema,
   AgentTaskSourceSchema, AgentThreadSchema, DemoStateSchema, GoalDraftSchema, IsoDateSchema,
   AgentToolResultSchema, AgentRunSchema, type AgentRun, type AgentToolResult, type AgentComponent, type AgentMessage, type AgentTask, type AgentTaskPhase, type AgentThread,
-  type DemoState, type GoalDraft } from '../shared/contracts.ts';
+  StatementImportBatchSchema, ImportIssueSchema, NormalizedStatementRowSchema, EvidenceRefSchema,
+  SubscriptionActionSchema, TransferScheduleSchema, TransferExecutionSchema,
+  type StatementImportBatch, type EvidenceRef, type SubscriptionAction, type TransferSchedule,
+  type TransferExecution, type DemoState, type GoalDraft } from '../shared/contracts.ts';
 import { createFirstUseFixture } from './fixtures.ts';
+import { reconcileServices, validateServiceBalances } from './financial-services.ts';
+import { migrateLegacyProduct } from './legacy-product-migration.ts';
+import { inspectEvidence } from './bill-analysis.ts';
 
-const configuredPath = process.env.NOVA_DB_PATH || './data/nova.sqlite';
-const inMemory = configuredPath === ':memory:';
-const dbPath = inMemory ? ':memory:' : resolve(configuredPath);
-if (!inMemory) mkdirSync(dirname(dbPath), { recursive: true });
+const dbPath = resolve(process.env.NOVA_DB_PATH || './data/nova.sqlite');
+mkdirSync(dirname(dbPath), { recursive: true });
 const db = new DatabaseSync(dbPath);
-db.exec(inMemory ? 'PRAGMA busy_timeout = 5000;' : 'PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
+db.exec('PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
 db.exec(`CREATE TABLE IF NOT EXISTS demo_sessions (
   id TEXT PRIMARY KEY, state_json TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
 );
@@ -152,6 +153,32 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
   challenge TEXT PRIMARY KEY, session_id TEXT NOT NULL, kind TEXT NOT NULL, operation_id TEXT,
   input_hash TEXT, mandate_id TEXT, twin_version INTEGER, expires_at TEXT NOT NULL,
   consumed_at TEXT, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS statement_import_batches (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, payload_json TEXT NOT NULL, PRIMARY KEY(session_id,id)
+);
+CREATE TABLE IF NOT EXISTS statement_import_issues (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, payload_json TEXT NOT NULL, PRIMARY KEY(session_id,id)
+);
+CREATE TABLE IF NOT EXISTS evidence_refs (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, payload_json TEXT NOT NULL, PRIMARY KEY(session_id,id)
+);
+CREATE TABLE IF NOT EXISTS subscription_actions (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, payload_json TEXT NOT NULL, PRIMARY KEY(session_id,id)
+);
+CREATE TABLE IF NOT EXISTS transfer_schedules (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, payload_json TEXT NOT NULL, PRIMARY KEY(session_id,id)
+);
+CREATE TABLE IF NOT EXISTS transfer_executions (
+  session_id TEXT NOT NULL, id TEXT NOT NULL, payload_json TEXT NOT NULL, PRIMARY KEY(session_id,id)
+);
+CREATE TABLE IF NOT EXISTS transfer_schedule_authorities (
+  session_id TEXT NOT NULL, schedule_id TEXT NOT NULL, payload_json TEXT NOT NULL,
+  PRIMARY KEY(session_id,schedule_id)
+);
+CREATE TABLE IF NOT EXISTS transfer_schedule_leases (
+  session_id TEXT NOT NULL, schedule_id TEXT NOT NULL, period TEXT NOT NULL,
+  lease_token TEXT, lease_until TEXT, PRIMARY KEY(session_id,schedule_id,period)
 );`);
 
 function ensureColumn(table: string, column: string, definition: string) {
@@ -165,20 +192,26 @@ for (const [column, definition] of [
 ensureColumn('monitor_notifications', 'subject_key', 'TEXT');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS monitor_notifications_subject ON monitor_notifications(session_id,subject_key) WHERE subject_key IS NOT NULL');
 
-
-const missionArtifactTables = {
-  statementImportBatches: 'statement_import_batches', importIssues: 'statement_import_issues', evidenceRefs: 'evidence_refs',
-  subscriptionActions: 'subscription_actions', transferSchedules: 'transfer_schedules', transferExecutions: 'transfer_executions',
+const moneyMissionTables = {
+  statementImportBatches: 'statement_import_batches', importIssues: 'statement_import_issues',
+  evidenceRefs: 'evidence_refs', subscriptionActions: 'subscription_actions',
+  transferSchedules: 'transfer_schedules', transferExecutions: 'transfer_executions',
 } as const;
-for (const table of Object.values(missionArtifactTables)) db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
-  session_id TEXT NOT NULL, id TEXT NOT NULL, payload_json TEXT NOT NULL, PRIMARY KEY(session_id,id)
-)`);
 
 function syncArtifacts(sessionId: string, state: DemoState) {
-  for (const [field, table] of Object.entries(missionArtifactTables)) {
-    for (const item of state[field as keyof typeof missionArtifactTables]) db.prepare(`INSERT INTO ${table}(session_id,id,payload_json) VALUES(?,?,?) ON CONFLICT(session_id,id) DO UPDATE SET payload_json=excluded.payload_json`).run(sessionId,item.id,JSON.stringify(item));
+  for (const schedule of state.transferSchedules) {
+    // Capture authority only at first persistence. Legacy schedules without a baseline fail closed.
+    if (!db.prepare('SELECT 1 FROM transfer_schedules WHERE session_id=? AND id=?').get(sessionId, schedule.id))
+      db.prepare('INSERT OR IGNORE INTO transfer_schedule_authorities VALUES(?,?,?)')
+        .run(sessionId, schedule.id, JSON.stringify(transferScheduleAuthority(state, schedule)));
   }
-
+  for (const [collection, table] of Object.entries(moneyMissionTables)) {
+    for (const artifact of state[collection as keyof typeof moneyMissionTables]) {
+      db.prepare(`INSERT INTO ${table}(session_id,id,payload_json) VALUES(?,?,?)
+        ON CONFLICT(session_id,id) DO UPDATE SET payload_json=excluded.payload_json`)
+        .run(sessionId, artifact.id, JSON.stringify(artifact));
+    }
+  }
   db.prepare(`INSERT INTO risk_preferences(session_id,payload_json,updated_at) VALUES(?,?,?)
     ON CONFLICT(session_id) DO UPDATE SET payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
     .run(sessionId, JSON.stringify(state.riskPreferences), new Date().toISOString());
@@ -225,7 +258,7 @@ export function migrateDemoStateShape(raw: unknown): DemoState {
     if (!('primaryGoalId' in record)) record.primaryGoalId = legacyGoal && typeof legacyGoal === 'object'
       ? String((legacyGoal as { id?: unknown }).id || '') || null : null;
   }
-  return migrateMoneyMissionState(DemoStateSchema.parse(value));
+  return DemoStateSchema.parse(value&&typeof value==='object'?migrateLegacyProduct(value as Record<string,unknown>):value);
 }
 
 export function getState(sessionId: string): DemoState {
@@ -246,10 +279,128 @@ export function mutateState(sessionId: string, change: (state: DemoState) => Dem
   } catch (error) { db.exec('ROLLBACK'); throw error; }
 }
 
+const StatementImportPreviewSchema = z.object({
+  batch: StatementImportBatchSchema, issues: z.array(ImportIssueSchema), rows: z.array(NormalizedStatementRowSchema),
+});
+
+function mergeArtifacts<T extends { id: string }>(current: T[], incoming: T[]): T[] {
+  const artifacts = new Map(current.map(artifact => [artifact.id, artifact]));
+  for (const artifact of incoming) artifacts.set(artifact.id, artifact);
+  return [...artifacts.values()];
+}
+
+export function saveStatementImportPreview(sessionId: string, value: unknown): StatementImportBatch {
+  const preview = StatementImportPreviewSchema.parse(value);
+  mutateState(sessionId, state => ({ ...state,
+    statementImportBatches: mergeArtifacts(state.statementImportBatches, [preview.batch]),
+    importIssues: mergeArtifacts(state.importIssues, preview.issues),
+    normalizedStatementRows: mergeArtifacts(state.normalizedStatementRows, preview.rows),
+  }));
+  return preview.batch;
+}
+
+export function getStatementImportBatch(sessionId: string, id: string): StatementImportBatch {
+  const row = db.prepare('SELECT payload_json FROM statement_import_batches WHERE session_id=? AND id=?')
+    .get(sessionId, id) as { payload_json: string } | undefined;
+  if (!row) throw new Error('IMPORT_BATCH_NOT_FOUND');
+  return StatementImportBatchSchema.parse(JSON.parse(row.payload_json));
+}
+
+export function listStatementImportBatches(sessionId: string): StatementImportBatch[] {
+  const rows = db.prepare('SELECT payload_json FROM statement_import_batches WHERE session_id=? ORDER BY rowid')
+    .all(sessionId) as Array<{ payload_json: string }>;
+  return rows.map(row => StatementImportBatchSchema.parse(JSON.parse(row.payload_json)));
+}
+
+export function saveEvidenceRefs(sessionId: string, value: unknown): EvidenceRef[] {
+  const refs = z.array(EvidenceRefSchema).parse(value);
+  mutateState(sessionId, state => ({ ...state, evidenceRefs: mergeArtifacts(state.evidenceRefs, refs) }));
+  return refs;
+}
+
+export function saveSubscriptionAction(sessionId: string, value: unknown): SubscriptionAction {
+  const action = SubscriptionActionSchema.parse(value);
+  mutateState(sessionId, state => ({ ...state,
+    subscriptionActions: mergeArtifacts(state.subscriptionActions, [action]) }));
+  return action;
+}
+
+export function saveTransferSchedule(sessionId: string, value: unknown): TransferSchedule {
+  const schedule = TransferScheduleSchema.parse(value);
+  mutateState(sessionId, state => ({ ...state,
+    transferSchedules: mergeArtifacts(state.transferSchedules, [schedule]) }));
+  return schedule;
+}
+
+export function saveTransferExecution(sessionId: string, value: unknown): TransferExecution {
+  const execution = TransferExecutionSchema.parse(value);
+  mutateState(sessionId, state => ({ ...state,
+    transferExecutions: mergeArtifacts(state.transferExecutions, [execution]) }));
+  return execution;
+}
+
+export function transferScheduleAuthority(state: DemoState, schedule: TransferSchedule) {
+  const { savedCents: _saved, status: _status, ...goal } = state.goal;
+  return { goal, primaryGoalId: state.primaryGoalId, emergencyCents: state.finance.emergencyCents,
+    accounts: [schedule.sourceAccountId, schedule.destinationAccountId].map(id => {
+      const account = state.accounts.find(item => item.id === id);
+      if (!account) return null;
+      const { balanceCents: _balance, ...configuration } = account;
+      return configuration;
+    }) };
+}
+
+export function getTransferScheduleAuthority(sessionId: string, scheduleId: string): unknown {
+  const row = db.prepare('SELECT payload_json FROM transfer_schedule_authorities WHERE session_id=? AND schedule_id=?')
+    .get(sessionId, scheduleId) as { payload_json: string } | undefined;
+  return row ? JSON.parse(row.payload_json) : null;
+}
+
+export function claimTransferSchedule(sessionId: string, scheduleId: string, period: string, now: Date): string | null {
+  const token = randomUUID();
+  const result = db.prepare(`INSERT INTO transfer_schedule_leases VALUES(?,?,?,?,?)
+    ON CONFLICT(session_id,schedule_id,period) DO UPDATE SET lease_token=excluded.lease_token,lease_until=excluded.lease_until
+    WHERE transfer_schedule_leases.lease_token IS NULL OR transfer_schedule_leases.lease_until<=?`)
+    .run(sessionId, scheduleId, period, token, new Date(now.getTime() + 30000).toISOString(), now.toISOString());
+  return result.changes ? token : null;
+}
+
+/** Balance, operation, receipt, period outcome and monitor outbox commit together. */
+export function commitTransferSchedule(sessionId: string, scheduleId: string, period: string, token: string,
+  now: Date, change: (state: DemoState) => { state: DemoState; execution: TransferExecution }): TransferExecution {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const lease = db.prepare('SELECT lease_token,lease_until FROM transfer_schedule_leases WHERE session_id=? AND schedule_id=? AND period=?')
+      .get(sessionId, scheduleId, period) as { lease_token: string; lease_until: string } | undefined;
+    if (lease?.lease_token !== token || lease.lease_until <= now.toISOString()) throw new Error('SCHEDULE_LEASE_LOST');
+    const result = change(getState(sessionId));
+    const next = persistStateChange(sessionId, () => result.state);
+    if (['failed', 'unknown', 'skipped_missing_trigger'].includes(result.execution.status))
+      enqueueTransferOutcome(sessionId, next.transferSchedules.find(item => item.id === scheduleId)?.goalId ?? next.goal.id,
+        result.execution, now);
+    db.prepare('UPDATE transfer_schedule_leases SET lease_token=NULL,lease_until=NULL WHERE session_id=? AND schedule_id=? AND period=? AND lease_token=?')
+      .run(sessionId, scheduleId, period, token);
+    db.exec('COMMIT');
+    return result.execution;
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+export function dueTransferSchedules(now: Date | undefined, limit: number): Array<{ sessionId: string; scheduleId: string }> {
+  const time = new Date(Date.now() + 8 * 3600000).toISOString().slice(11, 23);
+  const rows = db.prepare(`SELECT s.session_id,s.id FROM transfer_schedules s JOIN demo_sessions d ON d.id=s.session_id
+    WHERE json_extract(s.payload_json,'$.status')='active'
+      AND json_extract(s.payload_json,'$.trigger.type')='salary_event'
+      AND julianday(json_extract(s.payload_json,'$.nextEvaluationAt'))<=
+        julianday(COALESCE(?,json_extract(d.state_json,'$.clock')||'T'||?||'+08:00'))
+    ORDER BY json_extract(s.payload_json,'$.nextEvaluationAt'),s.session_id,s.id LIMIT ?`)
+    .all(now?.toISOString() ?? null, time, Math.max(0, Math.min(100, Math.floor(limit)))) as Array<{ session_id: string; id: string }>;
+  return rows.map(row => ({ sessionId: row.session_id, scheduleId: row.id }));
+}
+
 function persistStateChange(sessionId: string, change: (state: DemoState) => DemoState): DemoState {
   const old = getState(sessionId);
-  const changed = change(old);
-  const next = DemoStateSchema.parse(changed.twinVersion !== old.twinVersion ? screenMissionOutcomes(changed) : changed);
+  const next = DemoStateSchema.parse(change(old));
+  validateServiceBalances(old, next);
   const newEvents = next.audit.slice(old.audit.length);
   const result = db.prepare('UPDATE demo_sessions SET state_json = ?, version = version + 1, updated_at = ? WHERE id = ?')
     .run(JSON.stringify(next), new Date().toISOString(), sessionId);
@@ -388,6 +539,8 @@ export function resetState(sessionId: string): DemoState {
     db.prepare('DELETE FROM data_connections WHERE session_id=?').run(sessionId);
     db.prepare('DELETE FROM data_sync_batches WHERE session_id=?').run(sessionId);
     db.prepare('DELETE FROM imported_transactions WHERE session_id=?').run(sessionId);
+    for (const table of Object.values(moneyMissionTables))
+      db.prepare(`DELETE FROM ${table} WHERE session_id=?`).run(sessionId);
     db.prepare("UPDATE monitor_subscriptions SET status='cancelled',updated_at=? WHERE session_id=?")
       .run(new Date().toISOString(), sessionId);
     db.prepare("UPDATE monitor_events SET status='stale',processed_at=? WHERE session_id=? AND status IN ('pending','leased')")
@@ -512,6 +665,9 @@ function toolSourceExists(sessionId: string, task: AgentTask, state: DemoState,
     case 'bill': return state.bills.some(item => item.id === source.id);
     case 'transaction': return state.transactions.some(item => item.id === source.id);
     case 'connection': return state.dataConnections.some(item => item.id === source.id);
+    case 'evidence': {
+      try { inspectEvidence(state, source.id); return true; } catch { return false; }
+    }
     case 'tool_result': {
       try {
         const evidence = getAgentToolResult(sessionId, task.threadId, source.id);
@@ -973,9 +1129,17 @@ export function finishAgentAction(sessionId: string, actionId: string, status: '
   return getAgentAction(sessionId, actionId);
 }
 
+export function tickFinancialServices() {
+  const sessions = db.prepare(`SELECT id FROM demo_sessions WHERE
+    EXISTS(SELECT 1 FROM json_each(state_json,'$.financialServices.investments') WHERE json_extract(value,'$.status') IN ('pending','unknown') AND json_extract(value,'$.settlesOn') <= json_extract(state_json,'$.clock'))
+    OR EXISTS(SELECT 1 FROM json_each(state_json,'$.financialServices.bookings') WHERE json_extract(value,'$.status') = 'refund_pending' AND json_extract(value,'$.refundOn') <= json_extract(state_json,'$.clock')) LIMIT 100`).all() as Array<{id:string}>;
+  for (const session of sessions) mutateState(session.id, s => reconcileServices(s));
+  return sessions.length;
+}
+
 export interface MonitorEvent {
   id: string; sessionId: string; taskId: string; demoRunId: string; goalId: string;
-  twinVersion: number; kind: 'twin_changed' | 'bonus_followup'; status: string;
+  twinVersion: number; kind: 'twin_changed' | 'bonus_followup' | 'transfer_outcome'; status: string;
   dueDemoDate: string | null; attempts: number; leaseToken: string; payload: Record<string, unknown>;
 }
 
@@ -1057,6 +1221,9 @@ export function deferMonitorEvent(event: MonitorEvent, availableAt: string): voi
 }
 
 export function monitorEventIsCurrent(event: MonitorEvent): boolean {
+  if (event.kind === 'transfer_outcome') return currentRunId(event.sessionId) === event.demoRunId &&
+    getState(event.sessionId).transferExecutions.some(item => item.id === event.payload.executionId &&
+      ['failed', 'unknown', 'skipped_missing_trigger'].includes(item.status));
   const subscription = db.prepare(`SELECT * FROM monitor_subscriptions WHERE session_id=? AND task_id=?`)
     .get(event.sessionId, event.taskId) as Record<string, unknown> | undefined;
   if (!subscription || subscription.status !== 'active' || subscription.demo_run_id !== event.demoRunId ||
@@ -1089,10 +1256,24 @@ export function scheduleBonusFollowup(sessionId: string, threadId: string): stri
 }
 
 export function monitorThreadId(event: MonitorEvent): string {
+  if (event.kind === 'transfer_outcome') return createAgentThread(event.sessionId,
+    { title: '转账计划 · 需要核对', kind: 'risk', dedupeKey: `transfer:${event.payload.scheduleId}` }).id;
   const row = db.prepare(`SELECT thread_id FROM monitor_subscriptions WHERE session_id=? AND task_id=?`)
     .get(event.sessionId, event.taskId) as { thread_id: string } | undefined;
   if (!row) throw new Error('MONITOR_SUBSCRIPTION_NOT_FOUND');
   return row.thread_id;
+}
+
+export function enqueueTransferOutcome(sessionId: string, goalId: string, execution: TransferExecution,
+  now = new Date()): void {
+  const state = getState(sessionId);
+  db.prepare(`INSERT OR IGNORE INTO monitor_events(id,session_id,task_id,demo_run_id,goal_id,
+    twin_version,kind,dedupe_key,status,due_demo_date,available_at,attempts,payload_json,created_at)
+    VALUES(?,?,?,?,?,?,'transfer_outcome',?,'pending',NULL,?,0,?,?)`)
+    .run(randomUUID(), sessionId, `schedule:${execution.scheduleId}`, currentRunId(sessionId), goalId,
+      state.twinVersion, `transfer:${execution.id}`, now.toISOString(),
+      JSON.stringify({ executionId: execution.id, scheduleId: execution.scheduleId, status: execution.status,
+        reason: execution.reason }), now.toISOString());
 }
 
 export function monitorSubjectAlreadyDelivered(sessionId: string, subjectKey: string): boolean {
@@ -1159,40 +1340,3 @@ export function storedAuditChain(sessionId: string) {
 }
 
 export function closeStore() { db.close(); }
-
-function saveMissionArtifact<K extends keyof typeof missionArtifactTables>(sessionId: string, field: K, item: DemoState[K][number]) {
-  mutateState(sessionId, state => ({ ...state, [field]: [...state[field].filter(x => x.id !== item.id), item] }));
-  return item;
-}
-export function saveStatementImportPreview(sessionId: string, value: StatementImportBatch) { return saveMissionArtifact(sessionId, 'statementImportBatches', StatementImportBatchSchema.parse(value)); }
-export function getStatementImportBatch(sessionId: string, id: string) {
-  const batch = getState(sessionId).statementImportBatches.find(x => x.id === id);
-  if (!batch) throw new Error('IMPORT_BATCH_NOT_FOUND');
-  return StatementImportBatchSchema.parse(batch);
-}
-export function listStatementImportBatches(sessionId: string) { return getState(sessionId).statementImportBatches; }
-export function listMoneyMissionMonitorSessions(limit = 100): string[] {
-  return (db.prepare("SELECT id FROM demo_sessions WHERE json_extract(state_json, '$.mission.monitoringEnabled') = 1 ORDER BY updated_at LIMIT ?")
-    .all(Math.max(1, Math.min(1000, limit))) as Array<{id: string}>).map(row => row.id);
-}
-export function saveEvidenceRefs(sessionId: string, values: EvidenceRef[]) {
-  const parsed = EvidenceRefSchema.array().parse(values);
-  mutateState(sessionId, s => ({ ...s, evidenceRefs: [...s.evidenceRefs.filter(r => !parsed.some(x => x.id === r.id)), ...parsed] }));
-  return parsed;
-}
-export function saveSubscriptionAction(sessionId: string, value: SubscriptionAction) { return saveMissionArtifact(sessionId, 'subscriptionActions', SubscriptionActionSchema.parse(value)); }
-export function saveTransferSchedule(sessionId: string, value: TransferSchedule) { return saveMissionArtifact(sessionId, 'transferSchedules', TransferScheduleSchema.parse(value)); }
-export function saveTransferExecution(sessionId: string, value: TransferExecution) { return saveMissionArtifact(sessionId, 'transferExecutions', TransferExecutionSchema.parse(value)); }
-
-db.exec(`CREATE TABLE IF NOT EXISTS transfer_worker_leases(session_id TEXT NOT NULL,schedule_id TEXT NOT NULL,owner TEXT NOT NULL,expires_at INTEGER NOT NULL,PRIMARY KEY(session_id,schedule_id))`);
-db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS transfer_execution_period ON transfer_executions(session_id,json_extract(payload_json,'$.periodKey'))`);
-export function listActiveTransferSchedules(limit=100) {
-  return db.prepare(`SELECT s.id AS sessionId,json_extract(p.value,'$.id') AS scheduleId FROM demo_sessions s JOIN json_each(s.state_json,'$.transferSchedules') p WHERE json_extract(p.value,'$.status')='active' ORDER BY s.updated_at LIMIT ?`).all(Math.min(1000,Math.max(1,limit))) as {sessionId:string;scheduleId:string}[];
-}
-export function claimTransferLease(sessionId:string,scheduleId:string,owner:string) {
-  const now=Date.now();return !!db.prepare(`INSERT INTO transfer_worker_leases(session_id,schedule_id,owner,expires_at) VALUES(?,?,?,?) ON CONFLICT(session_id,schedule_id) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at WHERE transfer_worker_leases.expires_at<=?`).run(sessionId,scheduleId,owner,now+30000,now).changes;
-}
-export function releaseTransferLease(sessionId:string,scheduleId:string,owner:string) { db.prepare('DELETE FROM transfer_worker_leases WHERE session_id=? AND schedule_id=? AND owner=?').run(sessionId,scheduleId,owner); }
-
-db.exec('CREATE TABLE IF NOT EXISTS product_events(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,event_name TEXT NOT NULL,properties_json TEXT NOT NULL,at TEXT NOT NULL)');
-export function saveProductEvent(sessionId:string,event:{id:string;name:string;properties:unknown;at:string}){db.prepare('INSERT INTO product_events(id,session_id,event_name,properties_json,at) VALUES(?,?,?,?,?)').run(event.id,sessionId,event.name,JSON.stringify(event.properties),event.at);}

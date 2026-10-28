@@ -7,6 +7,7 @@ import {
 } from '../shared/contracts.ts';
 import { createFixture } from './fixtures.ts';
 import { previewGoalScenario } from './scenario.ts';
+import { createJapanMoneyMissionFixture } from './money-mission-fixture.ts';
 
 test('goal scenario preview is deterministic, immutable, and limited to three plans', () => {
   const state = createFixture();
@@ -43,6 +44,20 @@ test('an explicit zero monthly contribution has no projected completion date', (
   assert.equal(preview.assessment.projectedDate, null);
   assert.equal(preview.assessment.status, 'at_risk');
 });
+
+for (const [targetDate, reason] of [['2026-10-25', 'GOAL_DEADLINE_PASSED'],
+  ['2028-06-30', 'FORECAST_HORIZON_INCOMPLETE']] as const) {
+  test(`scenario exposes ${reason} through its existing contract without throwing`, () => {
+    const state = createJapanMoneyMissionFixture(); const before = structuredClone(state);
+    const preview = previewGoalScenario(state, { targetCents: 800000, targetDate,
+      monthlyContributionCents: 100000, protectedCents: 2000000, flexibilityWeeks: 0 });
+    assert.equal(preview.assessment.projectedDate, null);
+    assert.ok(preview.assessment.assumptions.includes(reason));
+    assert.ok(preview.plans.every(plan => plan.status === 'infeasible'));
+    assert.deepEqual(state, before);
+    assert.equal(GoalScenarioPreviewSchema.parse(preview).id, preview.id);
+  });
+}
 
 test('weekly summary and delivery contracts distinguish quiet summaries from urgent signals', () => {
   const summary = WeeklyRiskSummarySchema.parse({

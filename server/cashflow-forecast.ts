@@ -1,79 +1,188 @@
-import type { CashflowEdit, DatedCashflowForecast, DemoState } from '../shared/contracts.ts';
-import { stableHash } from './governance.ts';
-import { validDate } from './statement-parser.ts';
+import { createHash } from 'node:crypto';
+import { DatedCashflowForecastInputSchema, DatedCashflowForecastSchema,
+  type CashflowEdit, type DatedCashflowForecast, type DatedCashflowForecastInput, type DemoState } from '../shared/contracts.ts';
+import { subscriptionSavingsEligible } from './subscription-service.ts';
 
-export function monthDate(year: number, month: number, day: number) {
-  const last = new Date(Date.UTC(year,month + 1,0)).getUTCDate(); return new Date(Date.UTC(year,month,Math.min(day,last))).toISOString().slice(0,10);
+export type { CashflowEdit } from '../shared/contracts.ts';
+type Event = DatedCashflowForecast['events'][number];
+const DAY = 86_400_000;
+const timestamp = (date: string) => Date.parse(`${date}T00:00:00Z`);
+const iso = (time: number) => new Date(time).toISOString().slice(0, 10);
+const shift = (date: string, days: number) => iso(timestamp(date) + days * DAY);
+const unique = (values: string[]) => [...new Set(values)].sort();
+const priority = (kind: Event['kind'], amount: number) => amount >= 0 ? 100
+  : ({ bill: 10, subscription: 20, purchase: 30, transfer: 40, income: 50 })[kind];
+
+function integer(value: number): number {
+  if (!Number.isSafeInteger(value)) throw new Error('FORECAST_INVALID_CENTS');
+  return value;
 }
-export const addIsoDays = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000).toISOString().slice(0,10);
-export function buildDatedCashflowForecast(state: DemoState, input: { accountId: string; horizonEnd: string; scenario: 'baseline' | 'stress' | 'edited'; edits?: CashflowEdit[]; contributionCents?: number; contributionOverrides?: Record<string, number> }): DatedCashflowForecast {
-  if (!validDate(input.horizonEnd) || input.horizonEnd < state.clock || input.horizonEnd > addIsoDays(state.clock,366)) throw new Error('INVALID_FORECAST_HORIZON');
-  const account = state.accounts.find(a => a.id === input.accountId); if (!account) throw new Error('ACCOUNT_NOT_FOUND');
+
+/** Clamp each occurrence from the original day, never from a previously clamped month. */
+function monthlyDates(start: string, end: string, day: number): string[] {
+  const result: string[] = [];
+  const cursor = new Date(timestamp(`${start.slice(0, 7)}-01`));
+  while (iso(cursor.getTime()) <= end) {
+    const year = cursor.getUTCFullYear(); const month = cursor.getUTCMonth();
+    const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const date = iso(Date.UTC(year, month, Math.min(day, last)));
+    if (date >= start && date <= end) result.push(date);
+    cursor.setUTCMonth(month + 1);
+  }
+  return result;
+}
+
+/** A deterministic simulation ledger; exact refers to arithmetic under the surfaced assumptions. */
+export function buildDatedCashflowForecast(state: DemoState, rawInput: DatedCashflowForecastInput): DatedCashflowForecast {
+  const input = DatedCashflowForecastInputSchema.parse(rawInput);
+  if (input.horizonEnd < state.clock || timestamp(input.horizonEnd) - timestamp(state.clock) > 366 * DAY)
+    throw new Error('FORECAST_INVALID_HORIZON');
+  const account = state.accounts.find(item => item.id === input.accountId);
+  if (!account) throw new Error('ACCOUNT_NOT_FOUND');
+  if (account.protected || account.type === 'emergency') throw new Error('PROTECTED_ACCOUNT');
+  // Legacy bills and income are CNY checking-account obligations, with no FX or wallet ownership metadata.
   if (account.currency !== 'CNY') throw new Error('CURRENCY_MISMATCH');
-  if (account.protected || account.type !== 'checking') throw new Error('PROTECTED_ACCOUNT');
-  const snapshot = state.accountSnapshots.filter(s => s.accountId === account.id && s.confirmed && s.currency === account.currency && s.asOf <= state.clock).sort((a,b) => b.asOf.localeCompare(a.asOf) || b.twinVersion - a.twinVersion)[0];
-  const freshConnection = state.dataConnections.some(c => c.source === 'bank' && c.status === 'connected' && c.permissionScopes.includes('balances'));
-  const precision = !snapshot ? 'insufficient_balance' : snapshot.asOf === state.clock && snapshot.balanceCents === account.balanceCents && state.finance.checkingCents === account.balanceCents && (snapshot.source === 'user_confirmed' || freshConnection) ? 'exact' : 'range';
-  const limitations = ['仅预测已知账单和已声明假设，未知支出可能改变结果。', '转入日期是假设工资按时到账的预览，实际执行仍需验证到账。'];
-  const assumptions = ['工资通常25日到账；未来工资为假设。', '日内先考虑已知支出，再考虑收入和目标转入。', '核心应急金不进入活期预测。'];
-  type Event = Omit<DatedCashflowForecast['events'][number], 'balanceCents'>;
-  const events = new Map<string,Event>();
-  const put = (event: Event) => { if (event.date > state.clock && event.date <= input.horizonEnd) events.set(event.id,event); };
-  const base = { accountId: account.id,currency: account.currency,claimType: 'prediction' as const };
-  const start = new Date(`${state.clock}T00:00:00Z`); const end = new Date(`${input.horizonEnd}T00:00:00Z`);
-  for (let cursor = new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth(),1)); cursor <= end; cursor.setUTCMonth(cursor.getUTCMonth() + 1)) {
-    const year = cursor.getUTCFullYear(), month = cursor.getUTCMonth(), period = monthDate(year,month,1).slice(0,7);
-    put({ ...base,id:`salary:${period}`,date:monthDate(year,month,25),label:'工资',priority:20,amountCents:state.finance.monthlyIncomeCents,claimType:'assumption',sourceRefs:['finance:monthlyIncomeCents'] });
-    for (const bill of state.bills) {
-      const dueDate = bill.recurrence === 'monthly' ? monthDate(year,month,Number(bill.dueDate.slice(8))) : bill.dueDate;
-      if (bill.recurrence !== 'monthly' && (bill.paid || dueDate.slice(0,7) !== period)) continue;
-      put({ ...base,id:`bill:${bill.id}:${bill.recurrence === 'monthly' ? period : dueDate}`,date:dueDate,label:bill.title,priority:10,amountCents:-bill.amountCents,sourceRefs:[bill.id] });
-    }
-    for (const sub of state.subscriptions) {
-      const cancelled = state.subscriptionActions.some(a => a.subscriptionId === sub.id && a.action === 'cancel' && ['succeeded','reconciled'].includes(a.status) && a.nextChargeSuppressed && a.effectiveAt <= monthDate(year,month,Number(sub.nextChargeDate.slice(8))));
-      const dueDate = monthDate(year,month,Number(sub.nextChargeDate.slice(8)));
-      if (cancelled || dueDate < sub.nextChargeDate || (sub.cadence === 'annual' && dueDate.slice(5,7) !== sub.nextChargeDate.slice(5,7))) continue;
-      put({ ...base,id:`subscription:${sub.id}:${period}`,date:dueDate,label:sub.title,priority:10,amountCents:-sub.monthlyCents,sourceRefs:[sub.id] });
-    }
+  if (account.type !== 'checking') throw new Error('FORECAST_UNSUPPORTED_ACCOUNT');
+  const snapshots = state.accountSnapshots.filter(item => item.accountId === account.id && item.asOf <= state.clock)
+    .sort((a, b) => b.asOf.localeCompare(a.asOf) || b.twinVersion - a.twinVersion || b.createdAt.localeCompare(a.createdAt)
+      || a.id.localeCompare(b.id));
+  const snapshot = snapshots[0];
+  if (snapshot && snapshot.currency !== account.currency) throw new Error('CURRENCY_MISMATCH');
+  const current = snapshot && snapshot.asOf === state.clock && snapshot.twinVersion <= state.twinVersion &&
+    snapshot.balanceCents === account.balanceCents;
+  const startingBalanceCents = current ? integer(snapshot.balanceCents) : null;
+  const assumptions = ['只预测工资卡；独立应急金和目标钱包余额不计入可用资金',
+    '当前余额已包含基准日收支；未来未付账单和订阅按原始日期每月重复，月底不足原日则取当月末日',
+    '同日先支出后收入，同类按事件 ID 排序；最低余额包含日内事件顺序'];
+  const limitations = ['模拟日期与金额是确定性假设，不保证未来到账、扣款或执行',
+    '未记录的消费、账户间资金流和汇率变化未纳入；历史流水不能推算当前余额'];
+  if (!current) limitations.push('缺少与当前账户一致的当日权威余额快照；只展示事件范围，不提供可执行预测');
+  const evidenceRefs = new Set<string>(['finance']);
+  if (current) { evidenceRefs.add(snapshot.id); evidenceRefs.add(snapshot.sourceId); }
+  const ledger = new Map<string, Event>();
+  const add = (event: Omit<Event, 'priority'>) => {
+    integer(event.amountCents);
+    const normalized = { ...event, priority: priority(event.kind, event.amountCents), sourceRefs: unique(event.sourceRefs) };
+    const previous = ledger.get(event.id);
+    if (previous && JSON.stringify(previous) !== JSON.stringify(normalized)) throw new Error('FORECAST_CONFLICTING_EVENT');
+    ledger.set(event.id, normalized);
+  };
+  const nextDay = shift(state.clock, 1);
+  // Add a month's lookahead so delaying a month-end salary cannot discard its source occurrence.
+  const generationEnd = shift(input.horizonEnd, 31);
+  for (const bill of state.bills.filter(item => !item.paid)) {
+    if (bill.amountCents < 0) throw new Error('FORECAST_INVALID_CENTS');
+    for (const date of monthlyDates(bill.dueDate, generationEnd, Number(bill.dueDate.slice(-2))))
+      add({ id: `bill-${bill.id}-${date}`, date, label: bill.title,
+        kind: bill.id === 'daily-purchase' ? 'purchase' : 'bill', amountCents: -bill.amountCents, sourceRefs: [bill.id] });
   }
-  if ((input.edits?.length ?? 0) > 40) throw new Error('INVALID_FORECAST_EDITS');
-  for (const [index, edit] of (input.edits ?? []).entries()) {
-    if (edit.currency !== account.currency) throw new Error('CURRENCY_MISMATCH');
-    if (!validDate(edit.date) || !Number.isSafeInteger(edit.amountCents)) throw new Error('INVALID_FORECAST_EDIT');
-    if (edit.operation === 'remove' || edit.operation === 'replace') { if (!edit.eventId || !events.has(edit.eventId)) throw new Error('DATA_EVENT_NOT_FOUND'); events.delete(edit.eventId); }
-    if (edit.operation !== 'remove') put({ ...base,id:edit.eventId ?? `edit:${index}`,date:edit.date,label:edit.label,amountCents:edit.amountCents,priority:edit.amountCents < 0 ? 10 : 20,claimType:'assumption',sourceRefs:[`user-edit:${index}`] });
-  }
-  const activeSchedules = state.transferSchedules.filter(s => s.status === 'active' && s.sourceAccountId === account.id);
-  const contributions = input.contributionCents !== undefined
-    ? [...activeSchedules.filter(s => s.goalId !== state.goal.id), { id: 'preview', amountCents: input.contributionCents, endDate: state.goal.targetDate, goalId: state.goal.id }]
-    : activeSchedules;
-  for (const plan of contributions) {
-    const goal = state.goals.find(goal => goal.id === plan.goalId);
-    let gap = Math.max(0, Math.min(goal?.targetCents ?? 0, 'targetCents' in plan ? plan.targetCents : goal?.targetCents ?? 0) - (goal?.savedCents ?? 0));
-    const fixedDay = 'trigger' in plan && plan.trigger.type === 'fixed_day' ? plan.trigger.expectedDay : null;
-    const dates = fixedDay === null
-      ? [...events.values()].filter(event => event.id.startsWith('salary:') && Number(event.date.slice(8)) <= 27).map(event => addIsoDays(event.date, 1))
-      : Array.from({ length: 14 }, (_, index) => monthDate(start.getUTCFullYear(), start.getUTCMonth() + index, fixedDay));
-    for (const date of dates.sort()) {
-      if (date <= state.clock || date > input.horizonEnd || date > plan.endDate || gap <= 0 || plan.amountCents <= 0) continue;
-      if ('frequency' in plan && plan.frequency === 'one_time') continue; // Confirmed one-time transfers have already changed authoritative balances.
-      const periodKey = `schedule:${plan.id}:${date.slice(0, 7)}`;
-      if (state.transferExecutions.some(execution => execution.periodKey === periodKey)) continue;
-      const requestedAmount = plan.id === 'preview' ? input.contributionOverrides?.[date.slice(0, 7)] ?? plan.amountCents : plan.amountCents;
-      if (!Number.isSafeInteger(requestedAmount) || requestedAmount < 0) throw new Error('INVALID_CONTRIBUTION');
-      const amount = Math.min(requestedAmount, gap); gap -= amount;
-      if (amount === 0) continue;
-      put({ ...base, id: `transfer:${periodKey}`, date, label: fixedDay === null ? '旅行金转入（需工资实际到账）' : '目标转入（固定日期）', priority: 30, amountCents: -amount, sourceRefs: [plan.id] });
+  for (const subscription of state.subscriptions) {
+    const verified = state.subscriptionActions.filter(action => action.subscriptionId === subscription.id &&
+      subscriptionSavingsEligible(state, action.id)).sort((a, b) => a.effectiveAt.localeCompare(b.effectiveAt) || a.id.localeCompare(b.id));
+    for (const action of verified) {
+      evidenceRefs.add(action.id); action.evidenceRefs.forEach(ref => evidenceRefs.add(ref));
+      if (action.merchantOperationId) evidenceRefs.add(action.merchantOperationId);
+    }
+    for (const date of monthlyDates(subscription.nextChargeDate, generationEnd, Number(subscription.nextChargeDate.slice(-2)))) {
+      if (verified.some(action => date >= action.effectiveAt)) continue;
+      add({ id: `subscription-${subscription.id}-${date}`, date, label: subscription.title, kind: 'subscription',
+        amountCents: -subscription.monthlyCents, sourceRefs: [subscription.id] });
     }
   }
-  if (input.scenario === 'stress') {
-    const nextSalary = [...events.values()].filter(e => e.id.startsWith('salary:')).sort((a,b) => a.date.localeCompare(b.date))[0];
-    const date = nextSalary ? addIsoDays(nextSalary.date,-1) : addIsoDays(state.clock,1);
-    put({ ...base,id:'stress:essential-spending',date,label:'压力情景：额外必要支出',priority:10,amountCents:-50000,claimType:'assumption',sourceRefs:['scenario:essential-spending-500'] });
-    assumptions.push('压力情景额外增加一次¥500必要支出。');
+  const salaryRecords = state.transactions.filter(item => item.accountId === account.id &&
+    item.sourceKind === 'bank' && item.category === 'income' && item.title === '工资' && item.amountCents > 0);
+  const salaries = salaryRecords.filter(item => item.date <= state.clock)
+    .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+  const salary = salaries[0]; const salaryDay = salary ? Number(salary.date.slice(-2)) : 25;
+  assumptions.push(`预计工资每月 ${salaryDay} 日到账，金额 ${integer(state.finance.monthlyIncomeCents)} 分，收入来源与日期沿用当前模拟资料`);
+  if (!salary) limitations.push('缺少可验证的银行工资记录；工资日暂按每月 25 日假设');
+  const delay = input.scenario === 'stress' ? 3 : 0;
+  if (delay) assumptions.push('压力情景假设每次工资延迟 3 个自然日，不代表概率或实际入账');
+  for (const date of monthlyDates(nextDay, generationEnd, salaryDay)) {
+    if (salaryRecords.some(item => item.date > state.clock && item.date.slice(0, 7) === date.slice(0, 7))) continue;
+    add({ id: `salary-${date}`, date: shift(date, delay), label: '工资', kind: 'income',
+      amountCents: state.finance.monthlyIncomeCents, sourceRefs: salary ? ['finance', salary.id] : ['finance'] });
   }
-  let balance = snapshot?.balanceCents ?? 0, minimum = balance, minimumDate = state.clock;
-  const ledger = [...events.values()].sort((a,b) => a.date.localeCompare(b.date) || a.priority-b.priority || a.id.localeCompare(b.id)).map(e => { balance += e.amountCents; if (balance < minimum) { minimum = balance; minimumDate = e.date; } return { ...e,balanceCents:balance }; });
-  if (precision !== 'exact') limitations.push('没有足够新鲜的权威余额；本预测不能用于执行转账。');
-  return { forecastId: precision === 'exact' ? `forecast:${stableHash([state.twinVersion,snapshot,input]).slice(0,32)}` : null,twinVersion:state.twinVersion,accountId:account.id,horizonEnd:input.horizonEnd,scenario:input.scenario,precision,minimumBalanceCents:snapshot ? minimum : null,minimumBalanceDate:snapshot ? minimumDate : null,events:ledger,assumptions,limitations,dataAsOf:snapshot?.asOf ?? state.finance.updatedAt };
+  const importedIds = new Set(state.normalizedStatementRows.map(item => item.id));
+  for (const transaction of state.transactions.filter(item => item.accountId === account.id && item.date > state.clock))
+    add({ id: `transaction-${transaction.id}`, date: transaction.date,
+      label: importedIds.has(transaction.id) ? '已确认账单交易' : transaction.title,
+      kind: transaction.amountCents >= 0 ? 'income' : 'purchase', amountCents: transaction.amountCents, sourceRefs: [transaction.id] });
+  const edited = new Set<string>();
+  const applyEdit = (edit: CashflowEdit): boolean => {
+    if (edit.type === 'add') {
+      if (edit.event.currency !== account.currency) throw new Error('CURRENCY_MISMATCH');
+      if (ledger.has(edit.event.id)) throw new Error('FORECAST_DUPLICATE_EDIT');
+      const { currency: _currency, ...event } = edit.event; add(event);
+    } else {
+      const previous = ledger.get(edit.eventId); if (!previous) return false;
+      ledger.delete(edit.eventId);
+      if (edit.type === 'update') add({ ...previous, date: edit.date ?? previous.date,
+        amountCents: edit.amountCents ?? previous.amountCents });
+    }
+    return true;
+  };
+  const deferred: CashflowEdit[] = [];
+  for (const edit of input.edits ?? []) {
+    const id = edit.type === 'add' ? edit.event.id : edit.eventId;
+    if (edited.has(id)) throw new Error('FORECAST_DUPLICATE_EDIT');
+    edited.add(id);
+    const editedDate = edit.type === 'add' ? edit.event.date : edit.type === 'update' ? edit.date : undefined;
+    if (editedDate && editedDate <= state.clock) throw new Error('FORECAST_EDIT_DATE');
+    if (!applyEdit(edit)) deferred.push(edit);
+  }
+  // Income/date hypotheses must be applied before deriving salary-triggered transfers.
+  for (const schedule of state.transferSchedules.filter(item => item.status === 'active' && item.sourceAccountId === account.id)) {
+    if (schedule.currency !== account.currency) throw new Error('CURRENCY_MISMATCH');
+    const end = schedule.endDate && schedule.endDate < generationEnd ? schedule.endDate : generationEnd;
+    let dates: string[];
+    if (schedule.recurrence === 'one_time') dates = [schedule.startDate];
+    else if (schedule.trigger.type === 'fixed_day') dates = monthlyDates(schedule.startDate, end, schedule.trigger.day);
+    else {
+      const trigger = schedule.trigger;
+      dates = [...ledger.values()].filter(event => event.kind === 'income' && event.label === '工资' &&
+        trigger.accountId === account.id && Number(event.date.slice(-2)) >= trigger.windowStartDay &&
+        Number(event.date.slice(-2)) <= trigger.graceEndDay &&
+        Math.abs(event.amountCents - trigger.expectedAmountCents) * 10000 <= trigger.expectedAmountCents * trigger.toleranceBps)
+        .map(event => shift(event.date, trigger.executeOffsetDays));
+      assumptions.push('工资触发的转入日只是预测；实际转入仍须验证银行工资事件，缺失时跳过');
+    }
+    const goal = state.goals.find(item => item.id === schedule.goalId);
+    let remaining = schedule.stopAtGoal && goal ? Math.max(0, goal.targetCents - goal.savedCents) : Number.MAX_SAFE_INTEGER;
+    for (const date of unique(dates).filter(date => date >= nextDay && date >= schedule.startDate && date <= end)) {
+      const amountCents = Math.min(schedule.amountCents, remaining);
+      if (!amountCents) break;
+      add({ id: `transfer-${schedule.id}-${date}`, date, label: '目标转入', kind: 'transfer', amountCents: -amountCents,
+        sourceRefs: [schedule.id, schedule.forecastId] });
+      remaining -= amountCents;
+    }
+  }
+  for (const edit of deferred) if (!applyEdit(edit)) throw new Error('FORECAST_EDIT_EVENT_NOT_FOUND');
+  if (edited.size) assumptions.push('用户编辑仅用于当前情景假设，未更改账单、商户状态或已授权计划');
+  const events = [...ledger.values()].filter(event => event.date > state.clock && event.date <= input.horizonEnd)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.priority - b.priority || a.id.localeCompare(b.id));
+  events.forEach(event => event.sourceRefs.forEach(ref => evidenceRefs.add(ref)));
+  for (const ref of state.evidenceRefs) if (evidenceRefs.has(ref.sourceId)) evidenceRefs.add(ref.id);
+  let balance = startingBalanceCents; let minimumBalanceCents = balance;
+  let minimumBalanceDate = balance === null ? null : state.clock;
+  const dailyBalances: DatedCashflowForecast['dailyBalances'] = [];
+  if (balance !== null) {
+    let eventIndex = 0;
+    for (let time = timestamp(state.clock); time <= timestamp(input.horizonEnd); time += DAY) {
+      const date = iso(time);
+      while (events[eventIndex]?.date === date) {
+        balance = integer(balance + events[eventIndex++].amountCents);
+        if (balance < minimumBalanceCents!) { minimumBalanceCents = balance; minimumBalanceDate = date; }
+      }
+      dailyBalances.push({ date, balanceCents: balance });
+    }
+  }
+  const content = { accountId: account.id, currency: account.currency, twinVersion: state.twinVersion,
+    dataAsOf: current ? snapshot.asOf : state.finance.updatedAt, horizonStart: state.clock, horizonEnd: input.horizonEnd,
+    scenario: input.scenario, precision: current ? 'exact' as const : 'range' as const,
+    startingBalanceCents, minimumBalanceCents, minimumBalanceDate, events, dailyBalances,
+    evidenceRefs: unique([...evidenceRefs]), assumptions: unique(assumptions), limitations: unique(limitations),
+    createdAt: `${state.clock}T12:00:00.000Z` };
+  const id = `forecast-${createHash('sha256').update(JSON.stringify(content)).digest('hex')}`;
+  return DatedCashflowForecastSchema.parse({ id, executableForecastId: current ? id : null, ...content });
 }

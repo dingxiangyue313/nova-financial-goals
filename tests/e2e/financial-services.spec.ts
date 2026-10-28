@@ -1,0 +1,31 @@
+import {test,expect} from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+test.use({serviceWorkers:'block'});
+
+test('six scenario entry preserves goal-first home and explicit money confirmations',async({page},testInfo)=>{
+  await page.goto('/');
+  await expect(page.getByRole('heading',{name:'早上好，Alex'})).toBeVisible();
+  await expect(page.getByText('快速直达:')).toHaveCount(0);
+  await expect(page.getByText('10月花了 ¥4,778')).toBeVisible();
+  await page.screenshot({path:`artifacts/home-${testInfo.project.name}.png`,fullPage:true});
+  await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();
+  await expect(page.getByRole('heading',{name:'金融任务',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'转账与AA',exact:true}).click();
+  await page.getByLabel('明确选择收款人').selectOption('contact-1');
+  await page.getByRole('button',{name:'预览联系人转账'}).click();
+  const dialog=page.getByRole('dialog');await expect(dialog).toContainText('尾号1001');
+  await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('已提交模拟操作，请核对下方结果与凭证。')).toBeVisible();
+  await page.getByRole('button',{name:'理财',exact:true}).click();
+  await expect(page.getByRole('heading',{name:/风险与用钱/})).toBeVisible();
+  await page.getByRole('button',{name:'卡片',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'旅行借记卡 · 尾号2002'})).toBeVisible();
+  await page.getByRole('button',{name:'旅行请求',exact:true}).click();
+  await page.getByRole('button',{name:'获取签名机票与住宿报价'}).click();
+  await expect(page.getByText(/樱旅航空 · 往返机票/)).toBeVisible();
+  await page.screenshot({path:`artifacts/services-${testInfo.project.name}.png`,fullPage:true});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  const report=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+  expect(report.violations.filter(v=>['critical','serious'].includes(v.impact??''))).toEqual([]);
+});

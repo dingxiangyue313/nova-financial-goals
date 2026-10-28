@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createFixture } from './fixtures.ts';
-import { addDays, assessCandidateScenario, availableMonthly, simulateCandidateMonths } from './domain.ts';
+import { activatePlan, addDays, assessCandidateScenario, assessGoal, availableMonthly, simulateCandidateMonths } from './domain.ts';
 import type { CandidateInput, DemoState } from '../shared/contracts.ts';
+import { createJapanMoneyMissionFixture } from './money-mission-fixture.ts';
+import { connectDataSources } from './data-connections.ts';
 
 const candidate = (scenario: CandidateInput['scenario'] = { kind: 'baseline' }): CandidateInput => ({
   targetCents: 800000, targetDate: '2026-12-31', monthlyContributionCents: 200000,
@@ -92,3 +94,97 @@ test('income reduction start month and missed contribution month change the fore
   assert.equal(assessCandidateScenario(state, missedFirst, 300000, [], missedFirst.targetDate).bufferCents,
     200000);
 });
+
+test('dated candidates fund only the remaining goal gap and finish on a salary-following date', () => {
+  const state = createJapanMoneyMissionFixture();
+  for (const [monthly, date] of [[75000, '2027-06-26'], [100000, '2027-04-26'],
+    [120000, '2027-02-26']] as const) {
+    const input = { ...candidate(), targetDate: state.goal.targetDate, monthlyContributionCents: monthly,
+      firstMonthContributionCents: monthly };
+    const result = assessCandidateScenario(state, input, 200000, [], input.targetDate);
+    assert.equal(result.projectedDate, date);
+    assert.equal(result.fundedByTargetCents, 600000);
+    assert.equal(result.shortfallCents, 0);
+  }
+});
+
+test('dated candidate execution authority requires a current authoritative balance', () => {
+  const state = createJapanMoneyMissionFixture(); state.accountSnapshots = [];
+  const input = { ...candidate(), targetDate: state.goal.targetDate, monthlyContributionCents: 100000 };
+  const result = assessCandidateScenario(state, input, 200000, [], input.targetDate);
+  assert.equal(result.status, 'insufficient_data');
+  assert.equal(result.dataSufficient, false);
+});
+
+test('historical bank connections preserve a legacy goal calculation without claiming dated balance authority', () => {
+  const connected = connectDataSources(createFixture(), ['bank', 'wechat_pay', 'alipay']).state;
+  assert.equal(connected.accountSnapshots.length, 0);
+  const result = assessGoal(connected);
+  assert.equal(result.status, 'on_track');
+  assert.equal(result.projectedDate, '2026-12-15');
+});
+
+test('advancing the clock cannot downgrade a dated mission missing its balance into legacy execution', () => {
+  const state = createJapanMoneyMissionFixture(); state.clock = '2026-11-01'; state.accountSnapshots = [];
+  assert.equal(assessGoal(state).status, 'insufficient_data');
+});
+
+test('dated candidate treats its first month as a total rather than adding the total to recurring deposits', () => {
+  const state = createJapanMoneyMissionFixture(); state.clock = '2026-10-20';
+  state.accountSnapshots.forEach(snapshot => { snapshot.asOf = state.clock; });
+  const input = { ...candidate(), targetDate: state.goal.targetDate,
+    monthlyContributionCents: 120000, firstMonthContributionCents: 240000 };
+  const simulation = simulateCandidateMonths(state, input, 200000);
+  assert.deepEqual(simulation.months.slice(0, 2).map(month => month.contributedCents), [120000, 120000]);
+  assert.equal(simulation.months.reduce((sum, month) => sum + month.contributedCents, 0), 600000);
+  const result = assessCandidateScenario(state, input, 200000, [], input.targetDate);
+  assert.equal(result.status, 'on_track'); assert.equal(result.projectedDate, '2027-01-26');
+});
+
+test('a stale previously accepted ambiguous schedule cannot silently become another schedule', () => {
+  const state = createJapanMoneyMissionFixture(); state.goal.targetDate = '2026-12-30';
+  state.goal.status = 'active'; state.goal.monthlyContributionCents = 300000;
+  state.goal.firstMonthContributionCents = 300000; state.goal.selectedPlanId = 'goal-plan-prior-version-upfront';
+  state.twinVersion++;
+  const result = assessGoal(state);
+  assert.equal(result.status, 'infeasible'); assert.equal(result.projectedDate, null);
+  assert.ok(result.assumptions.includes('AMBIGUOUS_SCHEDULE'));
+  assert.ok(result.plans.every(plan => plan.status === 'infeasible'));
+});
+
+test('zero regenerated matches block accepted candidate assessment and simulation while explicit replanning still works', () => {
+  const initial = createJapanMoneyMissionFixture();
+  const state = activatePlan(initial, assessGoal(initial).plans[2].id);
+  state.twinVersion++; state.transactions[0].date = '2026-09-27';
+  const input: CandidateInput = { targetCents: state.goal.targetCents, targetDate: state.goal.targetDate,
+    monthlyContributionCents: state.goal.monthlyContributionCents,
+    firstMonthContributionCents: state.goal.firstMonthContributionCents,
+    protectedCents: state.goal.protectedCents, scenario: { kind: 'baseline' }, evidenceResultIds: [] };
+  const assessment = assessCandidateScenario(state, input, state.goal.savedCents, [], input.targetDate);
+  assert.equal(assessment.status, 'infeasible'); assert.equal(assessment.projectedDate, null);
+  assert.equal(assessment.dataSufficient, false);
+  assert.ok(assessment.constraintViolations.includes('AMBIGUOUS_SCHEDULE'));
+  assert.equal(assessment.fundedByTargetCents, 0); assert.equal(assessment.shortfallCents, 600000);
+  const simulation = simulateCandidateMonths(state, input, state.goal.savedCents);
+  assert.deepEqual(simulation.months, []); assert.equal(simulation.futureContributionCents, 0);
+  const replan = assessCandidateScenario(state, { ...input, firstMonthContributionCents: 240000 },
+    state.goal.savedCents, [], input.targetDate);
+  assert.equal(replan.status, 'on_track'); assert.equal(replan.projectedDate, '2027-01-28');
+});
+
+for (const [targetDate, reason] of [['2026-10-25', 'GOAL_DEADLINE_PASSED'],
+  ['2028-06-30', 'FORECAST_HORIZON_INCOMPLETE']] as const) {
+  test(`dated candidate and assessment expose ${reason} instead of throwing`, () => {
+    const state = createJapanMoneyMissionFixture(); state.goal.targetDate = targetDate;
+    const input = { ...candidate(), targetDate, monthlyContributionCents: 100000 };
+    const result = assessCandidateScenario(state, input, 200000, [], targetDate);
+    assert.equal(result.projectedDate, null); assert.equal(result.dataSufficient, false);
+    assert.ok(result.constraintViolations.includes(reason));
+    if (targetDate < state.clock) assert.equal(result.fundedByTargetCents, 0);
+    assert.doesNotThrow(() => simulateCandidateMonths(state, input, 200000));
+    const goal = assessGoal(state);
+    assert.equal(goal.projectedDate, null);
+    assert.ok(goal.assumptions.includes(reason));
+    assert.ok(goal.plans.every(plan => plan.status === 'infeasible'));
+  });
+}

@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 
 // Authoritative synthetic parser fixtures; no personal financial information.
 const directory = 'public/samples/formats';
-const records = [['id','date','merchant','cents','category','source'], ...Array.from({length:18},(_,i) => [`row-${String.fromCharCode(97+i)}`,`2026-10-${String(i+1).padStart(2,'0')}`,`Shop-${String.fromCharCode(65+i)}`,String(-(i+1)*100),'shopping','bank'])];
+const records = [['date','description','amount'], ...Array.from({length:18},(_,i) => [`2026-10-${String(i+1).padStart(2,'0')}`,`Shop-${String.fromCharCode(65+i)}`,String(-(i+1))+'.00'])];
 const lines = records.map(row => row.join(','));
 await mkdir(directory,{recursive:true});
 await writeFile(`${directory}/statement.csv`,lines.join('\n'));

@@ -10,9 +10,10 @@ const suggestions = ['我想年底去日本旅行，预算 ¥8,000', '这笔 ¥9
 const currentPreferences = (components: AgentComponent[], preferences: RiskPreferences) => components.map(component =>
   component.type === 'notification_preference_card' ? { ...component, preferences } : component);
 
-export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, onNavigate, onConnectData }: {
+export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, onNavigate, onConnectData, onFinancialTask }: {
   snapshot: Snapshot; compact: boolean; starter?: string; onSnapshot: (snapshot: Snapshot) => void;
   onNavigate: (screen: ScreenId) => void; onConnectData: (threadId: string) => void;
+  onFinancialTask?:(message:string)=>void;
 }) {
   const [threads, setThreads] = useState<AgentThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -71,6 +72,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
 
   async function send(message: string) {
     if (!message.trim() || busy) return;
+    if(onFinancialTask&&/给.+转\s*\d|我要申购|我要赎回|挂失.*卡|调额|管理订阅|取消订阅|查看账单|获取.*报价/.test(message)){onFinancialTask(message.trim());return;}
     setBusy(true); setError(null); setDraft('');
     try {
       const writableThreadId = activeThread && activeThread.status === 'active' && !activeThread.readOnly ? activeThread.id : null;
@@ -203,6 +205,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
       <div className="flex items-center justify-between"><div><h1 className="text-[16px] font-bold">NOVA 目标工作台</h1><p className="text-[10px] text-[#5A616B]">对话生成界面 · 操作前始终确认</p></div><button onClick={() => onNavigate('home')} aria-label="返回首页" className="rounded-lg border border-[#E5E8EB] px-2 py-1 text-[11px] text-[#5A616B]">返回首页</button></div>
       <div className="mt-2 flex gap-2"><button type="button" onClick={() => setHistoryOpen(value => !value)} className="rounded-full border border-[#D8E7E7] px-3 py-1.5 text-[11px] font-semibold text-[#0F6B6D]">{historyOpen ? '收起会话' : `会话历史 ${threads.length}`}</button>
         <button onClick={createThread} className="shrink-0 rounded-full bg-[#0F6B6D] px-3 py-1.5 text-[11px] font-semibold text-white">＋ 新会话</button>
+        <button type="button" onClick={()=>onNavigate('financial_services')} className="shrink-0 rounded-full border border-[#D8E7E7] px-3 py-1.5 text-[11px] font-semibold text-[#0F6B6D]">转账、理财与旅行任务</button>
       </div>
       {historyOpen && <div className="mt-2 flex gap-2 overflow-x-auto no-scrollbar">{threads.map(thread => <button key={thread.id} data-unread={thread.unread ? 'true' : 'false'} onClick={() => void loadMessages(thread.id)} className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] ${thread.id === activeThreadId ? 'border-[#0F6B6D] bg-[#E6F2F2] text-[#0F6B6D]' : 'border-[#E5E8EB] bg-white text-[#5A616B]'}`}><span className={thread.unread ? 'font-bold' : ''}>{thread.unread ? '● ' : ''}{thread.kind === 'summary' ? '摘要 · ' : ''}{thread.status === 'archived' ? '历史 · ' : ''}{thread.title}</span></button>)}</div>}
       {activeThread && <div className="mt-2 flex items-center gap-2 text-[10px] text-[#5A616B]"><button onClick={renameThread}>重命名</button><button disabled={activeThread.readOnly} onClick={() => void updateThread({ status: activeThread.status === 'active' ? 'archived' : 'active' })}>{activeThread.status === 'active' ? '归档' : '恢复'}</button><button onClick={removeThread} className="text-rose-600">删除</button>{activeThread.readOnly && <span className="ml-auto rounded-full bg-[#F0F2F5] px-2 py-1">旧演示 · 只读</span>}</div>}

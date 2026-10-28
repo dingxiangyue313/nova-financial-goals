@@ -42,6 +42,9 @@ export function previewGoalScenario(state: DemoState, input: GoalAssumptions,
       flexibilityWeeks: assumptions.flexibilityWeeks,
     },
   };
+  virtualState.goals = state.goals.some(goal => goal.id === virtualState.goal.id)
+    ? state.goals.map(goal => goal.id === virtualState.goal.id ? virtualState.goal : goal)
+    : [...state.goals, virtualState.goal];
   const calculated = assessGoal(virtualState);
   const assessment = assumptions.monthlyContributionCents === 0
     ? { ...calculated, status: 'at_risk' as const, projectedDate: null, delayDays: 0 }

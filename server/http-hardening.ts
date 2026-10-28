@@ -68,7 +68,7 @@ export function installRequestHardening(app: express.Express): void {
     const startedAt = Date.now();
     res.on('finish', () => logger.info({
       event: 'http_request', requestId, method: req.method,
-      path: typeof req.route?.path==='string' ? req.route.path : req.path.startsWith('/api/') ? '/api/<unmatched>' : req.path.startsWith('/assets/') ? '/assets/<asset>' : '/<document>', status: res.statusCode, durationMs: Date.now() - startedAt,
+      path: req.path, status: res.statusCode, durationMs: Date.now() - startedAt,
     }));
     next();
   });

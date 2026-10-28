@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test server/*.test.ts server/skills/*.test.ts src/*.test.ts",
+    "test": "node scripts/run-tests.mjs",
     "test:properties": "tsx --test server/properties.test.ts",
     "test:a11y": "playwright test tests/e2e/accessibility.spec.ts tests/e2e/money-mission-accessibility.spec.ts",
     "eval:promptfoo": "node scripts/run-promptfoo-eval.mjs",

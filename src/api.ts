@@ -1,15 +1,8 @@
-import { SnapshotSchema, type Snapshot } from '../shared/contracts';
+import { MoneyMissionReadModelSchema, SnapshotSchema, type Snapshot } from '../shared/contracts';
 import type { Goal, ImpactScenario } from './types';
 
 export class ApiError extends Error {
-  status: number;
-  code?: string;
-
-  constructor(status: number, message: string, code?: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
+  constructor(public status: number, message: string, public code?: string) { super(message); }
 }
 
 export async function api<T = Snapshot>(url: string, method = 'GET', body?: unknown): Promise<T> {
@@ -23,12 +16,13 @@ export async function api<T = Snapshot>(url: string, method = 'GET', body?: unkn
       body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, '暂时无法连接本地服务。请稍后重试，已输入的内容会保留。', 'OFFLINE');
+    throw new Error('暂时无法连接本地服务。请稍后重试，已输入的内容会保留。');
   }
-  const json = await response.json().catch(() => ({})) as T & { error?: string; code?: string };
+  const json = await response.json();
   if (!response.ok) throw new ApiError(response.status, json.error || '请求失败，请稍后重试', json.code || json.error);
-  if (url === '/api/capabilities') return json as T;
-  return url.startsWith('/api/money-mission') || url.startsWith('/api/statement-import') || url.startsWith('/api/account-snapshots') || url === '/api/mission/forecast' || url.startsWith('/api/mission/forecast?') || url === '/api/goal/interpret' || url === '/api/goals' || url === '/api/ui/cards' || url === '/api/mcp/token' || url.startsWith('/api/operations/') || url.startsWith('/api/agent') || url.startsWith('/api/risk/') || url.startsWith('/api/data-connections') || url.startsWith('/api/demo/data-connections/')
+  if (url === '/api/money-mission') return MoneyMissionReadModelSchema.parse(json) as T;
+  if (/^\/api\/(statement-import|account-snapshots|services|capabilities|subscriptions)/.test(url) || url.startsWith('/api/money-mission/') || url.startsWith('/api/product/') && !url.endsWith('/start') && !url.endsWith('/confirm')) return json as T;
+  return url === '/api/goal/interpret' || url === '/api/goals' || url === '/api/ui/cards' || url === '/api/mcp/token' || url.startsWith('/api/operations/') || url.startsWith('/api/agent') || url.startsWith('/api/risk/') || url.startsWith('/api/data-connections') || url.startsWith('/api/demo/data-connections/')
     ? json as T : SnapshotSchema.parse(json) as T;
 }
 

@@ -1,7 +1,3 @@
-import { registerMoneyMissionRoutes } from './money-mission-routes.ts';
-import { tickTransferWorker } from './transfer-worker.ts';
-import { tickMoneyMissionMonitor } from './mission-monitor-worker.ts';
-import { registerStatementRoutes } from './statement-upload.ts';
 import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
@@ -11,7 +7,7 @@ import { createServer as createViteServer } from 'vite';
 import { z } from 'zod';
 import { artifactCounts, createAgentThread, deleteAgentThread, getAgentAction, getAgentMessages,
   getAgentTaskForThread, getLatestAgentRunForThread, getState, listAgentThreads, markAgentThreadRead, mutateState,
-  monitorStatus, renameAgentThread, resetState, saveAgentMessage, scheduleBonusFollowup,
+  monitorStatus, renameAgentThread, resetState, saveAgentMessage, saveStatementImportPreview, scheduleBonusFollowup,
   setAgentThreadStatus, setMonitorSubscription, updateAgentRun, updateAgentTask } from './store.ts';
 import { snapshot } from './presentation.ts';
 import { assessCandidateScenario, assessGoal, injectExpense, resolveImpact } from './domain.ts';
@@ -25,7 +21,7 @@ import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
 import { containsPromptInjection, signExternalRequest, verifyExternalRequest } from './security.ts';
 import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary,
-  executeWorkspaceAction, prepareCandidateConfirmation } from './workspace.ts';
+  executeWorkspaceAction, prepareCandidateConfirmation, prepareSubscriptionConfirmation, prepareTransferScheduleConfirmation } from './workspace.ts';
 import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
 import { installApiRateLimits, installRequestHardening, setStaticCacheHeaders } from './http-hardening.ts';
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
@@ -35,6 +31,19 @@ import { AgentRunCancelRequestSchema, AgentRunStatusResponseSchema, AgentTurnWit
   MonitorStatusSchema } from '../shared/contracts.ts';
 import { getAgentRunStatus, startAgentRun, stopAgentRun } from './agent-runner.ts';
 import { tickMonitorWorker } from './monitor-worker.ts';
+import { tickTransferWorker } from './transfer-worker.ts';
+import { parseStatementBuffer, STATEMENT_TEMPLATES } from './statement-parser.ts';
+import { previewStatementImport, resolveImportIssue, commitStatementImport, revokeStatementImport, statementImportContentHash } from './statement-import.ts';
+import { parseSampleStatement, statementUpload } from './statement-upload.ts';
+import { buildBillBrief, inspectEvidence } from './bill-analysis.ts';
+import { BillPeriodInputSchema } from '../shared/contracts.ts';
+import { AccountSnapshotInputSchema, prepareAccountSnapshot } from './account-snapshots.ts';
+import { TransferScheduleInputSchema } from '../shared/contracts.ts';
+import { getTransferScheduleStatus, resumeTransferSchedule } from './transfer-schedules.ts';
+import { moneyMissionReadModel } from './money-mission.ts';
+import { registerProductMission, productMission } from './product-mission.ts';
+import { registerFinancialServices } from './financial-services-routes.ts';
+import { tickFinancialServices } from './store.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -46,14 +55,13 @@ if (production && (!process.env.NOVA_SESSION_SECRET || process.env.NOVA_SESSION_
   throw new Error('NOVA_SESSION_SECRET must contain at least 32 characters in production');
 
 installRequestHardening(app);
-app.use(express.json({ limit: '256kb' }));
+app.use(express.json({ limit: '16kb' }));
 installApiRateLimits(app);
 const demoControlsEnabled = !production || process.env.NOVA_DEMO_CONTROLS === 'true';
-app.get('/api/capabilities', (_req, res) => res.json({ demoControls: demoControlsEnabled }));
+app.get('/api/capabilities', (_req, res) => res.json({ demoControls: demoControlsEnabled, uploadEnabled: process.env.NOVA_ALLOW_STATEMENT_UPLOAD === 'true' }));
 app.use((req, res, next) => {
-  const debugRoute = req.path === '/demo-control' || req.path.startsWith('/api/demo/')
-    || /^\/api\/mission\/demo-/.test(req.path) || req.path === '/api/mission/load';
-  if (debugRoute && !demoControlsEnabled) return res.status(404).json({ error: 'NOT_FOUND' });
+  if (!demoControlsEnabled && (req.path === '/demo-control' || req.path.startsWith('/api/demo/')))
+    return res.status(404).json({ error: 'NOT_FOUND' });
   next();
 });
 app.use('/api', (req, res, next) => {
@@ -86,11 +94,8 @@ function sessionId(req: express.Request, res: express.Response): string {
 function respond(res: express.Response, state: DemoState) { return res.json(snapshot(state)); }
 function failure(res: express.Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
-  const bad = error instanceof z.ZodError || /^(PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|IMPORT_|EVIDENCE_|SCHEDULE_|SKILL_|HANDOFF_|SUBSCRIPTION_|TRANSFER_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_|DATA_)/.test(message);
-  return res.status(bad ? 400 : 500).json({
-    error: bad ? message : '服务暂时不可用，请稍后重试。',
-    code: bad ? message : 'SERVICE_UNAVAILABLE',
-  });
+  const bad = error instanceof z.ZodError || /^(SERVICE_|PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_|DATA_|STATEMENT_|IMPORT_|BILL_|EVIDENCE_|SUBSCRIPTION_|SCHEDULE_|FORECAST_)/.test(message);
+  return res.status(bad ? 400 : 500).json({ error: bad ? message : '服务暂时不可用，请稍后重试。' });
 }
 function route(fn: (req: express.Request, res: express.Response) => Promise<unknown> | unknown): express.RequestHandler {
   return (req, res) => { Promise.resolve().then(() => fn(req, res)).catch(error => failure(res, error)); };
@@ -103,16 +108,102 @@ const audit = (state: DemoState, action: string, outcome: string, detail: string
   return appendAuditEvent(next, action, outcome, detail);
 };
 
-registerStatementRoutes(app, sessionId, route);
-registerMoneyMissionRoutes(app, sessionId, route);
-
 app.get('/api/health', route((req, res) => {
   const id = sessionId(req, res);
   res.json({ status: 'ok', mode: 'simulated', sqlite: 'ok', contracts: 'ok',
     deepseek: process.env.DEEPSEEK_API_KEY ? 'configured' : 'deterministic_fallback',
     auditChainValid: verifyAuditChain(getState(id).audit), artifacts: artifactCounts(id) });
 }));
-app.get('/api/session', route((req, res) => respond(res, getState(sessionId(req, res)))));
+app.get('/api/session', route((req, res) => { const state=getState(sessionId(req,res)); res.json(state.goals.length&&state.accountSnapshots.length?productMission(state).snapshot:snapshot(state)); }));
+registerProductMission(app, sessionId, route);
+registerFinancialServices(app, sessionId, route);
+app.get('/api/money-mission', route((req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const state = getState(sessionId(req, res));
+  return res.json(state.goals.length && state.accountSnapshots.length ? productMission(state).snapshot.moneyMission : moneyMissionReadModel(state));
+}));
+app.use('/api/money-mission/transfer-schedules', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+app.post('/api/money-mission/transfer-schedules/preview', route((req, res) => {
+  const input = TransferScheduleInputSchema.parse(req.body);
+  let preview: unknown;
+  mutateState(sessionId(req, res), old => {
+    const result = runBankingTool(old, 'prepare_recurring_transfer', input);
+    preview = result.result.preview; return result.state;
+  });
+  res.json({ preview });
+}));
+app.post('/api/money-mission/transfer-schedules/:id/action', route((req, res) => {
+  const body = z.object({ action: z.enum(['activate', 'pause', 'cancel', 'resume']), threadId: z.string().min(1).optional() })
+    .strict().refine(value => value.action === 'resume' || value.threadId, { message: 'SCHEDULE_CONFIRMATION_THREAD_REQUIRED' }).parse(req.body);
+  const id = sessionId(req, res);
+  let result: unknown;
+  const state = mutateState(id, old => {
+    if (body.action === 'resume') {
+      const resumed = resumeTransferSchedule(old, { scheduleId: req.params.id });
+      result = { schedule: resumed.schedule }; return resumed.state;
+    }
+    const prepared = prepareTransferScheduleConfirmation(id, body.threadId!, old, body.action === 'activate'
+      ? { action: 'activate', previewId: req.params.id } : { action: body.action, scheduleId: req.params.id });
+    result = { actionId: prepared.actionId, component: prepared.component }; return prepared.state;
+  });
+  res.json({ ...(result as Record<string, unknown>), twinVersion: state.twinVersion });
+}));
+app.get('/api/money-mission/transfer-schedules/:id/status', route((req, res) => {
+  res.json({ schedule: getTransferScheduleStatus(getState(sessionId(req, res)), req.params.id) });
+}));
+app.post('/api/money-mission/bill-brief', route((req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(buildBillBrief(getState(sessionId(req, res)), BillPeriodInputSchema.parse(req.body)));
+}));
+app.get('/api/money-mission/evidence/:id', route((req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(inspectEvidence(getState(sessionId(req, res)), req.params.id));
+}));
+app.use(['/api/statement-import', '/api/statement-imports', '/api/account-snapshots'], (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store'); next();
+});
+app.get('/api/statement-import/templates', route((_req, res) => res.json({ templates: STATEMENT_TEMPLATES })));
+function saveImportPreview(id: string, parsed: Awaited<ReturnType<typeof parseStatementBuffer>>) {
+  const result = previewStatementImport(getState(id), parsed);
+  const rows = result.state.normalizedStatementRows.filter(row => row.batchId === result.batch.id);
+  const batch = saveStatementImportPreview(id, { batch: result.batch, issues: result.issues, rows });
+  return { batch, issues: result.issues, rows, confidence: parsed.confidence,
+    contentHash: result.contentHash, twinVersion: result.state.twinVersion };
+}
+app.post('/api/statement-imports/sample', route(async (req, res) => {
+  const id = sessionId(req, res);
+  res.json(saveImportPreview(id, await parseSampleStatement()));
+}));
+app.post('/api/statement-imports/upload', statementUpload, route(async (req, res) => {
+  if (!req.file) throw new Error('STATEMENT_FILE_REQUIRED');
+  try {
+    const templateId = z.string().min(1).max(100).parse(req.body.templateId);
+    const parsed = await parseStatementBuffer({ buffer: req.file.buffer, fileName: req.file.originalname,
+      mimeType: req.file.mimetype, templateId });
+    res.json(saveImportPreview(sessionId(req, res), parsed));
+  } finally { req.file.buffer.fill(0); delete req.file; }
+}));
+app.patch('/api/statement-imports/:batchId/issues/:issueId', route((req, res) => {
+  const state = mutateState(sessionId(req, res), old => resolveImportIssue(old, req.params.batchId, req.params.issueId, req.body));
+  res.json({ batch: state.statementImportBatches.find(batch => batch.id === req.params.batchId),
+    issues: state.importIssues.filter(issue => issue.batchId === req.params.batchId),
+    rows: state.normalizedStatementRows.filter(row => row.batchId === req.params.batchId),
+    contentHash: statementImportContentHash(state, req.params.batchId), twinVersion: state.twinVersion });
+}));
+app.post('/api/statement-imports/:batchId/commit', route((req, res) => {
+  const { expectedTwinVersion, expectedContentHash } = z.object({ expectedTwinVersion: z.number().int().positive(),
+    expectedContentHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict().parse(req.body);
+  respond(res, mutateState(sessionId(req, res), old => commitStatementImport(old, req.params.batchId, expectedTwinVersion, expectedContentHash)));
+}));
+app.post('/api/statement-imports/:batchId/revoke', route((req, res) => {
+  const { expectedTwinVersion } = z.object({ expectedTwinVersion: z.number().int().positive() }).strict().parse(req.body);
+  respond(res, mutateState(sessionId(req, res), old => revokeStatementImport(old, req.params.batchId, expectedTwinVersion)));
+}));
+app.post('/api/account-snapshots/prepare', route((req, res) => {
+  const { threadId, ...input } = AccountSnapshotInputSchema.extend({ threadId: z.string().min(1) }).parse(req.body);
+  const id = sessionId(req, res);
+  res.json(prepareAccountSnapshot(id, threadId, input, getState(id)));
+}));
 app.get('/api/data-connections', route((req, res) => {
   const state = getState(sessionId(req, res));
   res.json({ connections: state.dataConnections, simulated: true,
@@ -202,6 +293,35 @@ app.get('/api/goal-flow', route((req, res) => {
   res.json({ goal: state.goal, assessment: assessGoal(state), twinVersion: state.twinVersion });
 }));
 app.post('/api/goal-flow', route((req, res) => res.json(executeTool(sessionId(req, res), BankingCallSchema.parse(req.body)))));
+app.use('/api/subscriptions', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+app.post('/api/subscriptions/:id/prepare', route((req, res) => {
+  const body = z.object({ action: z.enum(['keep', 'remind', 'cancel', 'not_subscription']),
+    threadId: z.string().min(1).optional() }).strict().refine(value => value.action !== 'cancel' || value.threadId,
+      { message: 'SUBSCRIPTION_CONFIRMATION_THREAD_REQUIRED' }).parse(req.body);
+  const id = sessionId(req, res);
+  let result: unknown;
+  const state = mutateState(id, old => {
+    if (body.action === 'cancel') {
+      const prepared = prepareSubscriptionConfirmation(id, body.threadId!, req.params.id, old);
+      result = { actionId: prepared.actionId, preview: prepared.preview, component: prepared.component };
+      return prepared.state;
+    }
+    const prepared = runBankingTool(old, 'prepare_subscription_action', { subscriptionId: req.params.id, action: body.action });
+    result = { preview: prepared.result };
+    return prepared.state;
+  });
+  res.json({ ...(result as Record<string, unknown>), snapshot: snapshot(state) });
+}));
+app.post('/api/subscriptions/actions/:id/status', route((req, res) => {
+  z.object({}).strict().parse(req.body);
+  let action: unknown;
+  const state = mutateState(sessionId(req, res), old => {
+    const result = runBankingTool(old, 'get_subscription_action_status', { actionId: req.params.id });
+    action = result.result.action;
+    return result.state;
+  });
+  res.json({ action, snapshot: snapshot(state) });
+}));
 app.get('/api/banking-tools', (_req, res) => res.json({ tools: bankingToolDefinitions }));
 app.post('/api/banking-tools', route((req, res) => res.json(executeTool(sessionId(req, res), BankingCallSchema.parse(req.body)))));
 app.get('/api/activity', route((req, res) => {
@@ -279,7 +399,7 @@ app.post('/api/agent/turn', route(async (req, res) => {
   const id = sessionId(req, res);
   const turn = await createAgentTurn(id, body.threadId, body.message, getState(id));
   const latestUser = getAgentMessages(id, turn.thread.id).filter(item => item.role === 'user').at(-1);
-  const run = turn.intent === 'money_mission' && latestUser ? startAgentRun(id,turn.thread.id,latestUser.id) : turn.intent === 'goal_planning' && turn.components.some(item => item.type === 'goal_input_card') &&
+  const run = turn.intent === 'goal_planning' && turn.components.some(item => item.type === 'goal_input_card') &&
     !turn.components.some(item => item.type === 'clarification' || item.type === 'data_connection_prompt') && latestUser
     ? startAgentRun(id, turn.thread.id, latestUser.id) : null;
   res.json(AgentTurnWithRunSchema.parse({ ...turn, run }));
@@ -422,8 +542,11 @@ app.post('/api/demo/weekly-summary', route((req, res) => {
 }));
 app.post('/api/demo/clock', route((req, res) => {
   const date = z.iso.date().parse(req.body?.date);
-  const state = mutateState(sessionId(req, res), old => audit({ ...old, clock: date }, 'demo_clock', 'changed', `演示日期设为 ${date}`));
-  return respond(res, state);
+  const id = sessionId(req, res);
+  mutateState(id, old => audit({ ...old, clock: date }, 'demo_clock', 'changed', `演示日期设为 ${date}`));
+  tickTransferWorker();
+  tickMonitorWorker(new Date());
+  return respond(res, getState(id));
 }));
 app.post('/api/goal/interpret', route(async (req, res) => {
   const text = z.string().min(1).max(500).parse(req.body?.text);
@@ -617,7 +740,11 @@ if (production) {
   app.use(vite.middlewares);
 }
 const server = app.listen(port, '0.0.0.0', () => console.log(`NOVA original UI + new simulated backend: http://localhost:${port}`));
-function runMonitorTick() { try { tickMonitorWorker(); tickTransferWorker(); tickMoneyMissionMonitor(); } catch { console.error('Monitor worker tick failed'); } }
+function runMonitorTick() {
+  try { tickFinancialServices(); } catch { console.error('Financial service reconciliation failed'); }
+  try { tickTransferWorker(); } catch { console.error('Transfer worker tick failed'); }
+  try { tickMonitorWorker(); } catch { console.error('Monitor worker tick failed'); }
+}
 const monitorTimer = setInterval(runMonitorTick, 5_000);
 monitorTimer.unref();
 setImmediate(runMonitorTick);

@@ -1,5 +1,7 @@
 import type { AgentTask, CandidateAssessment, CandidateInput, DemoState } from '../shared/contracts.ts';
 import { assessCandidateScenario, availableMonthly } from './domain.ts';
+import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
+import { buildMoneyMissionPlans, goalForecastWindow, hasDatedCashflowEvidence } from './money-mission-plans.ts';
 
 export type SearchObjective = 'lower_monthly' | 'earlier' | 'higher_buffer' | 'balanced';
 export type SearchOption = { monthlyContributionCents: number;
@@ -27,10 +29,46 @@ export function searchGoalOptions(state: DemoState, task: AgentTask,
     options: [] as SearchOption[], excluded: [] as GoalOptionSearch['excluded'], gaps: [] as string[] };
   if (!goal.title || goal.targetCents === null || !goal.originalTargetDate || goal.savedCents === null)
     return { ...base, status: 'insufficient_data', gaps: ['目标、日期或已存金额尚未确认'] };
-  if (state.finance.historyMonths < 2)
+  if (!hasDatedCashflowEvidence(state) && state.finance.historyMonths < 2)
     return { ...base, status: 'insufficient_data', gaps: ['模拟历史不足 2 个月'] };
   if (goal.originalTargetDate < state.clock)
-    return { ...base, status: 'none_within_constraints', gaps: ['目标日期已经早于当前模拟日期'] };
+    return { ...base, status: 'none_within_constraints', gaps: ['GOAL_DEADLINE_PASSED', '目标日期已经早于当前模拟日期'] };
+
+  if (hasDatedCashflowEvidence(state)) {
+    const selectedGoal = { ...state.goal, id: task.goalId ?? task.goalDraftId ?? state.goal.id,
+      title: goal.title, targetCents: goal.targetCents, savedCents: goal.savedCents,
+      targetDate: goal.originalTargetDate, protectedCents };
+    const virtual = { ...state, goal: selectedGoal, goals: state.goals.some(item => item.id === selectedGoal.id)
+      ? state.goals.map(item => item.id === selectedGoal.id ? selectedGoal : item) : [...state.goals, selectedGoal] };
+    const forecast = buildDatedCashflowForecast(virtual, { accountId: 'checking',
+      horizonEnd: goalForecastWindow(state, goal.originalTargetDate).horizonEnd, scenario: 'baseline' });
+    const plans = buildMoneyMissionPlans(virtual, forecast);
+    const gaps = [...new Set(plans.flatMap(plan => plan.limitations.filter(value =>
+      ['AUTHORITATIVE_BALANCE_REQUIRED', 'GOAL_PRIORITY_CONFLICT', 'PROTECTED_FUNDS_UNAVAILABLE',
+        'MONTHLY_CAPACITY_EXCEEDED', 'FORECAST_HORIZON_INCOMPLETE', 'GOAL_DEADLINE_PASSED',
+        'AMBIGUOUS_SCHEDULE'].includes(value))))];
+    // The legacy frozen candidate carries monthly and first-month amounts, but no plan ID or upfront discriminator.
+    const eligible = plans.filter((plan, index) => !plans.slice(0, index).some(previous =>
+      previous.monthlyCents === plan.monthlyCents && previous.firstMonthContributionCents === plan.firstMonthContributionCents))
+      .filter(plan => plan.monthlyCents <= (task.constraints.monthlyContributionCapCents ?? Infinity) &&
+      plan.firstMonthContributionCents <= (task.constraints.monthlyContributionCapCents ?? Infinity) &&
+      !plan.limitations.some(value => ['GOAL_PRIORITY_CONFLICT', 'PROTECTED_FUNDS_UNAVAILABLE',
+        'MONTHLY_CAPACITY_EXCEEDED', 'FORECAST_HORIZON_INCOMPLETE', 'GOAL_DEADLINE_PASSED',
+        'AMBIGUOUS_SCHEDULE'].includes(value)));
+    if (objective === 'earlier') eligible.sort((a, b) => a.projectedDate.localeCompare(b.projectedDate));
+    const options = eligible.slice(0, Math.min(3, Math.max(1, maxResults))).map(plan => {
+      const input: CandidateInput = { targetCents: goal.targetCents!, targetDate: goal.originalTargetDate!,
+        monthlyContributionCents: plan.monthlyCents, firstMonthContributionCents: plan.firstMonthContributionCents,
+        protectedCents, scenario: { kind: 'baseline' }, evidenceResultIds: [] };
+      return { monthlyContributionCents: plan.monthlyCents, firstMonthContributionCents: plan.firstMonthContributionCents,
+        assessment: assessCandidateScenario(virtual, input, goal.savedCents!, [], goal.originalTargetDate!) };
+    });
+    return { status: gaps.includes('AUTHORITATIVE_BALANCE_REQUIRED') || gaps.includes('FORECAST_HORIZON_INCOMPLETE') ? 'insufficient_data'
+      : options.length ? 'options_found' : 'none_within_constraints',
+    searchedRangeCents: { min: options.length ? Math.min(...options.map(option => option.monthlyContributionCents)) : 0,
+      max: options.length ? Math.max(...options.map(option => option.monthlyContributionCents)) : 0 },
+    evaluatedCount: plans.length, options, excluded: [], gaps };
+  }
 
   const cache = new Map<number, CandidateAssessment>();
   const evaluate = (monthly: number) => {

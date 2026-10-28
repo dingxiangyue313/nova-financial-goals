@@ -83,8 +83,8 @@ export function DemoControlScreen({
             </button>
           ))}
         </div>
-        <button className="mission-link" onClick={() => onNavigate('bills')}>打开账单流程</button>
-        <button className="mission-link ml-4" onClick={() => onNavigate('savings')}>打开储蓄计划</button>
+        <button className="mission-link" onClick={() => onNavigate('money_mission')}>打开账单流程</button>
+        <button className="mission-link ml-4" onClick={() => onNavigate('money_mission')}>打开储蓄计划</button>
       </div>
     </>
   );

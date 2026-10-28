@@ -1,9 +1,7 @@
-import { readMoneyMission, projectLegacyMission } from './money-mission.ts';
-import { missionCompletionDate } from '../shared/mission.ts';
-import { forecastMission } from './mission.ts';
 import { SnapshotSchema, type Assessment, type DemoState, type Snapshot, type UiCard } from '../shared/contracts.ts';
 import { assessGoal } from './domain.ts';
 import { verifyAuditChain } from './governance.ts';
+import { moneyMissionReadModel } from './money-mission.ts';
 
 function yuan(cents: number) { return `¥${(cents / 100).toLocaleString('zh-CN')}`; }
 export function generatedCards(state: DemoState, assessment: Assessment): UiCard[] {
@@ -47,20 +45,14 @@ export function generatedCards(state: DemoState, assessment: Assessment): UiCard
 export function snapshot(state: DemoState): Snapshot {
   const primaryGoal = state.goals.find(goal => goal.id === state.primaryGoalId) ?? null;
   const displayState = primaryGoal ? { ...state, goal: primaryGoal } : state;
-  let assessment = assessGoal(displayState);
-  if (state.mission && primaryGoal?.id === state.goal.id) {
-    const amount = state.mission.schedule?.status === 'active' ? state.mission.schedule.amountCents : state.goal.monthlyContributionCents;
-    const projectedDate = missionCompletionDate(state.clock, Math.max(0, state.goal.targetCents - state.goal.savedCents), amount);
-    const forecast = forecastMission(state, amount);
-    const onTrack = !!projectedDate && projectedDate <= state.goal.targetDate && forecast.lowCents >= 0;
-    assessment = { ...assessment, projectedDate, status: onTrack ? 'on_track' : 'at_risk', safeToSpendCents: forecast.lowCents,
-      updatedAt: state.finance.updatedAt, assumptions: [forecast.assumption, '每期转入须检测到工资实际到账。'],
-      plans: [{ id: 'steady', label: '稳健', amount: 75000, initial: 0 }, { id: 'balanced', label: '平衡', amount: 100000, initial: 0 }, { id: 'accelerated', label: '加速', amount: 120000, initial: 120000 }].map(p => {
-        const date = missionCompletionDate(state.clock, state.goal.targetCents - state.goal.savedCents, p.amount, p.initial);
-        return { id: p.id, label: p.label, monthlyCents: p.amount, projectedDate: date, safeToSpendCents: forecastMission(state, p.amount).lowCents - p.initial, status: date && date <= state.goal.targetDate ? 'on_track' : 'at_risk', explanation: p.initial ? '先单独确认一次性转入，再创建月度计划。' : '工资实际到账后次日转入，未到账则跳过。', recommended: p.id === 'balanced' };
-      }) };
-  }
-  return SnapshotSchema.parse({ moneyMission: state.accountSnapshots.length ? readMoneyMission(state) : undefined, mission: state.accountSnapshots.length ? projectLegacyMission(state) : state.mission, goal: primaryGoal ?? state.goal, finance: state.finance, assessment,
+  const assessment = assessGoal(displayState);
+  return SnapshotSchema.parse({ goal: primaryGoal ?? state.goal, finance: state.finance, assessment,
+    moneyMission: moneyMissionReadModel(state),
+    accountSnapshots: state.accountSnapshots, statementImportBatches: state.statementImportBatches,
+    evidenceRefs: state.evidenceRefs, billBriefs: state.billBriefs, subscriptionActions: state.subscriptionActions,
+    datedCashflowForecasts: state.datedCashflowForecasts, goalPlanOptions: state.goalPlanOptions,
+    transferSchedulePreviews: state.transferSchedulePreviews, transferSchedules: state.transferSchedules,
+    transferExecutions: state.transferExecutions, handoffCasePacks: state.handoffCasePacks,
     goals: state.goals, primaryGoalId: state.primaryGoalId, primaryGoal,
     pendingImpact: state.pendingImpact, mandate: state.mandate, audit: state.audit,
     operations: state.operations, receipts: state.receipts,

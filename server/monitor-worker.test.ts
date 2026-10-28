@@ -207,3 +207,24 @@ test('archive, demo reset and deletion invalidate monitor work', async () => {
   assert.equal(monitorStatus(achieved.sessionId, achieved.threadId).enabled, false);
   assert.equal(getAgentTaskForThread(achieved.sessionId, achieved.threadId)?.terminationReason, 'goal_completed');
 });
+
+test('transfer outcome produces one explanatory monitor subject without requiring a risk signal', async () => {
+  const { sessionId, threadId } = await activeGoal();
+  const api = await import('./store.ts');
+  assert.equal(typeof api.enqueueTransferOutcome, 'function', 'transfer outcomes must enter the durable monitor queue');
+  const at = new Date().toISOString();
+  const execution = { id: 'schedule:monitor:2026-11', scheduleId: 'monitor', period: '2026-11',
+    status: 'skipped_missing_trigger' as const, amountCents: 100000, currency: 'CNY', operationId: null,
+    triggerTransactionId: null, scheduledAt: null, executedAt: null, receiptOperationId: null,
+    reason: 'SALARY_MISSING_SKIP_NO_CATCHUP', createdAt: at, updatedAt: at };
+  api.saveTransferExecution(sessionId, execution);
+  api.enqueueTransferOutcome(sessionId, getState(sessionId).goal.id, execution, new Date());
+  api.enqueueTransferOutcome(sessionId, getState(sessionId).goal.id, execution, new Date());
+  tickMonitorWorker(new Date()); tickMonitorWorker(new Date());
+  assert.equal(listMonitorEvents(sessionId).filter(item => item.kind === 'transfer_outcome').length, 1);
+  const messages = listAgentThreads(sessionId, true).flatMap(item => getAgentMessages(sessionId, item.id));
+  assert.equal(messages.filter(item => item.content.includes('SALARY_MISSING_SKIP_NO_CATCHUP')).length, 1);
+  assert.ok(messages.some(item => item.content.includes('不补扣')));
+  assert.equal(getState(sessionId).finance.checkingCents, 500000);
+  assert.ok(getAgentMessages(sessionId, threadId).length);
+});

@@ -12,28 +12,28 @@ endobj
 << /Type /Font /Subtype /Type1 /BaseFont /Courier >>
 endobj
 5 0 obj
-<< /Length 1004 >>
+<< /Length 647 >>
 stream
 BT /F1 9 Tf 14 TL 20 790 Td
-(id,date,merchant,cents,category,source) Tj T*
-(row-a,2026-10-01,Shop-A,-100,shopping,bank) Tj T*
-(row-b,2026-10-02,Shop-B,-200,shopping,bank) Tj T*
-(row-c,2026-10-03,Shop-C,-300,shopping,bank) Tj T*
-(row-d,2026-10-04,Shop-D,-400,shopping,bank) Tj T*
-(row-e,2026-10-05,Shop-E,-500,shopping,bank) Tj T*
-(row-f,2026-10-06,Shop-F,-600,shopping,bank) Tj T*
-(row-g,2026-10-07,Shop-G,-700,shopping,bank) Tj T*
-(row-h,2026-10-08,Shop-H,-800,shopping,bank) Tj T*
-(row-i,2026-10-09,Shop-I,-900,shopping,bank) Tj T*
-(row-j,2026-10-10,Shop-J,-1000,shopping,bank) Tj T*
-(row-k,2026-10-11,Shop-K,-1100,shopping,bank) Tj T*
-(row-l,2026-10-12,Shop-L,-1200,shopping,bank) Tj T*
-(row-m,2026-10-13,Shop-M,-1300,shopping,bank) Tj T*
-(row-n,2026-10-14,Shop-N,-1400,shopping,bank) Tj T*
-(row-o,2026-10-15,Shop-O,-1500,shopping,bank) Tj T*
-(row-p,2026-10-16,Shop-P,-1600,shopping,bank) Tj T*
-(row-q,2026-10-17,Shop-Q,-1700,shopping,bank) Tj T*
-(row-r,2026-10-18,Shop-R,-1800,shopping,bank) Tj T*
+(date,description,amount) Tj T*
+(2026-10-01,Shop-A,-1.00) Tj T*
+(2026-10-02,Shop-B,-2.00) Tj T*
+(2026-10-03,Shop-C,-3.00) Tj T*
+(2026-10-04,Shop-D,-4.00) Tj T*
+(2026-10-05,Shop-E,-5.00) Tj T*
+(2026-10-06,Shop-F,-6.00) Tj T*
+(2026-10-07,Shop-G,-7.00) Tj T*
+(2026-10-08,Shop-H,-8.00) Tj T*
+(2026-10-09,Shop-I,-9.00) Tj T*
+(2026-10-10,Shop-J,-10.00) Tj T*
+(2026-10-11,Shop-K,-11.00) Tj T*
+(2026-10-12,Shop-L,-12.00) Tj T*
+(2026-10-13,Shop-M,-13.00) Tj T*
+(2026-10-14,Shop-N,-14.00) Tj T*
+(2026-10-15,Shop-O,-15.00) Tj T*
+(2026-10-16,Shop-P,-16.00) Tj T*
+(2026-10-17,Shop-Q,-17.00) Tj T*
+(2026-10-18,Shop-R,-18.00) Tj T*
 ET
 endstream
 endobj
@@ -48,5 +48,5 @@ xref
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-1365
+1007
 %%EOF

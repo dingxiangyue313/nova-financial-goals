@@ -1,17 +1,214 @@
-import {runBankingTool} from './banking.ts';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AgentReadToolNameSchema, AgentToolResultSchema, CandidateInputSchema, SearchGoalOptionsInputSchema,
   StressTestGoalOptionsInputSchema, RepairStressedGoalOptionInputSchema,
-  type AgentToolResult, type AgentToolSource, type CandidateInput, type DemoState } from '../shared/contracts.ts';
+  BillPeriodInputSchema, EvidenceDetailInputSchema,
+  DatedCashflowForecastInputSchema,
+  type AgentToolResult, type AgentToolSource, type CandidateInput, type DemoState,
+  type DatedCashflowForecast, type GoalPlanOption } from '../shared/contracts.ts';
 import { assessCandidateScenario, availableMonthly } from './domain.ts';
 import { searchGoalOptions } from './goal-option-search.ts';
 import { searchStressRepair } from './stress-repair-search.ts';
 import { previewGoalScenario } from './scenario.ts';
+import { buildBillBrief, inspectEvidence } from './bill-analysis.ts';
+import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
+import { hasDatedCashflowEvidence } from './money-mission-plans.ts';
+import { buildMoneyMissionPlans, goalForecastWindow } from './money-mission-plans.ts';
+import { getTransferScheduleStatus, simulateTransferSchedule } from './transfer-schedules.ts';
+import { subscriptionSavingsEligible } from './subscription-service.ts';
+import { TransferScheduleInputSchema, SkillFactSchema, type SkillFact, type SkillId } from '../shared/contracts.ts';
+import { assertSkillToolAllowed, validateSkillInput } from './skills/registry.ts';
 import { getAgentTaskForThread, getAgentToolResult, getState, saveAgentToolResult,
-  updateAgentTask } from './store.ts';
+  updateAgentTask, monitorStatus, monitorEventIsCurrent, type MonitorEvent } from './store.ts';
 
 const Empty = z.object({}).strict();
+
+export type MoneyMissionToolFeedback = { facts: SkillFact[]; evidenceRefs: string[];
+  limitations: Array<'DATA_REQUIRED' | 'CONFIRMATION_REQUIRED' | 'PREVIEW_ONLY' |
+    'NO_EXTERNAL_CONTACT' | 'SOURCE_LIMITATIONS' | 'CAPABILITY_UNAVAILABLE'>; nextActionIds: string[] };
+export type MoneyMissionReadContext = { threadId: string; monitorEvent?: MonitorEvent };
+// Registry metadata preserves the full specification; implementation dispatch is explicit.
+const implementedSkillTools: Partial<Record<SkillId, readonly string[]>> = {
+  statement_ingestion_and_reconciliation: ['inspect_statement_file', 'list_import_issues', 'preview_import_batch'],
+  bill_and_subscription_investigator: ['summarize_bill_period', 'compare_spending_baseline',
+    'detect_subscription_candidates', 'inspect_subscription_history', 'list_relevant_transactions'],
+  dated_cashflow_forecast: ['build_cashflow_timeline', 'inspect_forecast_evidence'],
+  goal_portfolio_planner: ['read_goal_constraints', 'search_goal_options'],
+  transfer_and_savings_executor: ['get_transfer_schedule_status', 'list_transfer_eligible_accounts', 'simulate_transfer_schedule'],
+  outcome_monitor_and_replanner: ['screen_material_goal_events'],
+  financial_explanation_and_provenance: ['read_explanation_evidence'], human_handoff_case_pack: ['read_relevant_evidence'],
+};
+
+/** Skill tools resolve server-owned records and project numeric facts and IDs only.
+ * This path has no approval or finance-write capability and never returns raw text. */
+export function runMoneyMissionReadTool(sessionId: string, skillId: SkillId, tool: string,
+  rawInput: unknown, context?: MoneyMissionReadContext): MoneyMissionToolFeedback {
+  assertSkillToolAllowed(skillId, tool);
+  if (!implementedSkillTools[skillId]?.includes(tool)) throw new Error('SKILL_CAPABILITY_UNAVAILABLE');
+  const input = validateSkillInput(skillId, rawInput);
+  const state = getState(sessionId);
+  if (!context) throw new Error('SKILL_CONTEXT_REQUIRED');
+  const task = getAgentTaskForThread(sessionId, context.threadId);
+  const required = <T>(value: T | undefined): T => {
+    if (!value) throw new Error('SKILL_REFERENCE_NOT_FOUND');
+    return value;
+  };
+  const current = <T extends { twinVersion: number }>(value: T): T => {
+    if (value.twinVersion !== state.twinVersion) throw new Error('SKILL_REFERENCE_STALE');
+    return value;
+  };
+  const facts: SkillFact[] = [];
+  const limitations: MoneyMissionToolFeedback['limitations'] = [];
+  const add = (fact: SkillFact) => { facts.push(SkillFactSchema.parse(fact)); };
+  const goal = () => {
+    const found = required(state.goals.find(item => item.id === input.goalId)
+      ?? (state.goal.id === input.goalId ? state.goal : undefined));
+    // The plan service currently models the active portfolio root only.
+    if (found.id !== state.goal.id) throw new Error('SKILL_CAPABILITY_UNAVAILABLE');
+    return found;
+  };
+  const forecast = (accountId: string) => buildDatedCashflowForecast(state, {
+    accountId, horizonEnd: goalForecastWindow(state, goal().targetDate).horizonEnd, scenario: 'baseline',
+  });
+  // Reconstructible references include the whole deterministic result identity and
+  // server scope; a different thread, task revision or Twin cannot reuse them.
+  const scopedId = (resultId: string) => `skill-derived-${state.twinVersion}-${createHash('sha256').update(JSON.stringify({
+    sessionId, threadId: context.threadId, taskId: task?.taskId ?? null,
+    demoRunId: task?.demoRunId ?? null, revision: task?.taskRevision ?? null, resultId,
+  })).digest('hex')}`;
+  const forecastFact = (result: DatedCashflowForecast): SkillFact => ({ kind: 'forecast', refId: scopedId(result.id),
+    claimType: 'prediction', sourceRefs: result.evidenceRefs, status: result.precision,
+    minimumBalanceCents: result.minimumBalanceCents, ...(result.minimumBalanceDate ? { date: result.minimumBalanceDate } : {}),
+    executable: result.executableForecastId !== null });
+  const planFact = (plan: GoalPlanOption): SkillFact => ({ kind: 'plan', refId: scopedId(plan.id),
+    claimType: 'recommendation', sourceRefs: plan.evidenceRefs.map(ref => ref === plan.forecastId ? scopedId(ref) : ref),
+    amountCents: plan.monthlyCents, date: plan.projectedDate, executable: plan.executable,
+    minimumBalanceCents: plan.minimumBalanceCents });
+  const generatedFact = (id: string): SkillFact => {
+    if (!id.startsWith(`skill-derived-${state.twinVersion}-`)) throw new Error('SKILL_REFERENCE_STALE');
+    const activeState = state.goal;
+    for (const account of state.accounts.filter(item => item.type === 'checking' && !item.protected)) {
+      const calculated = buildDatedCashflowForecast(state, { accountId: account.id,
+        horizonEnd: goalForecastWindow(state, activeState.targetDate).horizonEnd, scenario: 'baseline' });
+      const candidates = [forecastFact(calculated), ...buildMoneyMissionPlans(state, calculated).map(planFact)];
+      const found = candidates.find(item => item.refId === id);
+      if (found) return { ...found, kind: 'evidence' };
+    }
+    throw new Error('SKILL_REFERENCE_NOT_FOUND');
+  };
+  if (skillId === 'statement_ingestion_and_reconciliation') {
+    const batch = required(state.statementImportBatches.find(item => item.id === input.batchId));
+    if (tool === 'list_import_issues') {
+      for (const issue of state.importIssues.filter(item => item.batchId === batch.id).slice(0, 100))
+        add({ kind: 'import_issue', refId: issue.id, claimType: 'fact', sourceRefs: [batch.id] });
+    } else {
+      add({ kind: 'import_batch', refId: batch.id, claimType: 'fact', sourceRefs: [batch.id],
+        status: batch.status, count: batch.recordCount, date: batch.coverageEnd });
+    }
+  } else if (skillId === 'bill_and_subscription_investigator') {
+    const period = current(required(state.billBriefs.find(item => item.id === input.periodId)));
+    if (tool === 'summarize_bill_period' || tool === 'compare_spending_baseline' || tool === 'detect_subscription_candidates') {
+      const brief = buildBillBrief(state, { periodStart: period.periodStart, periodEnd: period.periodEnd });
+      if (tool === 'detect_subscription_candidates') {
+        for (const item of brief.subscriptionCandidates.slice(0, 100)) add({ kind: 'subscription',
+          refId: item.subscriptionId ?? item.merchantId, claimType: 'assumption', sourceRefs: item.sourceRefs,
+          amountCents: item.monthlyCents, ...(item.nextChargeDate ? { date: item.nextChargeDate } : {}) });
+      } else add({ kind: 'bill', refId: brief.id, claimType: 'fact', sourceRefs: brief.sourceRefs ?? [],
+        amountCents: brief.totalExpenseCents, date: brief.dataAsOf });
+      if (brief.limitations.length) limitations.push('SOURCE_LIMITATIONS');
+    } else if (tool === 'inspect_subscription_history') {
+      const item = required(state.subscriptions.find(value => value.id === input.subscriptionId));
+      add({ kind: 'subscription', refId: item.id, claimType: 'fact', sourceRefs: [item.id],
+        amountCents: item.monthlyCents, date: item.nextChargeDate, status: item.status });
+      for (const action of state.subscriptionActions.filter(value => value.subscriptionId === item.id).slice(-20))
+        add({ kind: 'subscription', refId: action.id, claimType: 'simulated_result', sourceRefs: [item.id],
+          status: action.status, nextChargeSuppressed: subscriptionSavingsEligible(state, action.id) });
+    } else if (tool === 'list_relevant_transactions') {
+      const brief = buildBillBrief(state, { periodStart: period.periodStart, periodEnd: period.periodEnd });
+      for (const ref of (brief.sourceRefs ?? []).slice(0, 100)) add({ kind: 'evidence', refId: ref,
+        claimType: 'fact', sourceRefs: [ref] });
+    } else throw new Error('SKILL_CAPABILITY_UNAVAILABLE');
+  } else if (skillId === 'dated_cashflow_forecast') {
+    const result = forecast(String(input.accountId));
+    add(forecastFact(result));
+    if (result.limitations.length) limitations.push('SOURCE_LIMITATIONS');
+  } else if (skillId === 'goal_portfolio_planner') {
+    const active = goal();
+    if (tool === 'read_goal_constraints')
+      add({ kind: 'goal', refId: active.id, claimType: 'fact', sourceRefs: [active.id],
+        amountCents: active.targetCents, date: active.targetDate });
+    else if (tool === 'search_goal_options') {
+      const account = required(state.accounts.find(item => item.type === 'checking' && !item.protected));
+      const result = forecast(account.id);
+      for (const plan of buildMoneyMissionPlans(state, result)) add(planFact(plan));
+      limitations.push('PREVIEW_ONLY');
+    } else throw new Error('SKILL_CAPABILITY_UNAVAILABLE');
+  } else if (skillId === 'transfer_and_savings_executor') {
+    if (tool === 'get_transfer_schedule_status') {
+      const schedule = getTransferScheduleStatus(state, String(input.scheduleId));
+      add({ kind: 'schedule', refId: schedule.id, claimType: 'fact', sourceRefs: [schedule.id], status: schedule.status,
+        amountCents: schedule.amountCents, date: schedule.startDate });
+    } else if (tool === 'list_transfer_eligible_accounts') {
+      for (const account of state.accounts.filter(item => !item.protected && ['checking', 'goal'].includes(item.type)))
+        add({ kind: 'account', refId: account.id, claimType: 'fact', sourceRefs: [account.id] });
+    } else if (tool === 'simulate_transfer_schedule') {
+      const preview = current(required(state.transferSchedulePreviews.find(item => item.id === input.previewId)));
+      const parameters = TransferScheduleInputSchema.parse(Object.fromEntries(
+        Object.keys(TransferScheduleInputSchema.shape).map(key => [key, preview[key as keyof typeof preview]])));
+      const verified = simulateTransferSchedule(state, parameters);
+      if (verified.id !== preview.id) throw new Error('SKILL_REFERENCE_STALE');
+      add({ kind: 'schedule', refId: preview.id, claimType: 'prediction', sourceRefs: preview.evidenceRefs,
+        amountCents: preview.amountCents, date: preview.startDate, status: 'awaiting_confirmation' });
+      limitations.push('CONFIRMATION_REQUIRED', 'PREVIEW_ONLY');
+    } else throw new Error('SKILL_CAPABILITY_UNAVAILABLE');
+  } else if (skillId === 'outcome_monitor_and_replanner') {
+    const subscription = monitorStatus(sessionId, context.threadId);
+    if (!subscription.enabled) throw new Error('SKILL_MONITOR_NOT_ENABLED');
+    const active = goal();
+    if (active.status !== 'active' || state.primaryGoalId !== active.id || subscription.goalId !== active.id ||
+      !task || task.goalId !== active.id) throw new Error('SKILL_MONITOR_GOAL_NOT_ELIGIBLE');
+    if (task.readOnly || !['monitoring', 'awaiting_confirmation'].includes(task.phase)) throw new Error('SKILL_MONITOR_STALE');
+    const event = context.monitorEvent;
+    if (event && (event.sessionId !== sessionId || event.taskId !== task.taskId || event.demoRunId !== task.demoRunId ||
+      event.goalId !== active.id || event.twinVersion !== state.twinVersion || !monitorEventIsCurrent(event)))
+      throw new Error('SKILL_MONITOR_STALE');
+    // A verified current event exists to screen a changed Twin. Reconstruct its
+    // read-only baseline without changing the persisted task revision mid-run.
+    const baseline = event ? { ...task, baseTwinVersion: state.twinVersion } : task;
+    if (baseline.baseTwinVersion !== state.twinVersion) throw new Error('SKILL_MONITOR_STALE');
+    if (tool === 'screen_material_goal_events') {
+      add({ kind: 'goal', refId: active.id, claimType: 'fact', sourceRefs: [active.id], amountCents: active.savedCents });
+      const schedules = state.transferSchedules.filter(item => item.goalId === active.id &&
+        (!input.scheduleId || item.id === input.scheduleId));
+      if (input.scheduleId && !schedules.length) throw new Error('SKILL_REFERENCE_NOT_FOUND');
+      for (const item of state.transferExecutions.filter(item => schedules.some(schedule => schedule.id === item.scheduleId)).slice(-90))
+        add({ kind: 'execution', refId: item.id, claimType: 'simulated_result', sourceRefs: [item.scheduleId],
+          status: item.status, amountCents: item.amountCents });
+    } else throw new Error('SKILL_CAPABILITY_UNAVAILABLE');
+  } else if (skillId === 'financial_explanation_and_provenance' || skillId === 'human_handoff_case_pack') {
+    if (input.goalId) goal();
+    const ids = skillId === 'financial_explanation_and_provenance' ? [String(input.evidenceId)]
+      : (input.evidenceIds as string[]);
+    for (const id of ids) {
+      if (id.startsWith('skill-derived-')) { add(generatedFact(id)); continue; }
+      const artifact = state.evidenceRefs.find(item => item.id === id);
+      if (artifact?.twinVersion !== undefined) current({ twinVersion: artifact.twinVersion });
+      if (artifact && artifact.sourceKind !== 'import_batch') {
+        if (artifact.claimType === 'limitation') { limitations.push('SOURCE_LIMITATIONS'); continue; }
+        add({ kind: 'evidence', refId: artifact.id, claimType: artifact.claimType,
+          sourceRefs: artifact.sourceRefs ?? [artifact.sourceId], date: artifact.dataAsOf });
+      } else {
+        let detail: ReturnType<typeof inspectEvidence>;
+        try { detail = inspectEvidence(state, id); } catch { throw new Error('SKILL_REFERENCE_NOT_FOUND'); }
+        add({ kind: 'evidence', refId: detail.id, claimType: 'fact', sourceRefs: detail.sourceRefs,
+          date: detail.dataAsOf, ...(detail.transaction ? { amountCents: detail.transaction.amountCents } : {}) });
+      }
+    }
+    if (skillId === 'human_handoff_case_pack') limitations.push('NO_EXTERNAL_CONTACT', ...(ids.length ? [] : ['DATA_REQUIRED' as const]));
+  }
+  return { facts, evidenceRefs: [...new Set(facts.flatMap(fact => fact.sourceRefs))].slice(0, 100),
+    limitations: [...new Set(limitations)], nextActionIds: [] };
+}
 const TransactionsInput = z.object({ category: z.string().min(1).max(60).optional(),
   limit: z.number().int().min(1).max(30).default(20) }).strict();
 const supported = new Set(['baseline', 'current_month_expense', 'monthly_income_reduction',
@@ -20,11 +217,15 @@ type Source = AgentToolSource;
 
 function validatedInput(name: string, input: unknown) {
   if (!AgentReadToolNameSchema.safeParse(name).success) throw new Error('READ_TOOL_NOT_ALLOWED');
-  const schema = name === 'evidence_detail' ? z.object({evidenceId:z.string()}).strict() : name==='dated_cashflow_forecast' ? z.object({horizonDays:z.number().int().min(1).max(366).default(62),scenario:z.enum(['baseline','stress']).default('baseline')}).strict() : name === 'candidate_preview' ? CandidateInputSchema
+  const schema = name === 'candidate_preview' ? CandidateInputSchema
     : name === 'relevant_transactions' ? TransactionsInput
       : name === 'search_goal_options' ? SearchGoalOptionsInputSchema
         : name === 'stress_test_goal_options' ? StressTestGoalOptionsInputSchema
-          : name === 'repair_stressed_goal_option' ? RepairStressedGoalOptionInputSchema : Empty;
+          : name === 'repair_stressed_goal_option' ? RepairStressedGoalOptionInputSchema
+            : name === 'dated_cashflow_forecast' ? DatedCashflowForecastInputSchema
+            : name === 'evidence_detail' ? EvidenceDetailInputSchema
+              : ['bill_period_summary', 'spending_baseline_comparison', 'subscription_candidates'].includes(name)
+                ? BillPeriodInputSchema : Empty;
   const parsed = schema.safeParse(input);
   if (!parsed.success) throw new Error('READ_TOOL_INVALID_INPUT');
   return parsed.data;
@@ -88,7 +289,7 @@ function candidateResult(sessionId: string, threadId: string, input: CandidateIn
     input.monthlyContributionCents > task.constraints.monthlyContributionCapCents)
     violations.push('USER_MONTHLY_CAP_EXCEEDED');
   if (input.firstMonthContributionCents !== undefined &&
-    (input.firstMonthContributionCents > input.monthlyContributionCents ||
+    ((!hasDatedCashflowEvidence(state) && input.firstMonthContributionCents > input.monthlyContributionCents) ||
       input.firstMonthContributionCents > (task.constraints.monthlyContributionCapCents ?? Number.MAX_SAFE_INTEGER)))
     violations.push('FIRST_MONTH_CONTRIBUTION_INVALID');
   if (input.protectedCents < Math.max(task.constraints.protectedCents ?? 0, state.finance.emergencyCents))
@@ -291,9 +492,33 @@ export function runAgentReadTool(sessionId: string, threadId: string, name: stri
     twinVersion: state.twinVersion, dataAsOf: state.finance.updatedAt,
     createdAt: new Date().toISOString() };
   let result: AgentToolResult;
-  if(['bill_period_summary','spending_baseline_comparison','subscription_candidates','evidence_detail','dated_cashflow_forecast'].includes(name)){
-    const calculated=runBankingTool(state,name as Parameters<typeof runBankingTool>[1],input).result;
-    result=AgentToolResultSchema.parse({...base,tool:name,status:name==='dated_cashflow_forecast'&&calculated.precision!=='exact'?'insufficient_data':'ok',errorCode:name==='dated_cashflow_forecast'&&calculated.precision!=='exact'?'READ_TOOL_DATA_INSUFFICIENT':null,sourceEntities:state.transactions.slice(0,100).map(t=>({kind:'transaction',id:t.id})),assumptions:['金额、日期与证据由服务端确定性核算。'],gaps:[],output:calculated});
+  if (name === 'dated_cashflow_forecast') {
+    const forecast = buildDatedCashflowForecast(state, DatedCashflowForecastInputSchema.parse(input));
+    const referenced = new Set(forecast.evidenceRefs);
+    const sources: Source[] = [{ kind: 'account', id: forecast.accountId }, { kind: 'finance', id: 'finance' },
+      ...state.bills.filter(item => referenced.has(item.id)).map(item => ({ kind: 'bill' as const, id: item.id })),
+      ...state.transactions.filter(item => referenced.has(item.id)).map(item => ({ kind: 'transaction' as const, id: item.id }))];
+    result = AgentToolResultSchema.parse({ ...base, tool: name,
+      status: forecast.precision === 'exact' ? 'ok' : 'insufficient_data',
+      errorCode: forecast.precision === 'exact' ? null : 'READ_TOOL_DATA_INSUFFICIENT',
+      sourceEntities: sources.slice(0, 100),
+      assumptions: forecast.assumptions, gaps: forecast.limitations, output: forecast });
+  } else if (name === 'evidence_detail') {
+    const evidence = inspectEvidence(state, EvidenceDetailInputSchema.parse(input).evidenceId);
+    result = AgentToolResultSchema.parse({ ...base, tool: name, status: 'ok', errorCode: null,
+      sourceEntities: [{ kind: 'evidence', id: evidence.id }],
+      assumptions: [], gaps: evidence.limitations ?? [], output: evidence });
+  } else if (name === 'bill_period_summary' || name === 'spending_baseline_comparison' || name === 'subscription_candidates') {
+    const brief = buildBillBrief(state, BillPeriodInputSchema.parse(input));
+    const sourceIds = [...new Set(brief.claims.flatMap(claim => claim.sourceRefs))];
+    const sufficient = brief.categories.length > 0 && (name !== 'spending_baseline_comparison' || brief.changes.length > 0);
+    const output = name === 'bill_period_summary' ? brief : name === 'spending_baseline_comparison'
+      ? { briefId: brief.id, changes: brief.changes, claims: brief.claims, limitations: brief.limitations }
+      : { briefId: brief.id, subscriptionCandidates: brief.subscriptionCandidates, claims: brief.claims, limitations: brief.limitations };
+    result = AgentToolResultSchema.parse({ ...base, tool: name,
+      status: sufficient ? 'ok' : 'insufficient_data', errorCode: sufficient ? null : 'READ_TOOL_DATA_INSUFFICIENT',
+      sourceEntities: sourceIds.slice(0, 100).map(id => ({ kind: 'evidence', id })),
+      assumptions: ['只使用已确认账单历史；订阅及下次扣款仍需核实'], gaps: brief.limitations, output });
   } else if (name === 'financial_overview') {
     const { checkingCents, emergencyCents, monthlyIncomeCents, fixedBillsCents,
       essentialSpendingCents, historyMonths } = state.finance;
@@ -312,8 +537,10 @@ export function runAgentReadTool(sessionId: string, threadId: string, name: stri
         essentialSpendingCents: state.finance.essentialSpendingCents, bills: state.bills.slice(0, 100) } });
   } else if (name === 'relevant_transactions') {
     const args = TransactionsInput.parse(input);
+    const importedIds = new Set(state.normalizedStatementRows.map(row => row.id));
     const transactions = state.transactions.filter(item => !args.category || item.category === args.category)
-      .slice(0, args.limit);
+      .slice(0, args.limit).map(item => importedIds.has(item.id)
+        ? { ...item, title: '已确认账单交易', category: 'statement_history' } : item);
     result = AgentToolResultSchema.parse({ ...base, tool: name, status: 'ok', errorCode: null,
       sourceEntities: transactions.map(item => ({ kind: 'transaction', id: item.id })),
       assumptions: ['只返回当前会话的模拟流水，最多 30 条'],

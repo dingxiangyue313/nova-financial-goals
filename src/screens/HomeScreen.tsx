@@ -1,4 +1,3 @@
-import { money } from '../lib/format';
 import React, { useEffect, useState } from 'react';
 import { Goal } from '../types';
 import { SnapshotSchema, type Snapshot } from '../../shared/contracts';
@@ -28,7 +27,8 @@ interface HomeScreenProps {
   onNavigateToFeasibility: () => void;
   onNavigateToImpact: () => void;
   onNavigateToCreate: () => void;
-  onNavigateToBills: () => void;
+  onNavigateToMoneyMission: () => void;
+  onNavigateToServices: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -38,7 +38,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateToFeasibility,
   onNavigateToImpact,
   onNavigateToCreate,
-  onNavigateToBills,
+  onNavigateToMoneyMission,
+  onNavigateToServices,
 }) => {
   const [now, setNow] = useState(() => new Date());
 
@@ -47,17 +48,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => window.clearInterval(timer);
   }, []);
 
-  const brief = snapshot.moneyMission?.billBrief;
-  const dining = brief?.changes.find(item => item.category === 'dining_delivery');
-  const suppressed = Boolean(snapshot.moneyMission?.subscriptionActions.some(item => item.nextChargeSuppressed) || snapshot.mission?.subscription.nextChargeSuppressed);
-  const facts = brief ? {
-    total: brief.totalExpenseCents,
-    increase: dining?.increaseCents ?? 0,
-    minBalance: snapshot.moneyMission?.forecast?.minimumBalanceCents ?? 0,
-    month: Number(brief.periodEnd.slice(5, 7)),
-    suppressed,
-  } : null;
   const percentage = goal.progressPercent.toFixed(1);
+  const brief = snapshot.moneyMission?.billBrief;
+  const importedRows=snapshot.statementImportBatches.filter(b=>b.status==='committed').reduce((n,b)=>n+b.importedCount,0);
   const cards = SnapshotSchema.shape.cards.parse(snapshot.cards).map(card => normalizeUiCard(card));
   const insight = cards.find(card => card.type === 'goal_feasibility_card');
   const impact = snapshot.pendingImpact;
@@ -70,11 +63,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <section className="flex flex-col gap-0.5">
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium text-[#5A616B]">
-            {snapshot.mission ? formatCurrentDate(new Date(`${snapshot.clock}T12:00:00+08:00`)) + ' · 模拟今日' : formatCurrentDate(now) + ' · 今日'}
+            {snapshot.accountSnapshots.length ? `${snapshot.clock} · 模拟今日` : `${formatCurrentDate(now)} · 今日`}
           </span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] text-[11px] font-semibold">
             <span className="material-symbols-outlined text-[13px]">verified</span>
-            {connectedSources.length ? '智能守护中' : '等待连接数据'}
+            {connectedSources.length ? '智能守护中' : importedRows ? '模拟数据已就绪' : '等待连接数据'}
           </span>
         </div>
         <h1 className="text-[20px] font-bold text-[#1F2329] tracking-tight">
@@ -92,19 +85,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </section>
 
-      {facts && <button onClick={onNavigateToBills} className="text-left rounded-2xl bg-[#0F6B6D] px-[15px] py-4 text-white shadow-md flex flex-col gap-2.5" aria-label="查看账单与消费">
-        <span className="text-[11px] font-semibold text-white/90">消费趋势 · 银行卡 / 微信 / 支付宝 · 截至 {snapshot.clock}</span>
-        <strong className="text-[19px]">{facts.month}月花了 {money(facts.total)}</strong>
-        <div className="grid grid-cols-3 gap-2">{[{ title: '外卖多出', value: money(facts.increase) + '/月' }, { title: facts.suppressed ? '已关闭续费' : '11月5日续费', value: facts.suppressed ? '每月省¥68' : '¥68' }, { title: '工资前最低', value: money(facts.minBalance) }].map(x => <div key={x.title} className="rounded-xl bg-white/10 p-2"><span className="block text-[10px] text-white">{x.title}</span><strong className="text-[14px]">{x.value}</strong></div>)}</div>
-        <span className="text-[12px] font-bold">点开处理 CloudBox Plus，并安排工资到账后转入 →</span>
-      </button>}
-      {!facts && <button onClick={onNavigateToBills} className="mission-primary">查看账单与旅行任务 →</button>}
-
+      {brief && <button type="button" aria-label="查看账单与消费" onClick={onNavigateToMoneyMission} className="rounded-2xl bg-[#0F6B6D] text-white p-4 text-left shadow-md"><span className="text-[11px]">消费趋势 · 合成账单 · 截至 {brief.dataAsOf}</span><strong className="block text-[20px] mt-1">{Number(brief.periodStart.slice(5,7))}月花了 ¥{(brief.totalExpenseCents/100).toLocaleString('zh-CN')}</strong><span className="grid grid-cols-3 gap-2 mt-3"><span className="rounded-xl bg-white/15 p-2 text-[10px]">餐饮变化<strong className="block text-[13px]">¥{((brief.changes.find(c=>c.category==='dining')?.increaseCents??0)/100).toLocaleString('zh-CN')}/月</strong></span><span className="rounded-xl bg-white/15 p-2 text-[10px]">即将续费<strong className="block text-[13px]">¥{((brief.subscriptionCandidates[0]?.monthlyCents??0)/100).toLocaleString('zh-CN')}</strong></span><span className="rounded-xl bg-white/15 p-2 text-[10px]">工资前低谷<strong className="block text-[13px]">{snapshot.moneyMission?.forecast?.minimumBalanceCents==null?'待核对':'¥'+(snapshot.moneyMission.forecast.minimumBalanceCents/100).toLocaleString('zh-CN')}</strong></span></span><span className="block text-xs mt-3">处理续费，核对并安排工资到账后转入 →</span></button>}
       <div className="flex items-center gap-1.5 rounded-lg border border-[#E5E8EB] bg-white px-3 py-2 text-[11px] text-[#5A616B]">
         <span className="material-symbols-outlined text-[15px] text-[#0F6B6D]">sync</span>
         {connectedSources.length
           ? `已连接 ${connectedSources.length} 个模拟来源 · 财务数据截至 ${snapshot.finance.updatedAt}`
-          : '尚未连接流水 · 当前结果仅为演示估算'}
+          : importedRows ? `已导入 ${importedRows} 条历史证据 · 余额单独核对` : '尚未连接流水 · 当前结果仅为演示估算'}
       </div>
 
       {failedSources.length > 0 && (
@@ -147,11 +133,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <img
             alt={goal.title}
             className="w-full h-full object-cover object-center"
-            src={goal.imageUrl}
+            src={snapshot.accountSnapshots.length ? '/japan-trip.jpg' : goal.imageUrl}
             onError={(e) => {
               // High-res scenic winter Japan fallback
               e.currentTarget.src =
-                'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=80';
+                '/japan-trip.jpg';
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
@@ -174,17 +160,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         {/* Financial Metrics */}
-        <div className="flex items-baseline justify-between pt-0.5">
-          <div className="flex items-baseline gap-1 min-w-0 whitespace-nowrap">
+        <div className="flex items-baseline justify-between gap-2 pt-0.5">
+          <div className="flex items-baseline gap-1 whitespace-nowrap">
             <span className="text-[12px] text-[#5A616B]">已存</span>
-            <span className="text-[20px] font-bold text-[#1F2329] tracking-tight font-editorial">
+            <span className="text-[22px] font-bold text-[#1F2329] tracking-tight font-editorial">
               ¥{goal.currentAmount.toLocaleString()}
             </span>
-            <span className="text-[11px] text-[#5A616B]">
+            <span className="text-[13px] text-[#5A616B]">
               / ¥{goal.targetAmount.toLocaleString()}
             </span>
           </div>
-          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] text-[10px] font-semibold whitespace-nowrap shrink-0">
+          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] text-[10px] whitespace-nowrap font-semibold">
             <span className="material-symbols-outlined text-[14px]">trending_up</span>
             <span>已完成 {percentage}%</span>
           </div>

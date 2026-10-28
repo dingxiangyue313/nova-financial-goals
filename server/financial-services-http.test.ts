@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createServer } from 'node:net';
+
+test('consumer financial confirmations isolate sessions, reject stale approvals and debit once', {timeout:90000}, async()=>{
+  const listener=createServer(); await new Promise<void>(r=>listener.listen(0,'127.0.0.1',r));
+  const port=(listener.address() as {port:number}).port;await new Promise<void>(r=>listener.close(()=>r()));
+  const directory=mkdtempSync(join(tmpdir(),'nova-services-http-'));
+  const child=spawn(process.execPath,['--import','tsx','server/index.ts'],{env:{...process.env,PORT:String(port),NODE_ENV:'production',NOVA_DB_PATH:join(directory,'test.sqlite'),NOVA_SESSION_SECRET:'services-test-secret-0123456789abcdef',NOVA_DEMO_CONTROLS:'false',DEEPSEEK_API_KEY:''},stdio:'ignore'});
+  const base=`http://127.0.0.1:${port}`;
+  try {
+    let ready=false;for(let i=0;i<150;i++){try{ready=(await fetch(base+'/api/health')).ok;}catch{}if(ready)break;await new Promise(r=>setTimeout(r,100));}assert.ok(ready,'temporary HTTP server ready');
+    const cookie=async()=>{const r=await fetch(base+'/api/session');return r.headers.get('set-cookie')!.split(';')[0];};
+    const a=await cookie(),b=await cookie();
+    const call=(path:string,data?:unknown,c=a)=>fetch(base+path,{method:data===undefined?'GET':'POST',headers:{Cookie:c,'Content-Type':'application/json'},...(data===undefined?{}:{body:JSON.stringify(data)})});
+    assert.equal((await call('/api/demo/reset',{})).status,404);
+    assert.equal((await call('/api/product/start',{})).status,200);
+    const first=await (await call('/api/services')).json();assert.match((await call('/api/services')).headers.get('cache-control')! ,/no-store/);
+    const before=first.accounts.find((x:{id:string})=>x.id==='checking').balanceCents;
+    const transfer={kind:'transfer',recipientId:'contact-1',recipientVersion:1,accountId:'checking',amountCents:30000};
+    const prepared=await (await call('/api/services/prepare',transfer)).json();assert.ok(prepared.confirmation?.actionId);
+    const confirmation={actionId:prepared.confirmation.actionId,decision:'confirm'};
+    assert.notEqual((await call('/api/services/confirm',confirmation,b)).status,200);
+    assert.equal((await call('/api/services/confirm',confirmation)).status,200);
+    assert.equal((await call('/api/services/confirm',confirmation)).status,200);
+    const after=await (await call('/api/services')).json();assert.equal(after.accounts.find((x:{id:string})=>x.id==='checking').balanceCents,before-30000);assert.equal(after.receipts.filter((r:{operationId:string})=>r.operationId===confirmation.actionId).length,1);
+    const stale=await (await call('/api/services/prepare',transfer)).json();
+    const card=await (await call('/api/services/prepare',{kind:'card',id:'card-main',action:'lock'})).json();
+    assert.equal((await call('/api/services/confirm',{actionId:card.confirmation.actionId,decision:'confirm'})).status,200);
+    assert.notEqual((await call('/api/services/confirm',{actionId:stale.confirmation.actionId,decision:'confirm'})).status,200);
+    const cancelled=await (await call('/api/services/prepare',transfer)).json();
+    assert.equal((await call('/api/services/confirm',{actionId:cancelled.confirmation.actionId,decision:'cancel'})).status,200);
+    assert.notEqual((await call('/api/services/confirm',{actionId:cancelled.confirmation.actionId,decision:'confirm'})).status,200);
+    assert.notEqual((await call('/api/services/prepare',{...transfer,amountCents:0.1})).status,200);
+    assert.notEqual((await call('/api/services/prepare',{...transfer,recipientVersion:99})).status,200);
+    const mission=await (await call('/api/product/mission')).json();
+    const row=mission.rows.find((r:{amountCents:number;excludedReason:string|null})=>r.amountCents<0&&!r.excludedReason);
+    assert.ok(row);
+    const correction={category:'education',expectedTwinVersion:mission.snapshot.twinVersion};
+    assert.notEqual((await call(`/api/product/evidence/${row.id}/category`,correction,b)).status,200);
+    const changed=await call(`/api/product/evidence/${row.id}/category`,correction);assert.equal(changed.status,200);
+    const corrected=await changed.json();assert.equal(corrected.rows.find((r:{id:string})=>r.id===row.id).category,'education');
+    assert.equal(corrected.snapshot.finance.checkingCents,before-30000);assert.equal(corrected.brief.totalExpenseCents,mission.brief.totalExpenseCents);
+    assert.notEqual((await call(`/api/product/evidence/${row.id}/category`,correction)).status,200);
+    const annual=await call('/api/product/bill',{periodStart:'2026-01-01',periodEnd:'2026-10-26'});assert.equal(annual.status,200);assert.ok((await annual.json()).claims.every((c:{sourceRefs:unknown[]})=>c.sourceRefs.length));
+    const skills=await (await call('/api/services/skills')).json();assert.equal(skills.skills.length,13);
+    assert.equal((await call('/api/services/skills/inspect',{skillId:'card_lifecycle_manager',input:{cardId:'card-main'}})).status,200);
+    assert.notEqual((await call('/api/services/skills/inspect',{skillId:'card_lifecycle_manager',input:{cardId:'card-main',amountCents:1}})).status,200);
+  } finally {child.kill();await new Promise<void>(resolve=>{if(child.exitCode!==null)resolve();else child.once('exit',()=>resolve());});rmSync(directory,{recursive:true,force:true});}
+});

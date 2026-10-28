@@ -1,37 +1,122 @@
 import { z } from 'zod';
-import { MissionSkillResultSchema,SkillDefinitionSchema,SkillIdSchema,type SkillId } from '../../shared/contracts.ts';
+import { SkillIdSchema, EnabledSkillIdSchema, SkillDefinitionSchema, SkillReferenceIdSchema as Ref, SkillOutputSchema,
+  type SkillId, type SkillDefinition, type SkillOutput } from '../../shared/contracts.ts';
 
-const entries = [
-  ['statement_ingestion_and_reconciliation','账单导入、数据质量与对账',['read_import_quality','preview_statement_import']],
-  ['bill_and_subscription_investigator','月账单、订阅和逐笔证据调查',['bill_period_summary','spending_baseline_comparison','subscription_candidates','evidence_detail','prepare_subscription_action']],
-  ['dated_cashflow_forecast','按日期核算收入、账单与资金低谷',['dated_cashflow_forecast']],
-  ['goal_portfolio_planner','生成目标方案并检测共享资金冲突',['dated_cashflow_forecast','build_goal_portfolio']],
-  ['transfer_and_savings_executor','准备受控储蓄计划并查询执行结果',['simulate_transfer_schedule','get_transfer_schedule_status']],
-  ['mandate_builder','可编辑外部授权（P1暂不启用）',[]],
-  ['external_agent_request_inbox','已签名的外部请求收件箱（P1暂不启用）',[]],
-  ['outcome_monitor_and_replanner','调查转账失败、结果未知、工资缺失或延迟，生成只读修复建议',['read_material_outcomes','search_repair_options']],
-  ['financial_explanation_and_provenance','说明事实、假设、预测与来源',['read_explanation_evidence']],
-  ['human_handoff_case_pack','生成隐私最小化的人工问题包',['prepare_case_pack']],
-] as const;
-const definitions=entries.map(([id,description,tools])=>SkillDefinitionSchema.parse({id,version:'1.0.0',enabled:!['mandate_builder','external_agent_request_inbox'].includes(id),release:['mandate_builder','external_agent_request_inbox'].includes(id)?'p1_stretch':'p0',description,tools:[...tools],maxToolCalls:8,confirmationRequired:['statement_ingestion_and_reconciliation','bill_and_subscription_investigator','transfer_and_savings_executor'].includes(id)}));
-export const CORE_SKILL_IDS=definitions.filter(s=>s.enabled).map(s=>s.id);
-export const CoreSkillInputSchema=z.object({artifactId:z.string().max(200).optional()}).strict();
-export const CoreSkillOutputSchema=MissionSkillResultSchema;
-export function listSkillDefinitions(){return structuredClone(definitions);}
-export function getEnabledSkill(id:string){const parsed=SkillIdSchema.parse(id);const definition=definitions.find(s=>s.id===parsed)!;if(!definition.enabled)throw new Error('SKILL_NOT_ENABLED');return structuredClone(definition);}
-export function assertSkillToolAllowed(id:string,tool:string){const definition=getEnabledSkill(id);if(!definition.tools.includes(tool)||/^(execute|confirm|consume|activate)_/.test(tool))throw new Error('SKILL_TOOL_FORBIDDEN');}
-export function isMoneyMissionRequest(text:string){return /账单|订阅|CloudBox|续费|导入|流水|现金流|证据|工资.*到账|储蓄计划|定时转|人工.*问题包|数据.*冲突|目标.*争用|多个目标|为什么.*最低|股票|贷款|保险产品/i.test(text);}
-export function routeMoneyMissionSkill(intent:string,phase:string):SkillId {
-  if(/人工|问题包|商户处理|无法解决|股票|贷款|保险产品/.test(intent))return 'human_handoff_case_pack';
-  if(/授权|mandate/i.test(intent))return 'mandate_builder';
-  if(/外部.*请求|收件箱/.test(intent))return 'external_agent_request_inbox';
-  if(/导入|文件|数据覆盖|核对字段/.test(intent))return 'statement_ingestion_and_reconciliation';
-  if(/储蓄计划|定时转|安排.*转|工资.*到账.*存|工资.*到账.*转/.test(intent))return 'transfer_and_savings_executor';
-  if(/失败|跳过|重规划|监测|提醒.*变化/.test(intent)||(phase==='monitoring'&&!intent.trim()))return 'outcome_monitor_and_replanner';
-  if(/为什么|来源|解释|依据/.test(intent))return 'financial_explanation_and_provenance';
-  if(/现金流|低谷|预测|工资延迟/.test(intent))return 'dated_cashflow_forecast';
-  if(/目标.*争用|多个目标|方案|规划/.test(intent))return 'goal_portfolio_planner';
-  return 'bill_and_subscription_investigator';
+const Inputs = {
+  statement_ingestion_and_reconciliation: z.object({ batchId: Ref }).strict(),
+  bill_and_subscription_investigator: z.object({ periodId: Ref, subscriptionId: Ref.optional() }).strict(),
+  dated_cashflow_forecast: z.object({ accountId: Ref, goalId: Ref }).strict(),
+  goal_portfolio_planner: z.object({ goalId: Ref }).strict(),
+  transfer_and_savings_executor: z.object({ scheduleId: Ref.optional(), previewId: Ref.optional() }).strict()
+    .refine(value => Boolean(value.scheduleId) !== Boolean(value.previewId)),
+  mandate_builder: z.object({ agentId: Ref, scopeId: Ref }).strict(),
+  external_agent_request_inbox: z.object({ requestId: Ref }).strict(),
+  outcome_monitor_and_replanner: z.object({ goalId: Ref, scheduleId: Ref.optional() }).strict(),
+  financial_explanation_and_provenance: z.object({ evidenceId: Ref }).strict(),
+  human_handoff_case_pack: z.object({ goalId: Ref.optional(), evidenceIds: z.array(Ref).max(30).default([]) }).strict(),
+  recipient_and_split_coordinator:z.object({recipientId:Ref.optional(),operationId:Ref.optional()}).strict(),
+  investment_lifecycle_manager:z.object({productId:Ref.optional(),operationId:Ref.optional()}).strict(),
+  card_lifecycle_manager:z.object({cardId:Ref.optional()}).strict(),
+} satisfies Record<SkillId, z.ZodType>;
+
+const tools: Record<SkillId, readonly string[]> = {
+  statement_ingestion_and_reconciliation: ['inspect_statement_file', 'preview_statement_mapping',
+    'detect_duplicate_transactions', 'detect_refunds_and_internal_transfers', 'preview_import_batch',
+    'list_import_issues', 'prepare_import_batch'],
+  bill_and_subscription_investigator: ['summarize_bill_period', 'compare_spending_baseline',
+    'list_relevant_transactions', 'detect_subscription_candidates', 'inspect_subscription_history',
+    'assess_transaction_goal_impact', 'prepare_subscription_action'],
+  dated_cashflow_forecast: ['list_cashflow_events', 'build_cashflow_timeline',
+    'simulate_cashflow_scenario', 'compare_cashflow_scenarios', 'inspect_forecast_evidence'],
+  goal_portfolio_planner: ['read_goal_constraints', 'read_goal_allocations', 'search_goal_options',
+    'stress_test_goal_options', 'repair_stressed_goal_option', 'detect_goal_funding_conflicts', 'prepare_goal_candidate'],
+  transfer_and_savings_executor: ['list_transfer_eligible_accounts', 'simulate_transfer_schedule',
+    'prepare_internal_transfer', 'prepare_recurring_transfer', 'get_transfer_schedule_status',
+    'prepare_pause_transfer_schedule', 'prepare_cancel_transfer_schedule'],
+  mandate_builder: ['inspect_service_mandates'],
+  external_agent_request_inbox: ['inspect_verified_travel_requests'],
+  recipient_and_split_coordinator:['inspect_recipients_and_splits'],
+  investment_lifecycle_manager:['inspect_investment_suitability_and_settlement'],
+  card_lifecycle_manager:['inspect_card_payment_readiness'],
+  outcome_monitor_and_replanner: ['screen_material_goal_events', 'read_event_evidence', 'assess_event_goal_impact',
+    'search_repair_options', 'stress_test_repair_options', 'prepare_monitor_notification', 'schedule_followup'],
+  financial_explanation_and_provenance: ['read_explanation_evidence', 'render_calculation_breakdown',
+    'resolve_user_facing_labels', 'validate_explanation_grounding'],
+  human_handoff_case_pack: ['read_task_history_summary', 'read_relevant_evidence', 'list_attempted_actions',
+    'prepare_case_pack', 'export_case_pack'],
+};
+const descriptions: Record<SkillId, string> = {
+  statement_ingestion_and_reconciliation: 'Inspect reconciled statement previews and issues; confirmation commits imports.',
+  bill_and_subscription_investigator: 'Investigate bill evidence and subscription history without cancelling services.',
+  dated_cashflow_forecast: 'Build dated cashflow using authoritative snapshots and deterministic services.',
+  goal_portfolio_planner: 'Compare evidence-based goal options without activating a plan.',
+  transfer_and_savings_executor: 'Inspect and prepare savings schedules for workspace confirmation.',
+  mandate_builder: 'Inspect bounded mandates; edits require the exact consumer confirmation.',
+  external_agent_request_inbox: 'Inspect signed synthetic quotes and original order results without submitting payments.',
+  recipient_and_split_coordinator:'Inspect explicit recipient identities and AA collection evidence without sending funds.',
+  investment_lifecycle_manager:'Inspect suitability, unreserved shares and pending settlement without placing orders.',
+  card_lifecycle_manager:'Inspect card status and payment restrictions without changing card authority.',
+  outcome_monitor_and_replanner: 'Inspect monitored execution outcomes and route repairs for review.',
+  financial_explanation_and_provenance: 'Resolve calculations and evidence with explicit provenance.',
+  human_handoff_case_pack: 'Assemble minimal evidence for user-directed human handoff without external contact.',
+};
+const kinds: Record<SkillId, readonly string[]> = {
+  statement_ingestion_and_reconciliation: ['import_batch', 'import_issue'],
+  bill_and_subscription_investigator: ['bill', 'subscription', 'evidence'],
+  dated_cashflow_forecast: ['forecast'], goal_portfolio_planner: ['goal', 'plan'],
+  transfer_and_savings_executor: ['account', 'schedule'], mandate_builder: ['mandate'], external_agent_request_inbox: ['order'],
+  recipient_and_split_coordinator:['recipient','split'],investment_lifecycle_manager:['investment'],card_lifecycle_manager:['card'],
+  outcome_monitor_and_replanner: ['goal', 'schedule', 'execution', 'plan'],
+  financial_explanation_and_provenance: ['evidence'], human_handoff_case_pack: ['case_pack', 'evidence', 'execution'],
+};
+export type RegisteredSkillDefinition = SkillDefinition & { id: SkillId };
+export const CORE_SKILL_IDS = Object.freeze([...EnabledSkillIdSchema.options]);
+const definitions = SkillIdSchema.options.map(id => {
+  const enabled = true;
+  const canPrepareAction = !['dated_cashflow_forecast', 'financial_explanation_and_provenance',
+    'human_handoff_case_pack','mandate_builder','external_agent_request_inbox','recipient_and_split_coordinator','investment_lifecycle_manager','card_lifecycle_manager'].includes(id);
+  return { ...SkillDefinitionSchema.parse({ name: id, version: '0.6.0', description: descriptions[id],
+    riskClass: canPrepareAction ? 'prepare_write' : 'read', inputSchema: Inputs[id],
+    outputSchema: SkillOutputSchema.extend({ skillId: z.literal(id) }).refine(value =>
+      value.facts.every(fact => kinds[id].includes(fact.kind))),
+    allowedTools: [...tools[id]], maxToolCalls: 8, timeoutMs: 45_000,
+    requiresEvidence: true, canPrepareAction, canExecuteAction: false, enabled,
+    release: enabled ? 'p0' : 'p1_stretch' }), id };
+});
+
+// Never expose the mutable authority table to model callers or UI consumers.
+export function listSkillDefinitions(): RegisteredSkillDefinition[] {
+  return definitions.map(value => ({ ...value, allowedTools: [...value.allowedTools] }));
 }
-
-export function getSkillSchemas(id:SkillId){getEnabledSkill(id);return {input:CoreSkillInputSchema,output:CoreSkillOutputSchema.refine(result=>result.skillId===id,{message:'SKILL_OUTPUT_MISMATCH'})};}
+export function getEnabledSkill(id: string): RegisteredSkillDefinition {
+  const definition = definitions.find(value => value.id === id);
+  if (!definition) throw new Error('SKILL_NOT_FOUND');
+  if (!definition.enabled) throw new Error('SKILL_NOT_ENABLED');
+  return { ...definition, allowedTools: [...definition.allowedTools] };
+}
+export function assertSkillToolAllowed(id: string, tool: string): void {
+  const skill = getEnabledSkill(id);
+  if (!tools[skill.id].includes(tool)) throw new Error('SKILL_TOOL_FORBIDDEN');
+}
+export function validateSkillInput(id: string, input: unknown): Record<string, unknown> {
+  const parsed = (getEnabledSkill(id).inputSchema as z.ZodType).safeParse(input);
+  if (!parsed.success) throw new Error('SKILL_INVALID_INPUT');
+  return parsed.data as Record<string, unknown>;
+}
+export function validateSkillOutput(id: string, output: unknown): SkillOutput {
+  const parsed = (getEnabledSkill(id).outputSchema as z.ZodType<SkillOutput>).safeParse(output);
+  if (!parsed.success) throw new Error('SKILL_INVALID_OUTPUT');
+  return parsed.data;
+}
+export function routeMoneyMissionSkill(intent: string, phase: string): SkillId {
+  if (intent === 'handoff') return 'human_handoff_case_pack';
+  if (!['import', 'bill', 'subscription', 'forecast', 'goal', 'transfer', 'monitor', 'explain'].includes(intent))
+    return 'human_handoff_case_pack';
+  if (phase === 'monitoring' || intent === 'monitor') return 'outcome_monitor_and_replanner';
+  if (phase === 'explanation' || intent === 'explain') return 'financial_explanation_and_provenance';
+  if (intent === 'import') return 'statement_ingestion_and_reconciliation';
+  if (intent === 'bill' || intent === 'subscription') return 'bill_and_subscription_investigator';
+  if (phase === 'forecast' || intent === 'forecast') return 'dated_cashflow_forecast';
+  if (intent === 'transfer') return 'transfer_and_savings_executor';
+  return 'goal_portfolio_planner';
+}

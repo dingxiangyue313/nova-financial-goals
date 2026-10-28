@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { ScreenId, Goal } from './types';
+import { ScreenId, Goal, type MoneyMissionReadModel } from './types';
 import { api, cents, displayGoal, displayImpact } from './api';
 import type { DataSourceKind, DataSyncResult, RiskPreferences, Snapshot, UiCard } from '../shared/contracts';
 import { normalizeUiCard } from '../shared/generative';
@@ -13,13 +13,13 @@ import { GoalsListScreen } from './screens/GoalsListScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { BankingDemoScreen } from './screens/BankingDemoScreen';
-const AgentWorkspaceScreen = lazy(() => import('./screens/AgentWorkspaceScreen').then(module => ({ default: module.AgentWorkspaceScreen })));
-const MoneyMissionScreen = lazy(() => import('./screens/MoneyMissionScreen').then(module => ({ default: module.MoneyMissionScreen })));
-const DemoControlScreen = lazy(() => import('./screens/DemoControlScreen').then(module => ({ default: module.DemoControlScreen })));
 import { DataConnectionScreen } from './screens/DataConnectionScreen';
 import { OfflineScreen } from './screens/OfflineScreen';
 import { NovaMark } from './components/NovaMark';
 import { clearOfflineSnapshot, createOfflineSnapshot, loadOfflineSnapshot, saveOfflineSnapshot, type OfflineSnapshot } from './offline';
+const MoneyMissionScreen=lazy(()=>import('./screens/MoneyMissionScreen').then(m=>({default:m.MoneyMissionScreen})));
+const FinancialServicesScreen=lazy(()=>import('./screens/FinancialServicesScreen').then(m=>({default:m.FinancialServicesScreen})));
+const AgentWorkspaceScreen=lazy(()=>import('./screens/AgentWorkspaceScreen').then(m=>({default:m.AgentWorkspaceScreen})));
 
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -29,13 +29,15 @@ interface InstallPromptEvent extends Event {
 interface PwaUpdateEvent extends Event { detail: { updateSW: (reloadPage?: boolean) => Promise<void> } }
 
 export default function App() {
-  const [demoControlsEnabled, setDemoControlsEnabled] = useState(false);
-  useEffect(() => { void api<{ demoControls: boolean }>('/api/capabilities')
-    .then(result => setDemoControlsEnabled(result.demoControls)).catch(() => {}); }, []);
-  const demoControl = demoControlsEnabled && window.location.pathname === '/demo-control';
+  const [demoEnabled, setDemoEnabled] = useState(false);
+  const demoControl = window.location.pathname === '/demo-control' && demoEnabled;
+  useEffect(() => { void api<{demoControls:boolean}>('/api/capabilities').then(value => setDemoEnabled(value.demoControls)).catch(() => {}); }, []);
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('home');
   const [previousScreen, setPreviousScreen] = useState<ScreenId>('home');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [missionModel, setMissionModel] = useState<MoneyMissionReadModel | null>(null);
+  const [missionLoading, setMissionLoading] = useState(false);
+  const [missionError, setMissionError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [deviceFrame, setDeviceFrame] = useState<boolean>(true);
@@ -43,6 +45,7 @@ export default function App() {
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
   const [workspaceStarter, setWorkspaceStarter] = useState('');
+  const [financialStarter,setFinancialStarter]=useState('');
   const [pendingConnectionThreadId, setPendingConnectionThreadId] = useState<string | null>(null);
   const [connectionBusy, setConnectionBusy] = useState(false);
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
@@ -56,12 +59,30 @@ export default function App() {
   const [welcomeLeaving, setWelcomeLeaving] = useState(false);
   const initiallyRouted = useRef(false);
   const autoSyncing = useRef(false);
+  const missionRequest = useRef(0);
+  const refreshMission = async () => {
+    const request = ++missionRequest.current;
+    setMissionLoading(true);
+    setMissionError(null);
+    try {
+      const model = await api<MoneyMissionReadModel>('/api/money-mission');
+      if (request === missionRequest.current) setMissionModel(model);
+    } catch (error) {
+      if (request === missionRequest.current) setMissionError(error instanceof Error ? error.message : '暂时无法读取任务');
+    } finally {
+      if (request === missionRequest.current) setMissionLoading(false);
+    }
+  };
+  useEffect(() => {
+    if (currentScreen === 'money_mission') void refreshMission();
+    return () => { missionRequest.current += 1; };
+  }, [currentScreen, snapshot?.twinVersion]);
   useEffect(() => {
     let active = true;
     const load = async () => {
       try {
         let live = await api<Snapshot>('/api/session');
-        if (!live.mission && live.goals.length === 0 && window.location.pathname !== '/demo-control') live = await api<Snapshot>('/api/mission/start', 'POST');
+        if (!live.goals.length && window.location.pathname !== '/demo-control') live = await api<Snapshot>('/api/product/start', 'POST', {});
         if (active) { setSnapshot(live); setLoadError(null); }
       } catch (error) {
         const cached = await loadOfflineSnapshot();
@@ -143,7 +164,7 @@ export default function App() {
   }, [isOffline, snapshot?.goal.id, snapshot?.goal.savedCents, snapshot?.goal.selectedPlanId, snapshot?.pendingImpact?.id, snapshot?.operations.length]);
   const hasConnectedData = Boolean(snapshot?.dataConnections.some(item => item.status === 'connected'));
   useEffect(() => {
-    if (!hasConnectedData || isOffline || snapshot?.mission) return;
+    if (!hasConnectedData || isOffline) return;
     let active = true;
     const ensure = async () => {
       if (autoSyncing.current || document.visibilityState === 'hidden' || !navigator.onLine) return;
@@ -166,7 +187,7 @@ export default function App() {
     const onVisibility = () => { if (document.visibilityState === 'visible') void ensure(); };
     document.addEventListener('visibilitychange', onVisibility);
     return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibility); };
-  }, [hasConnectedData, isOffline, snapshot?.mission?.version]);
+  }, [hasConnectedData, isOffline]);
   const goal = snapshot?.primaryGoal ? displayGoal(snapshot) : null;
   const activeImpact = snapshot?.pendingImpact?.goalId == null || snapshot.pendingImpact.goalId === snapshot.primaryGoalId
     ? snapshot?.pendingImpact ?? null : null;
@@ -376,10 +397,6 @@ export default function App() {
         return '目标可行性';
       case 'data_connections':
         return '数据连接';
-      case 'bills':
-        return '账单与消费';
-      case 'savings':
-        return '旅行储蓄计划';
       case 'impact':
         return '目标影响';
       case 'goals_list':
@@ -392,6 +409,8 @@ export default function App() {
         return '授权与执行记录';
       case 'workspace':
         return 'NOVA 工作台';
+      case 'money_mission':
+        return '旅行任务';
       default:
         return '';
     }
@@ -401,6 +420,7 @@ export default function App() {
   const showBottomNav =
     currentScreen === 'home' ||
     currentScreen === 'workspace' ||
+    currentScreen === 'money_mission' ||
     currentScreen === 'goals_list' ||
     currentScreen === 'activity' ||
     currentScreen === 'profile';
@@ -412,24 +432,80 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#E5E8EB] flex flex-col items-center justify-center p-0 md:py-6 text-[#1F2329] selection:bg-[#E6F2F2]">
       {/* Top Floating Switcher Pill (Quick Screen Access) */}
-      {demoControl && (
-        <Suspense fallback={<p>正在加载演示控制台…</p>}>
-        <DemoControlScreen
-          currentScreen={currentScreen}
-          deviceFrame={deviceFrame}
-          onNavigate={navigateTo}
-          onToggleFrame={() => setDeviceFrame(!deviceFrame)}
-          onSnapshot={setSnapshot}
-          onToast={showToast}
-        />
-        </Suspense>
-      )}
+      {demoControl && <aside aria-label="屏幕快速切换与调试" className="w-full max-w-[500px] px-3 mb-2 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+          <span className="font-semibold text-[#5A616B] shrink-0 text-[11px]">快速直达:</span>
+          <button
+            onClick={() => navigateTo('home')}
+            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
+              currentScreen === 'home'
+                ? 'bg-[#0F6B6D] text-white shadow-xs'
+                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
+            }`}
+          >
+            1. 首页
+          </button>
+          <button
+            onClick={() => navigateTo('create_goal')}
+            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
+              currentScreen === 'create_goal'
+                ? 'bg-[#0F6B6D] text-white shadow-xs'
+                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
+            }`}
+          >
+            2. 创建目标
+          </button>
+          <button
+            onClick={() => navigateTo('feasibility')}
+            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
+              currentScreen === 'feasibility'
+                ? 'bg-[#0F6B6D] text-white shadow-xs'
+                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
+            }`}
+          >
+            4. 目标可行性
+          </button>
+          <button
+            onClick={() => navigateTo('impact')}
+            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
+              currentScreen === 'impact'
+                ? 'bg-[#0F6B6D] text-white shadow-xs'
+                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
+            }`}
+          >
+            3. 目标影响
+          </button>
+          <button
+            onClick={() => navigateTo('workspace')}
+            className={`px-2.5 py-1 rounded-full shrink-0 cursor-pointer font-medium text-[11px] ${
+              currentScreen === 'workspace'
+                ? 'bg-[#0F6B6D] text-white shadow-xs'
+                : 'bg-white/80 hover:bg-white text-[#1F2329] border border-[#D0D5DD]'
+            }`}
+          >
+            NOVA 工作台
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+          <button
+            onClick={() => setDeviceFrame(!deviceFrame)}
+            className="p-1 rounded-md bg-white border border-[#D0D5DD] text-[#5A616B] hover:text-[#1F2329] cursor-pointer"
+            title={deviceFrame ? '切换为自适应全屏' : '切换为手机尺寸 390x844'}
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {deviceFrame ? 'fullscreen' : 'smartphone'}
+            </span>
+          </button>
+        </div>
+      </aside>}
+
       {/* Main Screen Container (390 x 844 iPhone Frame or Responsive View) */}
       <div
         className={`bg-[#F5F7F8] relative flex flex-col overflow-hidden transition-all duration-300 ${
           deviceFrame
             ? 'w-[390px] max-w-[calc(100vw-16px)] h-[844px] max-h-[844px] min-h-[844px] rounded-[38px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border-[8px] border-[#1F2329]'
-            : currentScreen === 'workspace'
+            : currentScreen === 'workspace' || currentScreen === 'money_mission'
               ? 'w-full max-w-[1120px] min-h-screen md:min-h-[760px] md:max-h-[90vh] md:rounded-2xl md:shadow-xl md:border border-[#E5E8EB]'
               : 'w-full max-w-[420px] min-h-screen md:min-h-[844px] md:max-h-[90vh] md:rounded-2xl md:shadow-xl md:border border-[#E5E8EB]'
         }`}
@@ -439,17 +515,18 @@ export default function App() {
           isHome={isHomeScreen}
           title={getScreenTitle()}
           onBack={handleBack}
-          onOpenSimulateModal={demoControl ? () => setShowSimulateModal(true) : undefined}
+          onOpenSimulateModal={() => setShowSimulateModal(true)}
           onOpenProfile={() => navigateTo('profile')}
         />
 
         {/* Content Body */}
-        <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar relative w-full bg-[#F5F7F8]">
+        <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar relative w-full bg-[#F5F7F8]"><Suspense fallback={<p role="status" className="p-4">正在打开任务…</p>}>
           {!goal && ['home', 'create_goal', 'feasibility', 'profile'].includes(currentScreen) && (
             <section className="m-4 rounded-2xl border border-[#D8E7E7] bg-white p-5 shadow-sm">
               <h1 className="text-[17px] font-bold text-[#1F2329]">还没有财务目标</h1>
               <p className="mt-2 text-[13px] leading-relaxed text-[#5A616B]">创建目标后，这里会显示首页进度、可行性分析和智能守护提醒。你也可以载入日本旅行模拟数据，查看完整的原版页面。</p>
               <button onClick={() => navigateTo('workspace')} className="mt-4 w-full rounded-xl bg-[#0F6B6D] px-4 py-3 text-[13px] font-semibold text-white">和 NOVA 创建目标</button>
+              <button onClick={() => navigateTo('money_mission')} className="mt-2 min-h-11 w-full rounded-xl border border-[#B9D9D8] px-4 py-3 text-[13px] font-semibold text-[#0F6B6D]">开始日本旅行 Money Mission</button>
               <button onClick={() => setShowSimulateModal(true)} className="mt-2 w-full rounded-xl border border-[#B9D9D8] px-4 py-3 text-[13px] font-semibold text-[#0F6B6D]">查看日本旅行演示</button>
             </section>
           )}
@@ -458,14 +535,21 @@ export default function App() {
               goal={goal}
               snapshot={snapshot}
               hasImpactPending={hasImpactPending}
-              onNavigateToBills={() => navigateTo('bills')}
-              onNavigateToFeasibility={() => navigateTo(snapshot.mission ? 'savings' : 'feasibility')}
+              onNavigateToFeasibility={() => navigateTo('feasibility')}
               onNavigateToImpact={() => navigateTo('impact')}
               onNavigateToCreate={() => { setWorkspaceStarter('我想创建一个新的财务目标'); navigateTo('workspace'); }}
+              onNavigateToMoneyMission={() => navigateTo('money_mission')}
+              onNavigateToServices={() => navigateTo('financial_services')}
             />
           )}
 
-          {(currentScreen === 'bills' || currentScreen === 'savings') && <Suspense fallback={<p className="p-4 text-sm">正在读取旅行任务…</p>}><MoneyMissionScreen snapshot={snapshot} onSnapshot={setSnapshot} mode={currentScreen === 'bills' ? 'bills' : 'savings'} onSavings={() => navigateTo('savings')} /></Suspense>}
+          {currentScreen === 'money_mission' && <MoneyMissionScreen model={missionModel} loading={missionLoading}
+            onSnapshot={setSnapshot}
+            error={missionError} compact={deviceFrame} onRefresh={() => void refreshMission()}
+            onNavigate={() => { setWorkspaceStarter('请继续日本旅行目标的当前任务'); navigateTo('workspace'); }} />}
+          {currentScreen === 'financial_services' && <FinancialServicesScreen initialMessage={financialStarter} onBills={() => navigateTo('money_mission')}
+            onChanged={() => { void api<Snapshot>('/api/session').then(setSnapshot).catch(error => showToast(error.message)); }} />}
+
           {currentScreen === 'create_goal' && goal && (
             <CreateGoalScreen
               goal={goal}
@@ -534,9 +618,9 @@ export default function App() {
           {currentScreen === 'banking_demo' && <BankingDemoScreen snapshot={snapshot} mutate={mutate}
             onNavigateActivity={() => navigateTo('activity')} />}
 
-          {currentScreen === 'workspace' && <Suspense fallback={<p className="p-4 text-sm text-[#5A616B]">正在打开 NOVA 工作台…</p>}><AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame}
+          {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame}
             starter={workspaceStarter} onSnapshot={setSnapshot} onNavigate={navigateTo}
-            onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} /></Suspense>}
+            onFinancialTask={message=>{setFinancialStarter(message);navigateTo('financial_services');}} onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} />}
 
           {currentScreen === 'profile' && goal && (
             <ProfileScreen
@@ -550,7 +634,7 @@ export default function App() {
               onClearOffline={() => void handleClearOffline()}
             />
           )}
-        </main>
+        </Suspense></main>
 
         {/* Bottom Nav on Home / Tabs */}
         {showBottomNav && (

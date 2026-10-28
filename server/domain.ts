@@ -1,5 +1,8 @@
 import type { Assessment, CandidateAssessment, CandidateInput, DemoState, Impact, Plan } from '../shared/contracts.ts';
-import { assessDatedCandidate } from './dated-candidate.ts';
+import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
+import { buildMoneyMissionPlans, competingGoalMonthlyCents, datedMonthlyCapacity,
+  forecastHasExecutionAuthority, goalContributionDates, hasDatedCashflowEvidence,
+  goalForecastWindow, minimumAfterContributions } from './money-mission-plans.ts';
 
 const DAY = 86_400_000;
 export function addDays(iso: string, days: number): string {
@@ -25,9 +28,92 @@ export function availableMonthly(state: DemoState): number {
 export type CandidateMonth = { monthIndex: number; availableCents: number;
   capacityCents: number; contributedCents: number; cumulativeCents: number };
 
+function datedCandidate(state: DemoState, input: CandidateInput, savedCents: number,
+  constraintViolations: string[], latestAllowedDate: string) {
+  const goal = { ...state.goal, targetCents: input.targetCents, targetDate: input.targetDate,
+    savedCents, protectedCents: input.protectedCents };
+  const virtual = { ...state, goal };
+  const window = goalForecastWindow(state, input.targetDate);
+  const baseline = buildDatedCashflowForecast(virtual, { accountId: 'checking',
+    horizonEnd: window.horizonEnd, scenario: 'baseline' });
+  const plans = buildMoneyMissionPlans(virtual, baseline);
+  const matches = plans.filter(plan => plan.monthlyCents === input.monthlyContributionCents &&
+    (input.firstMonthContributionCents === plan.firstMonthContributionCents ||
+      input.firstMonthContributionCents === undefined && plan.upfrontCents === 0));
+  const matching = matches.find(plan => plan.id === state.goal.selectedPlanId) ?? matches[0];
+  const acceptedSelection = state.goal.selectedPlanId !== null && ['active', 'paused'].includes(state.goal.status) &&
+    state.goal.savedCents < state.goal.targetCents && input.monthlyContributionCents === state.goal.monthlyContributionCents &&
+    input.firstMonthContributionCents === state.goal.firstMonthContributionCents;
+  const ambiguous = matches.some(plan => plan.limitations.includes('AMBIGUOUS_SCHEDULE')) ||
+    acceptedSelection && matches.length === 0;
+  const edits: import('../shared/contracts.ts').CashflowEdit[] = [];
+  const scenario = input.scenario;
+  if (scenario.kind === 'current_month_expense') edits.push({ type: 'add', event: {
+    id: 'candidate-expense', date: addDays(state.clock, 1), label: '假设额外支出', kind: 'purchase',
+    amountCents: -(scenario.amountCents ?? 0), currency: 'CNY', sourceRefs: ['candidate-scenario'] } });
+  if (scenario.kind === 'monthly_income_reduction') baseline.events.filter(event => event.kind === 'income' &&
+    event.label === '工资').forEach((event, index) => {
+    if (index >= (scenario.startMonthIndex ?? 0)) edits.push({ type: 'update', eventId: event.id,
+      amountCents: Math.max(0, event.amountCents - (scenario.amountCents ?? 0)) });
+  });
+  if (scenario.kind === 'monthly_essential_spending_increase') goalContributionDates(baseline)
+    .filter(date => date <= input.targetDate).forEach((date, index) => {
+      if (index >= (scenario.startMonthIndex ?? 0)) edits.push({ type: 'add', event: {
+        id: `candidate-essentials-${index}`, date, label: '假设必要支出增加', kind: 'purchase',
+        amountCents: -(scenario.amountCents ?? 0), currency: 'CNY', sourceRefs: ['candidate-scenario'] } });
+    });
+  const forecast = edits.length ? buildDatedCashflowForecast(virtual, { accountId: 'checking',
+    horizonEnd: window.horizonEnd, scenario: 'edited', edits }) : baseline;
+  const available = datedMonthlyCapacity(forecast);
+  const reserve = Math.max(0, input.protectedCents - state.finance.emergencyCents);
+  const firstCapacity = Math.max(0, Math.min(available, (forecast.startingBalanceCents ?? 0) - reserve));
+  const dates = goalContributionDates(forecast).filter(date => date <= input.targetDate && date <= forecast.horizonEnd);
+  const upfront = input.targetDate < state.clock ? 0 : matching?.upfrontCents ?? 0;
+  const planned = ambiguous ? [] : dates.map((date, index) => ({ date, amountCents: index === 0 && !upfront
+    ? input.firstMonthContributionCents ?? input.monthlyContributionCents : input.monthlyContributionCents }));
+  if (upfront && !ambiguous) planned.unshift({ date: state.clock, amountCents: upfront });
+  let remaining = Math.max(0, input.targetCents - savedCents); let projectedDate: string | null = remaining ? null : state.clock;
+  const contributions: Array<{ date: string; amountCents: number }> = [];
+  const months: CandidateMonth[] = [];
+  let cumulativeCents = savedCents;
+  planned.forEach((item, monthIndex) => {
+    const contributedCents = scenario.kind === 'missed_contribution_once' && monthIndex === scenario.monthIndex
+      ? 0 : Math.min(item.amountCents, remaining);
+    remaining -= contributedCents; cumulativeCents += contributedCents;
+    if (contributedCents) contributions.push({ date: item.date, amountCents: contributedCents });
+    if (!remaining && projectedDate === null) projectedDate = item.date;
+    months.push({ monthIndex, availableCents: available, capacityCents: monthIndex ? available : firstCapacity,
+      contributedCents, cumulativeCents });
+  });
+  const minimum = minimumAfterContributions(virtual, forecast, contributions);
+  const violations = [...constraintViolations, ...window.limitations];
+  if (ambiguous) violations.push('AMBIGUOUS_SCHEDULE');
+  if (input.monthlyContributionCents > available) violations.push('MONTHLY_CAPACITY_EXCEEDED');
+  if (minimum !== null && minimum < reserve) violations.push('PROTECTED_FUNDS_UNAVAILABLE');
+  const competing = competingGoalMonthlyCents(virtual);
+  if (competing && input.monthlyContributionCents + competing > available) violations.push('GOAL_PRIORITY_CONFLICT');
+  if (scenario.kind === 'baseline' && projectedDate && projectedDate > latestAllowedDate)
+    violations.push('PROJECTED_AFTER_ALLOWED_END');
+  const dataSufficient = forecastHasExecutionAuthority(virtual, forecast) && !window.limitations.length && !ambiguous;
+  const assessment: CandidateAssessment = {
+    status: violations.length ? 'infeasible' : !dataSufficient ? 'insufficient_data' : projectedDate ? 'on_track' : 'at_risk',
+    projectedDate: violations.length ? null : projectedDate,
+    requiredMonthlyCents: Math.ceil(Math.max(0, input.targetCents - savedCents) / Math.max(1, dates.length)),
+    availableMonthlyCents: available, firstMonthCapacityCents: firstCapacity,
+    bufferCents: minimum === null ? 0 : minimum - reserve,
+    fundedByTargetCents: Math.max(0, input.targetCents - savedCents) - remaining,
+    shortfallCents: remaining, delayDays: remaining && input.monthlyContributionCents
+      ? Math.ceil(remaining / input.monthlyContributionCents) * 30 : 0,
+    dataSufficient, constraintViolations: violations,
+  };
+  return { assessment, simulation: { months, firstMonthCapacityCents: firstCapacity,
+    availableMonthlyCents: available, futureContributionCents: ambiguous ? 0 : Math.min(input.monthlyContributionCents, available) } };
+}
+
 export function simulateCandidateMonths(state: DemoState, input: CandidateInput,
   savedCents: number): { months: CandidateMonth[]; firstMonthCapacityCents: number;
     availableMonthlyCents: number; futureContributionCents: number } {
+  if (hasDatedCashflowEvidence(state)) return datedCandidate(state, input, savedCents, [], input.targetDate).simulation;
   const count = calculateMonthlyRequirement(input.targetCents, savedCents, state.clock, input.targetDate).remainingMonths;
   const scenario = input.scenario;
   const reserveFromChecking = Math.max(0, input.protectedCents - state.finance.emergencyCents);
@@ -66,7 +152,8 @@ export function simulateCandidateMonths(state: DemoState, input: CandidateInput,
 
 export function assessCandidateScenario(state: DemoState, input: CandidateInput,
   savedCents: number, constraintViolations: string[], latestAllowedDate: string): CandidateAssessment {
-  if (state.mission?.artifactsVersion === 2) return assessDatedCandidate(state, input, savedCents, constraintViolations, latestAllowedDate);
+  if (hasDatedCashflowEvidence(state))
+    return datedCandidate(state, input, savedCents, constraintViolations, latestAllowedDate).assessment;
   const { remainingCents: remaining, remainingMonths: months, requiredMonthlyCents: required } =
     calculateMonthlyRequirement(input.targetCents, savedCents, state.clock, input.targetDate);
   const simulation = simulateCandidateMonths(state, input, savedCents);
@@ -110,6 +197,30 @@ export function assessCandidateScenario(state: DemoState, input: CandidateInput,
 
 export function assessGoal(state: DemoState): Assessment {
   const { goal, finance, clock } = state;
+  if (hasDatedCashflowEvidence(state)) {
+    const forecast = buildDatedCashflowForecast(state, { accountId: 'checking',
+      horizonEnd: goalForecastWindow(state, goal.targetDate).horizonEnd, scenario: 'baseline' });
+    const options = buildMoneyMissionPlans(state, forecast);
+    const chosen = datedCandidate(state, { targetCents: goal.targetCents, targetDate: goal.targetDate,
+      monthlyContributionCents: goal.monthlyContributionCents, firstMonthContributionCents: goal.firstMonthContributionCents,
+      protectedCents: goal.protectedCents, scenario: { kind: 'baseline' }, evidenceResultIds: [] }, goal.savedCents,
+    [], goal.targetDate).assessment;
+    return { status: chosen.status,
+      progressPercent: goal.targetCents ? Math.min(100, Math.round(goal.savedCents / goal.targetCents * 1000) / 10) : 0,
+      requiredMonthlyCents: chosen.requiredMonthlyCents, availableMonthlyCents: chosen.availableMonthlyCents,
+      projectedDate: chosen.projectedDate, delayDays: chosen.delayDays, safeToSpendCents: chosen.bufferCents,
+      dataSufficiency: chosen.dataSufficient ? '基于当日权威余额与日期级模拟事件'
+        : chosen.constraintViolations.length ? chosen.constraintViolations.join('；') : '缺少当日权威余额，方案仅供参考',
+      assumptions: [...forecast.assumptions, ...chosen.constraintViolations], updatedAt: clock,
+      plans: options.filter((option, index) => !options.slice(0, index).some(previous =>
+        previous.monthlyCents === option.monthlyCents && previous.upfrontCents === option.upfrontCents &&
+        previous.occurrences === option.occurrences && previous.projectedDate === option.projectedDate))
+        .map((option, index) => ({ id: option.id, label: option.label, monthlyCents: option.monthlyCents,
+        projectedDate: option.projectedDate, safeToSpendCents: option.minimumBalanceCents ?? 0,
+        status: option.executable ? 'on_track' : 'infeasible', recommended: index === 1 && option.executable,
+        explanation: option.executable ? `${option.upfrontCents ? `立即投入 ¥${option.upfrontCents / 100}，随后` : ''}每月投入 ¥${option.monthlyCents / 100}，共 ${option.occurrences} 次；执行仍需确认`
+          : option.limitations.join('；') })) };
+  }
   const { remainingCents: remaining, remainingMonths: months, requiredMonthlyCents: required } =
     calculateMonthlyRequirement(goal.targetCents, goal.savedCents, clock, goal.targetDate);
   const available = availableMonthly(state);
@@ -154,7 +265,11 @@ export function activatePlan(state: DemoState, planId: string | null): DemoState
   const assessment = assessGoal(state);
   const plan = assessment.plans.find(p => p.id === planId);
   if (!plan || plan.status === 'infeasible') throw new Error('PLAN_NOT_AVAILABLE');
-  const goal = { ...state.goal, status: 'active' as const, selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents };
+  const dated = hasDatedCashflowEvidence(state) ? buildMoneyMissionPlans(state, buildDatedCashflowForecast(state,
+    { accountId: 'checking', horizonEnd: goalForecastWindow(state, state.goal.targetDate).horizonEnd,
+      scenario: 'baseline' })).find(option => option.id === plan.id) : null;
+  const goal = { ...state.goal, status: 'active' as const, selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents,
+    ...(dated ? { firstMonthContributionCents: dated.firstMonthContributionCents } : {}) };
   return { ...state, goal, goals: state.goals.map(item => item.id === goal.id ? goal : item) };
 }
 

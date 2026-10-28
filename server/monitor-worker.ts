@@ -42,6 +42,16 @@ export function processMonitorEvent(event: MonitorEvent, now = new Date()): void
   if (!monitorEventIsCurrent(event)) { finishMonitorEvent(event, 'stale', now); return; }
   const state = getState(event.sessionId);
   const threadId = monitorThreadId(event);
+  if (event.kind === 'transfer_outcome') {
+    const delivery = notificationDelivery(state.riskPreferences, 'immediate', now);
+    if (delivery.mode === 'deferred') { deferMonitorEvent(event, delivery.availableAt); return; }
+    const content = `转账计划本期${event.payload.status === 'skipped_missing_trigger' ? '已跳过' : '需要核对'}：${event.payload.reason}。` +
+      '未确认成功的执行不会再次扣款；缺少工资时不补扣。请核对实际工资、账户余额与保护资金，再重新试算计划。';
+    deliverMonitorNotification(event, threadId, content, [{ id: randomUUID(), type: 'clarification',
+      title: '核对转账计划', body: content, suggestions: ['核对工资到账', '重新试算计划'] }], null,
+      `transfer:${event.payload.executionId}`);
+    return;
+  }
   if (event.kind === 'bonus_followup') {
     const content = '你之前选择了下个月再看奖金。请确认奖金是否到账、实际金额及来源；未确认收入没有计入基础计划。';
     deliverMonitorNotification(event, threadId, content, [{ id: randomUUID(),

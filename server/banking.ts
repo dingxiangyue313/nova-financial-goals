@@ -1,10 +1,11 @@
-import { buildBillBrief, inspectEvidence } from './bill-analysis.ts';
-import { addIsoDays, buildDatedCashflowForecast } from './cashflow-forecast.ts';
-import { prepareSubscriptionAction, executeSubscriptionCancellation } from './subscription-service.ts';
-import { simulateTransferSchedule, activateTransferSchedule, applyScheduleLifecycle } from './transfer-schedules.ts';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { DemoState, Operation, Receipt, ToolRecord } from '../shared/contracts.ts';
+import { DatedCashflowForecastInputSchema, SubscriptionActionInputSchema, SubscriptionCancellationInputSchema, TransferScheduleInputSchema, type DemoState, type Operation,
+  type Receipt, type ToolRecord } from '../shared/contracts.ts';
+import { executeSubscriptionCancellation, persistSubscriptionDecision, prepareSubscriptionAction, reconcileSubscriptionCancellation } from './subscription-service.ts';
+import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
+import { cancelTransferSchedule, getTransferScheduleStatus, pauseTransferSchedule, simulateTransferSchedule,
+  transferScheduleApprovalParameters, TransferScheduleLifecycleSchema } from './transfer-schedules.ts';
 import { assessGoal } from './domain.ts';
 import { activatePlan } from './domain.ts';
 import { approveOperation, evaluateExternalRequest, reconcileOperation } from './tools.ts';
@@ -20,22 +21,21 @@ import {
 
 const money = z.number().int().positive();
 const schemas = {
-  bill_period_summary: z.object({periodStart:z.iso.date().optional(),periodEnd:z.iso.date().optional()}),
-  spending_baseline_comparison: z.object({}), subscription_candidates: z.object({}), evidence_detail:z.object({evidenceId:z.string()}),
-  dated_cashflow_forecast:z.object({horizonDays:z.number().int().min(1).max(366).default(62),scenario:z.enum(['baseline','stress']).default('baseline')}),
-  prepare_subscription_action:z.object({subscriptionId:z.string(),action:z.enum(['keep','remind','cancel','not_subscription'])}),
-  execute_subscription_cancellation:z.object({actionId:z.string(),approvalToken:z.string()}),get_subscription_action_status:z.object({actionId:z.string()}),
-  simulate_transfer_schedule:z.object({goalId:z.string(),sourceAccountId:z.string(),destinationAccountId:z.string(),amountCents:money,frequency:z.enum(['one_time','monthly']),forecastId:z.string(),triggerType:z.enum(['salary_event','fixed_day']).optional(),fixedDay:z.number().int().min(1).max(28).optional()}),
-  prepare_recurring_transfer:z.object({goalId:z.string(),sourceAccountId:z.string(),destinationAccountId:z.string(),amountCents:money,frequency:z.enum(['one_time','monthly']),forecastId:z.string()}),
-  activate_transfer_schedule:z.object({scheduleId:z.string(),approvalToken:z.string()}),get_transfer_schedule_status:z.object({scheduleId:z.string()}),
-  pause_transfer_schedule:z.object({scheduleId:z.string(),approvalToken:z.string()}),resume_transfer_schedule:z.object({scheduleId:z.string(),approvalToken:z.string()}),cancel_transfer_schedule:z.object({scheduleId:z.string(),approvalToken:z.string()}),
-
   get_financial_snapshot: z.object({}),
   list_accounts: z.object({}),
   list_transactions: z.object({ accountId: z.string().optional(), limit: z.number().int().min(1).max(100).default(50) }),
   list_bills: z.object({}),
   list_subscriptions: z.object({ status: z.enum(['active', 'cancelled', 'all']).default('active') }),
+  prepare_subscription_action: SubscriptionActionInputSchema,
+  execute_subscription_cancellation: SubscriptionCancellationInputSchema,
+  get_subscription_action_status: z.object({ actionId: z.string().min(1) }).strict(),
   forecast_cashflow: z.object({ horizonDays: z.number().int().min(1).max(365).default(30) }),
+  dated_cashflow_forecast: DatedCashflowForecastInputSchema,
+  simulate_transfer_schedule: TransferScheduleInputSchema,
+  prepare_recurring_transfer: TransferScheduleInputSchema,
+  get_transfer_schedule_status: z.object({ scheduleId: z.string().min(1) }).strict(),
+  pause_transfer_schedule: TransferScheduleLifecycleSchema,
+  cancel_transfer_schedule: TransferScheduleLifecycleSchema,
   assess_goal_feasibility: z.object({}),
   simulate_goal_plan: z.object({}),
   compare_scenarios: z.object({}),
@@ -84,11 +84,11 @@ const schemas = {
 
 export type BankingToolName = keyof typeof schemas;
 const readOnly = new Set<BankingToolName>([
-  'bill_period_summary','spending_baseline_comparison','subscription_candidates','evidence_detail','dated_cashflow_forecast','get_subscription_action_status','get_transfer_schedule_status',
   'get_financial_snapshot', 'list_accounts', 'list_transactions', 'list_bills', 'list_subscriptions',
-  'forecast_cashflow', 'assess_goal_feasibility', 'simulate_goal_plan', 'compare_scenarios',
+  'forecast_cashflow', 'dated_cashflow_forecast', 'assess_goal_feasibility', 'simulate_goal_plan', 'compare_scenarios',
   'get_goal_progress', 'permission_check', 'risk_check', 'get_operation_status', 'list_mandates',
   'detect_financial_signals', 'explain_decision', 'get_activity', 'export_audit_report',
+  'simulate_transfer_schedule', 'get_transfer_schedule_status',
 ]);
 
 export const bankingToolDefinitions = (Object.keys(schemas) as BankingToolName[])
@@ -151,19 +151,6 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
   if (!schema) throw new Error('UNKNOWN_TOOL');
   const input = schema.parse(raw) as Record<string, any>;
   switch (name) {
-    case 'bill_period_summary':return {state,result:buildBillBrief(state,{periodStart:input.periodStart??state.clock.slice(0,7)+'-01',periodEnd:input.periodEnd??state.clock})};
-    case 'spending_baseline_comparison':return {state,result:{changes:buildBillBrief(state,{periodStart:state.clock.slice(0,7)+'-01',periodEnd:state.clock}).changes}};
-    case 'subscription_candidates':return {state,result:{candidates:buildBillBrief(state,{periodStart:state.clock.slice(0,7)+'-01',periodEnd:state.clock}).subscriptionCandidates}};
-    case 'evidence_detail':return {state,result:inspectEvidence(state,input.evidenceId)};
-    case 'dated_cashflow_forecast':return {state,result:buildDatedCashflowForecast(state,{accountId:'checking',horizonEnd:addIsoDays(state.clock,input.horizonDays),scenario:input.scenario})};
-    case 'prepare_subscription_action':{const prepared=prepareSubscriptionAction(state,input as never);return {state:prepared.state,result:prepared.action};}
-    case 'execute_subscription_cancellation':{const executed=executeSubscriptionCancellation(state,input as never);return {state:executed.state,result:executed.action};}
-    case 'get_subscription_action_status':{const action=state.subscriptionActions.find(a=>a.id===input.actionId);if(!action)throw new Error('SUBSCRIPTION_ACTION_NOT_FOUND');return {state,result:action};}
-    case 'simulate_transfer_schedule':case 'prepare_recurring_transfer':{const prepared=simulateTransferSchedule(state,input as never);return {state:prepared.state,result:prepared.preview};}
-    case 'activate_transfer_schedule':{const active=activateTransferSchedule(state,input as never);return {state:active.state,result:active.schedule};}
-    case 'get_transfer_schedule_status':{const schedule=state.transferSchedules.find(s=>s.id===input.scheduleId);if(!schedule)throw new Error('SCHEDULE_NOT_FOUND');return {state,result:{schedule,executions:state.transferExecutions.filter(e=>e.scheduleId===schedule.id)}};}
-    case 'pause_transfer_schedule':case 'resume_transfer_schedule':case 'cancel_transfer_schedule':{const result=applyScheduleLifecycle(state,input.scheduleId,name==='pause_transfer_schedule'?'pause':name==='resume_transfer_schedule'?'resume':'cancel',input.approvalToken);return {state:result.state,result:result.schedule};}
-
     case 'get_financial_snapshot': return { state, result: financialTwin(state) };
     case 'list_accounts': return { state, result: { accounts: state.accounts } };
     case 'list_transactions': return { state, result: { transactions: state.transactions
@@ -171,13 +158,45 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
     case 'list_bills': return { state, result: { bills: state.bills } };
     case 'list_subscriptions': return { state, result: { subscriptions: state.subscriptions
       .filter(item => input.status === 'all' || item.status === input.status) } };
+    case 'prepare_subscription_action': {
+      const preview = prepareSubscriptionAction(state, SubscriptionActionInputSchema.parse(input));
+      const next = preview.action.action !== 'cancel' ? persistSubscriptionDecision(state, preview.action)
+        : appendAuditEvent({ ...state, subscriptionActions: [...state.subscriptionActions, preview.action] },
+          'subscription_action_prepared', preview.action.status, preview.consequences.join(' '));
+      return { state: next, result: preview };
+    }
+    case 'execute_subscription_cancellation': {
+      const result = executeSubscriptionCancellation(state, SubscriptionCancellationInputSchema.parse(input));
+      return { state: result.state, result: { action: result.action, receipt: result.receipt } };
+    }
+    case 'get_subscription_action_status': {
+      const result = reconcileSubscriptionCancellation(state, input.actionId);
+      return { state: result.state, result: { action: result.action } };
+    }
     case 'forecast_cashflow': {
-      if(state.accountSnapshots.length){const forecast=buildDatedCashflowForecast(state,{accountId:'checking',horizonEnd:addIsoDays(state.clock,input.horizonDays),scenario:'baseline'});return {state,result:{...forecast,horizonDays:input.horizonDays,safeToSpendCents:forecast.minimumBalanceCents,projectedCheckingCents:forecast.events.at(-1)?.balanceCents??state.finance.checkingCents,protectedCents:state.finance.emergencyCents}};}
-
+      const horizonEnd = new Date(Date.parse(`${state.clock}T00:00:00Z`) + input.horizonDays * 86_400_000).toISOString().slice(0, 10);
+      const forecast = buildDatedCashflowForecast(state, { accountId: 'checking', horizonEnd, scenario: 'baseline' });
       const safeToSpendCents = Math.max(0, state.finance.monthlyIncomeCents - state.finance.fixedBillsCents - state.finance.essentialSpendingCents);
-      return { state, result: { horizonDays: input.horizonDays, safeToSpendCents,
-        projectedCheckingCents: state.finance.checkingCents + safeToSpendCents - state.bills.filter(item => !item.paid).reduce((sum, item) => sum + item.amountCents, 0),
-        protectedCents: state.finance.emergencyCents, assumptions: ['收入与固定支出按模拟数据估计', '应急金不参与可支配计算'] } };
+      return { state, result: { ...forecast, forecastId: forecast.executableForecastId,
+        horizonDays: input.horizonDays, safeToSpendCents,
+        projectedCheckingCents: forecast.dailyBalances.at(-1)?.balanceCents ?? null,
+        protectedCents: state.finance.emergencyCents } };
+    }
+    case 'dated_cashflow_forecast': return { state, result: buildDatedCashflowForecast(state, DatedCashflowForecastInputSchema.parse(input)) };
+    case 'simulate_transfer_schedule': return { state, result: simulateTransferSchedule(state, TransferScheduleInputSchema.parse(input)) };
+    case 'prepare_recurring_transfer': {
+      const preview = simulateTransferSchedule(state, TransferScheduleInputSchema.parse(input));
+      return { state: { ...state, transferSchedulePreviews: [...state.transferSchedulePreviews.filter(item => item.id !== preview.id), preview] },
+        result: { preview, approvalParameters: transferScheduleApprovalParameters(preview) } };
+    }
+    case 'get_transfer_schedule_status': return { state, result: { schedule: getTransferScheduleStatus(state, input.scheduleId) } };
+    case 'pause_transfer_schedule': {
+      const outcome = pauseTransferSchedule(state, TransferScheduleLifecycleSchema.parse(input));
+      return { state: outcome.state, result: { schedule: outcome.schedule } };
+    }
+    case 'cancel_transfer_schedule': {
+      const outcome = cancelTransferSchedule(state, TransferScheduleLifecycleSchema.parse(input));
+      return { state: outcome.state, result: { schedule: outcome.schedule } };
     }
     case 'assess_goal_feasibility': return { state, result: assessGoal(state) };
     case 'simulate_goal_plan': return { state, result: { plans: assessGoal(state).plans } };

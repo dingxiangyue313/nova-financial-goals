@@ -1,40 +1,94 @@
-import type { DemoState,SkillId } from '../../shared/contracts.ts';
-import { buildBillBrief } from '../bill-analysis.ts';
-import { buildDatedCashflowForecast,addIsoDays } from '../cashflow-forecast.ts';
-import { buildMoneyMissionPlans } from '../money-mission-plans.ts';
-import { buildHandoffCasePack } from '../handoff.ts';
-import { previewMissionRepairs } from '../mission-monitor.ts';
-import { CoreSkillInputSchema,CoreSkillOutputSchema,getEnabledSkill,assertSkillToolAllowed } from './registry.ts';
+import { type SkillId, type SkillOutput } from '../../shared/contracts.ts';
+import { getAgentThread, getAgentTaskForThread, getState, type MonitorEvent } from '../store.ts';
+import { runMoneyMissionReadTool, type MoneyMissionToolFeedback } from '../agent-read-tools.ts';
+import { getEnabledSkill, validateSkillInput, validateSkillOutput } from './registry.ts';
+import { financialServicesView } from '../financial-services.ts';
 
-const yuan=(cents:number)=>`¥${(cents/100).toLocaleString('zh-CN')}`;
-export function runCoreSkill(state:DemoState,id:SkillId,input:unknown={}) {
-  const definition=getEnabledSkill(id),args=CoreSkillInputSchema.parse(input);let next=state;
-  let stage:'data'|'bills'|'planning'|'transfer'|'monitoring'|'handoff'='bills',summary='',artifactId='mission';
-  const claims:Array<{claimType:'fact'|'assumption'|'prediction'|'limitation';text:string;sourceRefs:string[]}>=[];
-  let toolCalls=0;const call=<T>(tool:string,fn:()=>T)=>{assertSkillToolAllowed(id,tool);if(++toolCalls>definition.maxToolCalls)throw new Error('SKILL_TOOL_BUDGET');return fn();};
-  if(id==='statement_ingestion_and_reconciliation'){
-    call('read_import_quality',()=>{stage='data';summary=`已有${state.statementImportBatches.filter(b=>b.status==='committed').length}个已确认批次，${state.importIssues.filter(i=>!i.resolved).length}项待核对。历史账单不会改写当前余额。`;artifactId=state.statementImportBatches.at(-1)?.id??'data-coverage';});
-  }else if(id==='bill_and_subscription_investigator'||id==='financial_explanation_and_provenance'){
-    const brief=call(id==='bill_and_subscription_investigator'?'bill_period_summary':'read_explanation_evidence',()=>buildBillBrief(state,{periodStart:state.clock.slice(0,7)+'-01',periodEnd:state.clock}));
-    next={...state,billBriefs:[...state.billBriefs.filter(b=>b.id!==brief.id),brief],evidenceRefs:[...state.evidenceRefs.filter(e=>!brief.claims.some(c=>c.id===e.id)),...brief.claims]};artifactId=brief.id;
-    summary=`本期计入消费${yuan(brief.totalExpenseCents)}。${brief.subscriptionCandidates.length?'发现可能的周期订阅，请核对证据及使用情况。':'周期证据不足，暂不认定订阅。'}取消或转入都需要你单独确认。`;
-    claims.push(...brief.claims.map(c=>({claimType:c.claimType,text:c.label,sourceRefs:c.sourceRefs??[c.sourceId]})));
-  }else if(id==='dated_cashflow_forecast'||id==='goal_portfolio_planner'){
-    const horizonEnd=id==='goal_portfolio_planner'&&state.goal.targetDate<=addIsoDays(state.clock,366)?state.goal.targetDate:addIsoDays(state.clock,62);
-    const forecast=call('dated_cashflow_forecast',()=>buildDatedCashflowForecast(state,{accountId:'checking',horizonEnd,scenario:'baseline'}));
-    next={...state,datedForecasts:[...state.datedForecasts.filter(f=>f.forecastId!==forecast.forecastId),forecast]};artifactId=forecast.forecastId??'missing-balance';stage=id==='goal_portfolio_planner'?'planning':'bills';
-    summary=forecast.precision==='exact'?`预计最低可用余额${yuan(forecast.minimumBalanceCents!)}，出现在${forecast.minimumBalanceDate}。未来工资仍是假设。`:'当前权威余额不足或已过期，可以分析历史账单，但不能据此执行转账。';
-    claims.push({claimType:'prediction',text:summary,sourceRefs:[forecast.forecastId??'data-coverage']});
-    if(id==='goal_portfolio_planner'){const plans=call('build_goal_portfolio',()=>buildMoneyMissionPlans(state,forecast));next={...next,goalPlanOptions:plans};summary+=plans.some(p=>p.conflicts.length)?'多个目标或保护资金存在冲突，需先明确优先级。':'已核算三个不同节奏，可在计划页比较。';}
-  }else if(id==='transfer_and_savings_executor'){
-    call('get_transfer_schedule_status',()=>{stage='transfer';const schedules=state.transferSchedules.filter(s=>!args.artifactId||s.id===args.artifactId);if(args.artifactId&&!schedules.length)throw new Error('SCHEDULE_NOT_FOUND');artifactId=schedules.at(-1)?.id??'transfer-builder';summary=schedules.length?`储蓄计划状态：${({active:'进行中',paused:'已暂停',completed:'已完成',cancelled:'已取消',awaiting_confirmation:'待确认',draft:'草稿',simulated:'预览',failed:'需处理'})[schedules.at(-1)!.status]}。请核对触发条件和执行回执。`:'尚未创建储蓄计划。请在计划页选择金额、账户和频率，再核对确认。创建月度计划时不会立即扣款。';});
-  }else if(id==='outcome_monitor_and_replanner'){
-    call('read_material_outcomes',()=>{stage='monitoring';const outcomes=state.transferExecutions.filter(e=>['failed','unknown','skipped_missing_trigger'].includes(e.status));artifactId=outcomes.at(-1)?.id??'monitoring';summary=outcomes.length?'检测到需要核对的转入结果。可以查询原操作，或预览暂停及重新规划；不会自动补扣。':'目前没有新的显著执行问题。';claims.push({claimType:'fact',text:summary,sourceRefs:outcomes.length?outcomes.map(e=>e.id):['monitoring']});});
-    call('search_repair_options',()=>{const repairs=previewMissionRepairs(state);if(repairs.length)claims.push({claimType:'limitation',text:`有${repairs.length}个只读修复预览，确认前不会改写计划。`,sourceRefs:repairs.map(item=>item.id)});});
-  }else if(id==='human_handoff_case_pack'){
-    const pack=call('prepare_case_pack',()=>buildHandoffCasePack(state,{problem:state.subscriptionActions.some(a=>a.status==='requires_merchant')?'subscription_requires_merchant':state.importIssues.some(i=>!i.resolved)?'import_conflict':state.transferExecutions.some(e=>e.status==='failed')?'transfer_failed':'unsupported'}));next={...state,handoffCasePacks:[...state.handoffCasePacks,pack]};stage='handoff';artifactId=pack.id;summary=`已整理人工问题包：${pack.problem}。包含必要事实、已尝试步骤与待确认问题，尚未向任何人发送。`;
+const steps: Partial<Record<SkillId, string[]>> = {
+  statement_ingestion_and_reconciliation: ['inspect_statement_file', 'list_import_issues'],
+  bill_and_subscription_investigator: ['summarize_bill_period', 'detect_subscription_candidates'],
+  dated_cashflow_forecast: ['build_cashflow_timeline'],
+  goal_portfolio_planner: ['read_goal_constraints', 'search_goal_options'],
+  transfer_and_savings_executor: ['list_transfer_eligible_accounts'],
+  outcome_monitor_and_replanner: ['screen_material_goal_events'],
+  financial_explanation_and_provenance: ['read_explanation_evidence'],
+  human_handoff_case_pack: ['read_relevant_evidence'],
+};
+const handoffs: Partial<Record<SkillId, SkillId>> = {
+  statement_ingestion_and_reconciliation: 'bill_and_subscription_investigator',
+  bill_and_subscription_investigator: 'dated_cashflow_forecast', dated_cashflow_forecast: 'goal_portfolio_planner',
+  goal_portfolio_planner: 'transfer_and_savings_executor', transfer_and_savings_executor: 'outcome_monitor_and_replanner',
+  outcome_monitor_and_replanner: 'goal_portfolio_planner',
+};
+export type SkillExecutionOptions = { signal?: AbortSignal; maxTools?: number; deadlineAt?: number;
+  onToolCall?: () => void; assertCurrent?: () => void; monitorEvent?: MonitorEvent };
+
+/** Runs a fixed adapter sequence: no model-supplied tools, arguments or write calls. */
+export async function executeMoneyMissionSkill(sessionId: string, threadId: string, id: string,
+  rawInput: unknown, options: SkillExecutionOptions = {}): Promise<SkillOutput> {
+  const definition = getEnabledSkill(id);
+  const input = validateSkillInput(id, rawInput);
+  try { getAgentThread(sessionId, threadId); } catch { throw new Error('SKILL_THREAD_NOT_FOUND'); }
+  const version = getState(sessionId).twinVersion;
+  const revision = getAgentTaskForThread(sessionId, threadId)?.taskRevision;
+  const deadlineAt = Math.min(options.deadlineAt ?? Infinity, Date.now() + definition.timeoutMs);
+  const preflight = () => {
+    if (options.signal?.aborted) throw new Error('SKILL_CANCELLED');
+    if (Date.now() >= deadlineAt) throw new Error('SKILL_TIMEOUT');
+    let thread;
+    try { thread = getAgentThread(sessionId, threadId); } catch { throw new Error('SKILL_THREAD_NOT_FOUND'); }
+    if (thread.status !== 'active' || thread.readOnly) throw new Error('SKILL_CANCELLED');
+    if (getState(sessionId).twinVersion !== version ||
+      getAgentTaskForThread(sessionId, threadId)?.taskRevision !== revision) throw new Error('SKILL_RUN_STALE');
+    options.assertCurrent?.();
+  };
+  const calls = [...(steps[definition.id]??[])];
+  if (definition.id === 'bill_and_subscription_investigator' && input.subscriptionId) calls.push('inspect_subscription_history');
+  if (definition.id === 'transfer_and_savings_executor') calls.push(input.scheduleId
+    ? 'get_transfer_schedule_status' : 'simulate_transfer_schedule');
+  const budget = Math.min(definition.maxToolCalls, options.maxTools ?? definition.maxToolCalls);
+  const results: MoneyMissionToolFeedback[] = [];
+  for (const tool of calls) {
+    preflight();
+    if (results.length >= budget) throw new Error('SKILL_TOOL_BUDGET_EXHAUSTED');
+    options.onToolCall?.();
+    results.push(runMoneyMissionReadTool(sessionId, definition.id, tool, input, { threadId, monitorEvent: options.monitorEvent }));
   }
-  if(!claims.length)claims.push({claimType:'fact',text:summary,sourceRefs:[artifactId]});
-  const output=CoreSkillOutputSchema.parse({skillId:id,artifactId,stage,summary,claims,requiresConfirmation:definition.confirmationRequired});
-  return {state:next,output,toolCalls};
+  preflight();
+  if(['mandate_builder','external_agent_request_inbox','recipient_and_split_coordinator','investment_lifecycle_manager','card_lifecycle_manager'].includes(definition.id)){
+    if((options.maxTools??8)<1)throw new Error('SKILL_TOOL_BUDGET_EXHAUSTED');
+    options.onToolCall?.();
+    const view=financialServicesView(getState(sessionId)),refs:string[]=[];
+    let facts:SkillOutput['facts']=[];
+    const fact=(kind:SkillOutput['facts'][number]['kind'],refId:string,count?:number,amountCents?:number)=>({kind,refId,claimType:'simulated_result' as const,sourceRefs:[refId],...(count===undefined?{}:{count}),...(amountCents===undefined?{}:{amountCents})});
+    const select=<T extends {id:string}>(items:T[],id:unknown)=>{if(id!==undefined&&!items.some(x=>x.id===id))throw new Error('SKILL_INVALID_INPUT');return id===undefined?items:items.filter(x=>x.id===id);};
+    if(definition.id==='recipient_and_split_coordinator'){
+      facts=select(view.recipients,input.recipientId).map(r=>fact('recipient',r.id));
+      const splits=select(view.splits,input.operationId);facts.push(...splits.map(s=>fact('split',s.id,s.shares.length,s.shares.reduce((n,x)=>n+x.collectedCents,0))));
+    }else if(definition.id==='investment_lifecycle_manager'){
+      const products=select(view.products,input.productId);facts=products.map(p=>({...fact('investment',p.id),executable:p.suitable}));
+      facts.push(...select(view.investments,input.operationId).map(o=>fact('investment',o.id,undefined,o.amountCents)));
+    }else if(definition.id==='card_lifecycle_manager')facts=select(view.cards,input.cardId).map(c=>({...fact('card',c.id,undefined,c.limitCents),executable:c.status==='active'&&c.online&&c.overseas}));
+    else if(definition.id==='mandate_builder'){
+      if(!['air-demo','stay-demo','travel-agent'].includes(String(input.agentId)))throw new Error('SKILL_INVALID_INPUT');
+      if(!view.goals.some(g=>g.id===input.scopeId))throw new Error('SKILL_INVALID_INPUT');
+      facts=view.mandates.filter(m=>m.goalId===input.scopeId).map(m=>fact('mandate',m.id,undefined,Math.max(0,m.totalCents-m.spentCents-m.reservedCents)));
+    }else {
+      const quotes=view.quotes.filter(q=>q.identityVerified&&!q.expired),orders=view.bookings;
+      const matching=[...quotes,...orders].filter(q=>q.id===input.requestId);
+      if(!matching.length)throw new Error('SKILL_INVALID_INPUT');facts=matching.map(q=>fact('order',q.id,undefined,'totalCents' in q?q.totalCents:q.amountCents));
+    }
+    preflight();facts.forEach(f=>refs.push(...f.sourceRefs));
+    return validateSkillOutput(id,{skillId:definition.id,status:'completed',facts:facts.slice(0,100),evidenceRefs:[...new Set(refs)].slice(0,100),limitations:['PREVIEW_ONLY','SOURCE_LIMITATIONS','NO_EXTERNAL_CONTACT'],nextActionIds:['open-financial-services'],handoff:null});
+  }
+  const limitations = [...new Set(results.flatMap(result => result.limitations))];
+  // Confirmation is a workspace boundary, not a transition to monitoring.
+  const handoff = limitations.includes('CONFIRMATION_REQUIRED') ? null : handoffs[definition.id] ?? null;
+  return validateSkillOutput(id, { skillId: definition.id,
+    status: limitations.includes('CONFIRMATION_REQUIRED') ? 'awaiting_confirmation'
+      : limitations.includes('DATA_REQUIRED') ? 'awaiting_user' : 'completed',
+    facts: results.flatMap(result => result.facts).slice(0, 100),
+    evidenceRefs: [...new Set(results.flatMap(result => result.evidenceRefs))].slice(0, 100),
+    limitations, nextActionIds: [...new Set(results.flatMap(result => result.nextActionIds))],
+    handoff: handoff ? getEnabledSkill(handoff).id : null });
 }
