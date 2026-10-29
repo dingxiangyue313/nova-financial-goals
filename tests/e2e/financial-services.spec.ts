@@ -58,6 +58,8 @@ test('funded trip checks card controls, bounded mandate, signed orders and refun
   const hotelOrder=page.locator('section').filter({hasText:'住宿 · 已确认 · ¥2,200'});
   await hotelOrder.getByRole('button',{name:'预览取消与退款'}).click();await confirm();
   await expect(page.getByText('住宿 · 退款在途 · ¥2,200',{exact:true})).toBeVisible();
+  const download=page.waitForEvent('download');await page.getByRole('region',{name:'住宿订单',exact:true}).getByRole('button',{name:'导出此订单对账单'}).click();expect((await download).suggestedFilename()).toBe('nova-travel-order.json');
+  await page.getByLabel('筛选旅行订单').selectOption('refund_pending');await expect(page.getByRole('region',{name:'机票订单',exact:true})).toHaveCount(0);await page.getByLabel('筛选旅行订单').selectOption('all');
   const pending=await (await page.request.get('/api/services')).json();
   expect(pending.accounts.find((a:{id:string})=>a.id==='goal-wallet').balanceCents).toBe(300000);
   await page.screenshot({path:`artifacts/travel-checkout-${testInfo.project.name}.png`,fullPage:true});
