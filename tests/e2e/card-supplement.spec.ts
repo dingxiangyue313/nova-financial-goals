@@ -10,6 +10,6 @@ test('synthetic missing employment requires explicit supplement and later review
  await result.getByRole('button',{name:'核对补交资料'}).click();await expect(page.getByRole('dialog')).toContainText('合成自由职业收入说明');
  const prepared=await (await page.request.get('/api/services')).json();expect(prepared.applications[0].status).toBe('needs_information');await confirm();await expect(result).toContainText('等待重新审核');
  await result.getByRole('button',{name:'查询申请进度'}).click();await expect(result).toContainText('已通过');await expect(result).toContainText('获批');
- const after=await (await page.request.get('/api/services')).json();expect(after.applications).toHaveLength(1);expect(after.cards).toHaveLength(before.cards.length+1);expect(after.accounts).toEqual(before.accounts);
+ const after=await (await page.request.get('/api/services')).json();expect(after.applications).toHaveLength(1);expect(after.cards).toHaveLength(before.cards.length+1);expect(after.accounts).toEqual(before.accounts);const card=after.cards.find((c:{id:string})=>c.id.startsWith('card:'));expect(card.status).toBe('locked');const region=page.getByRole('region',{name:`${card.label}尾号${card.suffix}`});await region.getByRole('button',{name:'解除临时锁'}).click();await confirm();await expect(region).toContainText('正常');
  await page.screenshot({path:`artifacts/card-supplement-${test.info().project.name}.png`,fullPage:true});
 });

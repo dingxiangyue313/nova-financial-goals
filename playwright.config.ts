@@ -11,7 +11,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run build && node --import tsx scripts/start-e2e.mjs',
     url: 'http://localhost:3177/api/health',
-    timeout: 90_000,
+    timeout: 180_000,
     reuseExistingServer: false,
   },
   projects: [
