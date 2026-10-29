@@ -735,6 +735,8 @@ app.post('/api/operations/:id/auth/verify', route(async (req, res) => {
 }));
 registerMcp(app, verifyMcpToken);
 
+// A malformed request must not fall through to Express stderr with raw request excerpts.
+app.use((error:unknown,_req:express.Request,res:express.Response,_next:express.NextFunction)=>{res.status(error instanceof SyntaxError?400:500).json({error:error instanceof SyntaxError?'INVALID_REQUEST':'INTERNAL_ERROR'});});
 if (production) {
   app.use(express.static(path.join(rootDir, 'dist'), { setHeaders: setStaticCacheHeaders }));
   app.get(/.*/, (_req, res) => res.sendFile(path.join(rootDir, 'dist', 'index.html')));

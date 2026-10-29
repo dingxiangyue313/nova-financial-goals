@@ -1,3 +1,4 @@
+import {requestSignedTravelQuotes,requestTravelCounteroffer,receiveTravelRequest,TravelEnvelopeSchema} from './travel-inbox.ts';
 import {ProviderEventSchema} from '../shared/financial-services.ts';
 import {applyProviderEvent,signProviderEvent} from './provider-events.ts';
 import type { Express, Request, Response, RequestHandler } from 'express';
@@ -54,9 +55,11 @@ export function registerFinancialServices(app:Express,sessionId:(req:Request,res
     const match=message.match(/给(.+?)(?:转|支付)/),amount=message.match(/(?:转|支付|申购)\s*[¥￥]?\s*(\d+(?:\.\d{1,2})?)/);
     res.json({tab,provider:'deterministic',explanation:'已按明确关键词整理任务。请核对对象、条件和预览；理解这句话不会直接执行金融操作。',draft:{...(match?{query:match[1].trim()}:{}),...(amount?{amount:amount[1]}:{})}});
   }));
+  app.post('/api/services/travel-inbox/receive',route((req,res)=>{const packet=z.object({envelope:TravelEnvelopeSchema,signature:z.string().max(128)}).strict().parse(req.body),id=sessionId(req,res);res.json(financialServicesView(mutateState(id,s=>receiveTravelRequest(s,id,packet.envelope,packet.signature))));}));
+  app.post('/api/services/travel-inbox/counteroffer',route((req,res)=>{const body=z.object({id:z.string(),kind:z.enum(['flight','hotel']),budgetCents:z.number().int().positive().max(100000000)}).strict().parse(req.body),id=sessionId(req,res);res.json(financialServicesView(mutateState(id,s=>requestTravelCounteroffer(s,id,body.id,body.kind,body.budgetCents))));}));
   app.post('/api/services/quotes',route((req,res)=>{
-    z.object({}).strict().parse(req.body);const id=sessionId(req,res);
-    res.json(financialServicesView(mutateState(id,s=>requestTravelQuotes(s))));
+    const body=z.object({goalId:z.string().optional()}).strict().parse(req.body);const id=sessionId(req,res);
+    res.json(financialServicesView(mutateState(id,s=>requestSignedTravelQuotes(s,id,Date.now(),body.goalId))));
   }));
   app.post('/api/services/prepare',route((req,res)=>{
     const input=ServiceActionSchema.parse(req.body),id=sessionId(req,res);

@@ -62,13 +62,14 @@ export function installRequestHardening(app: express.Express): void {
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   }));
   app.use((req, res, next) => {
-    const supplied = req.get('x-request-id');
-    const requestId = supplied && /^[A-Za-z0-9_-]{8,80}$/.test(supplied) ? supplied : randomUUID();
+    // Correlation IDs are generated here so a caller cannot smuggle secrets into logs.
+    const supplied = undefined;
+    const requestId = randomUUID();
     res.setHeader('x-request-id', requestId);
     const startedAt = Date.now();
     res.on('finish', () => logger.info({
-      event: 'http_request', requestId, method: req.method,
-      path: req.path, status: res.statusCode, durationMs: Date.now() - startedAt,
+      event: 'http_request', requestId, method: ['GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'].includes(req.method)?req.method:'OTHER',
+      path: typeof req.route?.path==='string'?req.route.path:'/static-or-unmatched', status: res.statusCode, durationMs: Date.now() - startedAt,
     }));
     next();
   });

@@ -4,6 +4,7 @@ import {InvestmentAnswersSchema} from './investment-profile.ts';
 const money = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const quantity = z.string().regex(/^\d+$/);
 export const ServiceActionSchema = z.discriminatedUnion('kind', [
+  z.object({kind:z.literal('travel_request_decision'),id:z.string(),decision:z.enum(['accept','decline'])}).strict(),
   z.object({kind:z.literal('verify_recipient'),id:z.string(),expectedVersion:z.number().int().positive(),suffix:z.string().regex(/^\d{4}$/),acknowledged:z.literal(true)}).strict(),
   z.object({kind:z.literal('review_recipient'),id:z.string(),expectedVersion:z.number().int().positive()}).strict(),
   GoalContractChangeSchema.extend({kind:z.literal('goal_contract')}).strict(),
@@ -35,6 +36,7 @@ export type MandateDraft=z.infer<typeof MandateDraftSchema>;
 export const ProviderEventSchema=z.object({id:z.string().min(1).max(100),provider:z.literal('nova-sim-provider'),domain:z.enum(['investment','booking']),subjectId:z.string().min(1).max(200),revision:z.number().int().positive().max(1000000000),status:z.enum(['pending','settled','confirmed','failed']),reportedOn:z.iso.date()}).strict();
 export type ProviderEvent=z.infer<typeof ProviderEventSchema>;
 export const FinancialServicesSchema = z.object({
+  travelRequests:z.array(z.object({id:z.string(),agentId:z.literal('travel-agent-demo'),goalId:z.string(),quoteIds:z.array(z.string()),status:z.enum(['received','accepted','declined','superseded']),expiresAt:z.iso.datetime(),receivedAt:z.iso.datetime(),revision:z.number().int().positive(),replacesRequestId:z.string().optional()})).default([]),
   providerEventLog:z.array(z.object({id:z.string(),payloadHash:z.string(),subjectId:z.string(),domain:z.enum(['investment','booking']),revision:z.number().int(),outcome:z.enum(['applied','stale','terminal_ignored']),reportedOn:z.iso.date()})).default([]),
   providerRevisions:z.array(z.object({subjectId:z.string(),domain:z.enum(['investment','booking']),revision:z.number().int()})).default([]),
   subscriptionNotifications:z.array(z.object({id:z.string(),actionId:z.string(),subscriptionId:z.string(),title:z.string(),dueDate:z.iso.date(),
@@ -54,7 +56,7 @@ export const FinancialServicesSchema = z.object({
   cardOperations:z.array(z.object({id:z.string(),cardId:z.string(),kind:z.enum(['card','replace_card']),status:z.enum(['unknown','succeeded','failed']),providerStatus:z.enum(['succeeded','failed']),replacementCardId:z.string().nullable(),originalVersion:z.number().int()})).default([]),
   applications: z.array(z.object({ id: z.string(), product: z.string(), requestedCents: money, approvedCents: money, status: z.enum(['under_review','approved','rejected','unknown','withdrawn','needs_information']), operationId: z.string(),providerAccepted:z.boolean().optional(),decisionReason:z.string().optional(),employmentEvidence:z.enum(['available','missing']).optional(),employment:z.enum(['synthetic_salaried','synthetic_freelance']).optional(),supplementedOn:z.iso.date().optional() })).default([]),
   mandates: z.array(z.object({ id: z.string(), goalId: z.string(), accountId: z.string(), maxPerOrderCents: money, totalCents: money, reservedCents: money, spentCents: money, merchants: z.array(z.string()), expiresAt: z.iso.datetime(), status: z.enum(['active','revoked']) })).default([]),
-  quotes: z.array(z.object({ id: z.string(), merchantId: z.string(), label: z.string(), kind: z.enum(['flight','hotel']), baseCents: money, taxCents: money, feeCents: money, totalCents: money, refundable: z.boolean(), expiresAt: z.iso.datetime(), signature: z.string() })).default([]),
+  quotes: z.array(z.object({ id: z.string(), merchantId: z.string(), label: z.string(), kind: z.enum(['flight','hotel']),currency:z.literal('CNY').optional(), baseCents: money, taxCents: money, feeCents: money, totalCents: money, refundable: z.boolean(), expiresAt: z.iso.datetime(),requestId:z.string().optional(),replacesQuoteId:z.string().optional(),revision:z.number().int().positive().optional(), signature: z.string() })).default([]),
   bookings: z.array(z.object({ id: z.string(), quoteId: z.string(), merchantId: z.string(), accountId: z.string(), cardId: z.string(), goalId: z.string(), mandateId: z.string(), amountCents: money, refundable: z.boolean(), operationId: z.string(), status: z.enum(['submitted','confirmed','failed','unknown','cancelled','refund_pending','refunded']), payment: z.enum(['held','captured','released','refunded']), providerStatus: z.enum(['confirmed','failed','pending']), refundOn: z.iso.date().nullable() })).default([]),
   receipts: z.array(z.object({ id: z.string(), operationId: z.string(), kind: z.string(), status: z.enum(['succeeded','pending','failed','unknown']), label: z.string(), amountCents: money, date: z.iso.date() })).default([]),
   fault: z.enum(['none','decline','timeout_before','timeout_after','partial']).default('none'),

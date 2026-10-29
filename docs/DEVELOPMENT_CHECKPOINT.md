@@ -1,3 +1,23 @@
+## 额度停工收尾（2026-10-29，最新）
+
+最新成功查询短窗已用91%、剩余9%，周剩24%。此前最近成功值剩22%，中间一次查询不可用；最终查询已越过10%线，现停止新增开发，只保存已验证结果/文档/本地提交。进度MD在此前已保存，不等耗尽。三项最终全量468/468、类型、三尺寸9/9均已收取，下段为最终业务结果；当前剩9项部分完成。前端3190健康200，打开signed-inbox检查；下一轮先查额度再接手，禁止在仍≤10%时开新功能。
+
+## X-A01 / X-A05 / Q-A10验收完成（2026-10-29，最新最终）
+
+本轮三项模拟R1完成：签名旅行Inbox（身份、HMAC、会话:目标、nonce、时效、CNY/报价完整性）；预算协商产生新签名请求及替代关系，降价不可退仍重新接受，旧付款确认失效，接受不授付款权；本提交生产HTTP/模型诊断日志审查及脱敏修复。真实商户网络/Outbox、通用语义、FX仍不宣称完成。
+
+最终全量468/468通过（artifacts/travel-privacy-final-full.log），类型通过（travel-privacy-final-lint.log），三尺寸9/9（travel-inbox-browser-verified.log）。新域/真实HTTP3/3，日志HTTP+诊断2/2，强化诊断1/1；首次文本重复定位和错误holds视图断言失败日志保留。手机截图已目视检查（travel-inbox-mobile-360.png）。
+
+75项现在66项有范围限定证据、9项部分完成，已更新剩余清单、映射、演示脚本。说明见TRAVEL_INBOX_CONTRACT.md、RELEASE_LOG_AUDIT.md。完成后打开3190?review=signed-inbox，入口金融任务→旅行请求→签名报价/接受→住宿预算协商→新条件再次接受。用户独立产品经理文档未修改，不推main。
+
+## X-A01 / X-A05 / Q-A10（2026-10-29，最终验收中）
+
+实现签名Agent Inbox、主体/nonce/期限/币种/报价验证；请求接受不付款，拒绝不可付款。预算重询价生成有lineage的新签名请求，降价但不可退醒目标明；旧请求superseded、旧付款确认失效，新条件需重新接受和独立付款；已付/未知订单不能用改价覆盖。日志修复动态路径、外部requestId、默认JSON错误stderr、模型诊断字段路径和任意错误名，发布测试扫描合成秘密标记。
+
+已通过领域18/18（travel-inbox-tests.log）、新域+真实HTTP3/3（travel-inbox-final-domain.log）、发布HTTP及模型诊断2/2（release-log-audit.log）、强化模型诊断1/1（release-diagnostics-final.log）。浏览器首轮3项原付款流程通过，另6项由于新旧报价重复文本定位和误断言视图无holds字段失败，均保留日志。已修正测试，最终三尺寸在exec session13094，travel-inbox-browser-verified.log；若通过顺序全量travel-privacy-final-full.log及类型travel-privacy-final-lint.log。未提前声称三项完成或改变12项剩余数。
+
+协议及日志审查说明见TRAVEL_INBOX_CONTRACT.md、RELEASE_LOG_AUDIT.md。最近额度剩22%，不再新增功能，继续收结果并在10%前保存MD。用户独立产品经理文档未修改。
+
 ## T-A05 / W-A08 / Q-A05验收完成（2026-10-29，最新最终）
 
 本轮三项按模拟R1原条款完成：12组独立AA目录（部分/重复/逾期/关闭/自定义/垫付与同行负债）；申购/赎回版本化回报不重复现金或份额；跨投资/订单的签名会话绑定、事件id冲突、revision乱序、终态不回退和SQLite原子持久。pending理财回报不会因日期到期自行settle，最终信号仍须满足结算日。所有回报推进原授权操作，不创建新金额/收款/付款。

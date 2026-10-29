@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 test.use({serviceWorkers:'block'});
 
 test('six scenario entry preserves goal-first home and explicit money confirmations',async({page},testInfo)=>{
-  await page.goto('/');
+  await page.goto('/');await page.request.post('/api/product/start',{data:{}});
   await expect(page.getByRole('heading',{name:'早上好，Alex'})).toBeVisible();
   await expect(page.getByText('快速直达:')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'模拟数据',exact:true})).toBeDisabled();
@@ -24,7 +24,7 @@ test('six scenario entry preserves goal-first home and explicit money confirmati
   await expect(page.getByRole('heading',{name:'旅行借记卡 · 尾号2002'})).toBeVisible();
   await page.getByRole('button',{name:'旅行请求',exact:true}).click();
   await page.getByRole('button',{name:'获取签名机票与住宿报价'}).click();
-  await expect(page.getByText(/樱旅航空 · 往返机票/)).toBeVisible();
+  await expect(page.getByRole('checkbox',{name:/樱旅航空 · 往返机票/})).toBeVisible();
   await page.screenshot({path:`artifacts/services-${testInfo.project.name}.png`,fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
   const report=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
@@ -43,6 +43,7 @@ test('funded trip checks card controls, bounded mandate, signed orders and refun
   await card.getByRole('button',{name:'开启境外交易'}).click();await confirm();
   await page.getByRole('button',{name:'旅行请求',exact:true}).click();
   await page.getByRole('button',{name:'获取签名机票与住宿报价'}).click();
+  await page.getByRole('button',{name:'核对并接受此请求'}).click();await confirm();
   await page.getByRole('button',{name:'核对创建授权'}).click();await confirm();
   const flight=page.getByRole('checkbox',{name:/樱旅航空 · 往返机票/}),hotel=page.getByRole('checkbox',{name:/京都旅宿 · 三晚住宿/});
   await flight.uncheck();await hotel.uncheck();

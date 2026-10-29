@@ -41,12 +41,12 @@ export async function requestDeepSeekJson<T>(schema: z.ZodType<T>, options: {
     try { return { ok: true, data: schema.parse(JSON.parse(content)) }; }
     catch (error) {
       if (process.env.NOVA_EVAL_MODEL_DIAGNOSTICS === '1') console.error('DeepSeek JSON validation',
-        error instanceof z.ZodError ? error.issues.map(issue => `${issue.path.join('.')}:${issue.code}`) : 'parse_error');
+        error instanceof z.ZodError ? error.issues.slice(0,10).map(issue => issue.code) : 'parse_error');
       return { ok: false, reason: 'DEEPSEEK_INVALID_OR_TIMEOUT' };
     }
   } catch (error) {
     if (process.env.NOVA_EVAL_MODEL_DIAGNOSTICS === '1') console.error('DeepSeek request failure',
-      error instanceof Error ? error.name : 'unknown');
+      error instanceof Error && ['TimeoutError','AbortError','TypeError'].includes(error.name) ? error.name : 'request_error');
     return { ok: false, reason: 'DEEPSEEK_INVALID_OR_TIMEOUT' };
   }
 }
