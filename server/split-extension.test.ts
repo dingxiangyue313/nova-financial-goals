@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {createJapanMoneyMissionFixture} from './money-mission-fixture.ts';import {initializeServices,executeServiceAction,describeServiceAction} from './financial-services.ts';import {DemoStateSchema} from '../shared/contracts.ts';
+test('AA extension preserves settlement, cash and audit dates; stale, closed and unbounded requests fail',()=>{
+ const initial=initializeServices(createJapanMoneyMissionFixture());const split=executeServiceAction(initial,{kind:'split',totalCents:39801,participantIds:['self','contact-1'],payerId:'self',alreadyPaid:true,accountId:'checking',dueDate:'2026-10-27'},'split');
+ const action={kind:'reschedule_split',id:'split',expectedDueDate:'2026-10-27',dueDate:'2026-11-10'} as const;const next=executeServiceAction(split,action,'extend');assert.deepEqual(next.accounts,split.accounts);assert.deepEqual(next.financialServices.splits[0].shares,split.financialServices.splits[0].shares);assert.equal(next.financialServices.splits[0].dateChanges?.[0].from,'2026-10-27');assert.ok(DemoStateSchema.safeParse(next).success);assert.equal(executeServiceAction(next,action,'extend'),next);
+ assert.throws(()=>describeServiceAction(next,action),/DATE_CHANGED/);assert.throws(()=>describeServiceAction(split,{...action,dueDate:'2027-10-01'}),/EXTENSION_INVALID/);assert.throws(()=>describeServiceAction(split,{...action,dueDate:'2026-10-26'}),/EXTENSION_INVALID/);
+ const closed=executeServiceAction(split,{kind:'close_split',id:'split'},'close');assert.throws(()=>describeServiceAction(closed,action),/NOT_OPEN/);
+});
