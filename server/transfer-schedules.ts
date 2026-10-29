@@ -111,7 +111,7 @@ export function simulateTransferSchedule(state: DemoState, raw: TransferSchedule
     occurrences: contributions.slice(0, 3).map(item => ({ ...item, minimumBalanceCents: minimum, conflicts: conflicts(item.date) })),
     evidenceRefs: [...new Set([forecast.id, plan.id, ...forecast.evidenceRefs])].sort(),
     limitations: [...forecast.limitations, ...(dates.some(date => conflicts(date).length) ? ['SCHEDULE_BILL_CONFLICT'] : []),
-      '预览为预计日期；工资须实际验证，缺失时跳过且不补扣；创建计划不执行首笔转账'],
+      input.trigger.type==='salary_event'?'预览为预计日期；工资须实际验证，缺失时跳过且不补扣；创建计划不执行首笔转账':'按用户指定日期09:00核对余额与授权后执行；不足时不透支，不自动等待工资或补扣；创建时不转账'],
     createdAt: at(state) };
   return TransferSchedulePreviewSchema.parse({ id: `schedule-preview-${stableHash(content)}`, ...content });
 }

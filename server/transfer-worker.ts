@@ -43,6 +43,7 @@ function requireAuthority(sessionId: string, state: DemoState, schedule: Transfe
     stableHash(getTransferScheduleAuthority(sessionId, schedule.id)) !== stableHash(transferScheduleAuthority(state, schedule)))
     throw new Error('SCHEDULE_AUTHORITY_CHANGED');
   const trigger = schedule.trigger;
+  if(trigger.type==='fixed_day'){if(schedule.recurrence!=='one_time'||schedule.sourceAccountId!=='checking'||trigger.day!==Number(schedule.startDate.slice(-2))||!schedule.stopAtGoal)throw new Error('SCHEDULE_INVALID_SCOPE');return original;}
   if (trigger.type !== 'salary_event' || trigger.accountId !== 'checking' || schedule.sourceAccountId !== 'checking' ||
     trigger.expectedAmountCents !== 850000 || trigger.toleranceBps > 1000 || trigger.windowStartDay !== 23 ||
     trigger.graceEndDay !== 27 || trigger.executeOffsetDays !== 1 || !schedule.stopAtGoal)
@@ -97,16 +98,17 @@ function evaluate(sessionId: string, state: DemoState, scheduleId: string, perio
       return saveOutcome(appendAuditEvent(state, 'risk', 'stopped', execution.reason!), schedule, execution, now, 'completed');
     }
     const original = requireAuthority(sessionId, state, schedule);
-    const candidate = matchSalaryEvent({ ...schedule, nextEvaluationAt: `${period}-23T09:00:00+08:00` },
-      state.transactions.filter(item => item.date <= date && item.date <= state.clock));
-    const cutoff = new Date(`${period}-28T00:00:00+08:00`);
-    if ((!candidate && now >= cutoff) || date.slice(0, 7) > period) {
-      execution = { ...execution, status: 'skipped_missing_trigger', reason: 'SALARY_MISSING_SKIP_NO_CATCHUP', updatedAt: at };
-      return saveOutcome(appendAuditEvent(state, 'risk', 'skipped', execution.reason!, { approvalId: original.id }), schedule, execution, now);
+    let dueAt:string;
+    if(schedule.trigger.type==='fixed_day'){
+      dueAt=`${schedule.startDate}T09:00:00+08:00`;
+      execution={...execution,triggerTransactionId:null,scheduledAt:dueAt,updatedAt:at};
+    }else{
+      const candidate = matchSalaryEvent({ ...schedule, nextEvaluationAt: `${period}-23T09:00:00+08:00` },state.transactions.filter(item=>item.date<=date&&item.date<=state.clock));
+      const cutoff=new Date(`${period}-28T00:00:00+08:00`);
+      if((!candidate&&now>=cutoff)||date.slice(0,7)>period){execution={...execution,status:'skipped_missing_trigger',reason:'SALARY_MISSING_SKIP_NO_CATCHUP',updatedAt:at};return saveOutcome(appendAuditEvent(state,'risk','skipped',execution.reason!,{approvalId:original.id}),schedule,execution,now);}
+      if(!candidate)return saveOutcome(state,schedule,execution,now);
+      dueAt=`${shift(candidate.date,1)}T09:00:00+08:00`;execution={...execution,triggerTransactionId:candidate.id,scheduledAt:dueAt,updatedAt:at};
     }
-    if (!candidate) return saveOutcome(state, schedule, execution, now);
-    const dueAt = `${shift(candidate.date, 1)}T09:00:00+08:00`;
-    execution = { ...execution, triggerTransactionId: candidate.id, scheduledAt: dueAt, updatedAt: at };
     const executionDate = dueAt.slice(0, 10);
     if (executionDate < schedule.startDate || executionDate > (schedule.endDate ?? state.goal.targetDate))
       throw new Error('SCHEDULE_EXECUTION_OUT_OF_SCOPE');

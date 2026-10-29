@@ -20,7 +20,7 @@ const salary = (patch: Partial<Transaction> = {}): Transaction => ({ id: 'salary
   date: '2026-11-25', title: '工资', category: 'income', amountCents: 850000,
   sourceKind: 'bank', provenance: 'connected_data', ...patch });
 
-export function workerFixture(withSalary = true) {
+export function workerFixture(withSalary = true, fixedDate?:string) {
   let state = createJapanMoneyMissionFixture();
   const forecast = buildDatedCashflowForecast(state, { accountId: 'checking', horizonEnd: state.goal.targetDate, scenario: 'baseline' });
   const plan = buildMoneyMissionPlans(state, forecast)[1];
@@ -28,8 +28,8 @@ export function workerFixture(withSalary = true) {
   state.goals = [state.goal];
   const preview = simulateTransferSchedule(state, { goalId: state.goal.id, planOptionId: plan.id, forecastId: forecast.id,
     twinVersion: 1, sourceAccountId: 'checking', destinationAccountId: 'goal-wallet', currency: 'CNY', amountCents: 100000,
-    recurrence: 'monthly', startDate: '2026-11-26', endDate: '2027-04-26', stopAtGoal: true,
-    trigger: { type: 'salary_event', accountId: 'checking', sourceKind: 'bank', category: 'income', classification: 'salary',
+    recurrence: fixedDate?'one_time':'monthly', startDate: fixedDate??'2026-11-26', endDate: fixedDate??'2027-04-26', stopAtGoal: true,
+    trigger: fixedDate?{type:'fixed_day',day:Number(fixedDate.slice(-2))}:{ type: 'salary_event', accountId: 'checking', sourceKind: 'bank', category: 'income', classification: 'salary',
       expectedAmountCents: 850000, toleranceBps: 1000, expectedDay: 25, windowStartDay: 23, graceEndDay: 27,
       graceEndTime: '23:59', executeOffsetDays: 1, executeTime: '09:00', missingEventPolicy: 'skip_no_catchup' } });
   state.transferSchedulePreviews = [preview];
@@ -38,8 +38,8 @@ export function workerFixture(withSalary = true) {
   const active = activateTransferSchedule(confirmed.state, { previewId: preview.id, approvalToken: confirmed.token });
   const sessionId = randomUUID();
   store.mutateState(sessionId, () => active.state);
-  store.mutateState(sessionId, old => ({ ...old, clock: '2026-11-26',
-    accountSnapshots: old.accountSnapshots.map(item => ({ ...item, asOf: '2026-11-26' })),
+  store.mutateState(sessionId, old => ({ ...old, clock: fixedDate??'2026-11-26',
+    accountSnapshots: old.accountSnapshots.map(item => ({ ...item, asOf: fixedDate??'2026-11-26' })),
     transactions: withSalary ? [...old.transactions, salary()] : old.transactions }));
   return { sessionId, schedule: active.schedule };
 }
@@ -305,3 +305,16 @@ test('first-period salary on the 23rd cannot execute on the 24th before the auth
   assert.deepEqual(after.finance, before.finance); assert.equal(after.operations.length, 0);
   assert.equal(store.listMonitorEvents(f.sessionId).filter(item => item.kind === 'transfer_outcome').length, 1);
 });
+
+ test('fixed one-time date executes at 09:00 without a salary event, conserves funds and never repeats',()=>{
+ const f=workerFixture(false,'2026-11-20'),before=store.getState(f.sessionId);
+ assert.equal(processDue(f,new Date('2026-11-20T08:59:00+08:00')).status,'scheduled');
+ const result=processDue(f,new Date('2026-11-20T09:00:00+08:00'));assert.equal(result.status,'succeeded');assert.equal(result.triggerTransactionId,null);
+ const after=store.getState(f.sessionId);assert.equal(after.finance.checkingCents,before.finance.checkingCents-100000);assert.equal(after.goal.savedCents,before.goal.savedCents+100000);
+ assert.equal(processDue(f,new Date('2026-11-21T10:00:00+08:00')).operationId,result.operationId);assert.equal(store.getState(f.sessionId).transferExecutions.length,1);
+ });
+ test('fixed one-time insufficiency and missed date never wait for salary or catch up',()=>{
+ const f=workerFixture(false,'2026-11-20');change(f,s=>({...s,finance:{...s.finance,checkingCents:50000},accounts:s.accounts.map(a=>a.id==='checking'?{...a,balanceCents:50000}:a)}));
+ assert.equal(processDue(f,new Date('2026-11-20T09:00:00+08:00')).status,'failed');assert.equal(store.getState(f.sessionId).finance.checkingCents,50000);
+ const missed=workerFixture(false,'2026-11-20'),before=store.getState(missed.sessionId);assert.equal(processDue(missed,new Date('2026-11-21T09:00:00+08:00')).reason,'SCHEDULE_STOP_CONDITION');assert.deepEqual(store.getState(missed.sessionId).accounts,before.accounts);
+ });

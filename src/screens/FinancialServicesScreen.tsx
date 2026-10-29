@@ -1,3 +1,4 @@
+import {ProductMissionPanel} from '../components/money-mission/ProductMissionPanel';
 import {recipientReady} from '../../shared/recipient-identity';
 import {RecipientVerifier} from '../components/money-mission/RecipientVerifier';
 import {CardApplications} from '../components/money-mission/CardApplications';
@@ -58,6 +59,7 @@ export function FinancialServicesScreen({onChanged,onBills,initialMessage=''}:{o
     {tab==='transfers'&&<>
       <section className="mission-card"><h2 className="font-bold">联系人转账</h2><label>姓名、手机号或备注<input className="mission-input" value={query} onChange={e=>{setQuery(e.target.value);setRecipient('');}} /></label><label>明确选择收款人<select className="mission-input" value={recipient} onChange={e=>setRecipient(e.target.value)}><option value="">请选择并核对身份</option>{contacts.map(r=><option key={r.id} value={r.id}>{r.name} · {r.alias} · 尾号{r.suffix}{!recipientReady(r)&&' · 待核对'}</option>)}</select></label><label>来源账户<select className="mission-input" value={source} onChange={e=>setSource(e.target.value)}>{view.accounts.filter(a=>a.type==='checking').map(a=><option key={a.id} value={a.id}>{a.label} · 可用{money(a.availableCents)}</option>)}</select></label><label>转账金额（元）<input className="mission-input" value={amount} onChange={e=>setAmount(e.target.value)} /></label><button className="mission-primary" disabled={busy||!recipient} onClick={()=>parseAction(()=>({kind:'transfer',recipientId:recipient,recipientVersion:view.recipients.find(r=>r.id===recipient)!.version,accountId:source,amountCents:amountCents(amount),note:'用户确认的模拟转账'}))}>预览联系人转账</button><button className="mission-link" onClick={onBills}>工资到账与定时安排在旅行任务中核对 →</button></section>
       <RecipientVerifier recipients={view.recipients} selectedId={recipient} busy={busy} onSelect={setRecipient} onPrepare={a=>void prepare(a)}/>
+      <details className="mission-card"><summary className="font-bold min-h-11 py-2 cursor-pointer">旅行金转入安排</summary><p>先在首页新建目标并确认方案，再选择工资到账后按月转入或指定日期一次性转入。</p><ProductMissionPanel stage="transfer" onChanged={()=>{void refresh();onChanged();}}/></details>
       <SplitPlanner recipients={view.recipients} source={source} defaultDate={useBy} busy={busy} onPrepare={parseAction} />
       {view.splits.map(s=><SplitStatusCard key={s.id} split={s} view={view} source={source} busy={busy} onPrepare={a=>void prepare(a)} onQuery={()=>void run(()=>api(`/api/services/splits/${s.id}/status`,'POST',{}))} />)}
     </>}
