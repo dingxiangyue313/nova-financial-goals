@@ -1,3 +1,4 @@
+import {cardImpact} from './card-impact.ts';
 import {HandoffCasePackSchema,type DemoState} from '../shared/contracts.ts';
 import {stableHash} from './governance.ts';
 import {subscriptionDisputes} from './subscription-catalog.ts';
@@ -16,8 +17,8 @@ export function serviceIssues(state:DemoState):ServiceIssue[]{
   add('investment',o.id,o.status==='unknown'?'理财提交结果待核对':o.status==='failed'?'理财操作未完成':'理财结算待核对',`金额 ¥${(o.amountCents/100).toFixed(2)}；未结算资金或份额不可使用。`,o.status==='failed'?'review':'query_service',['查询原申购或赎回操作。','核对待确认份额、占用与结算日。','未到账不能用于当前付款。']);
  for(const b of d.bookings.filter(b=>['unknown','failed'].includes(b.status)||b.status==='refund_pending'&&b.refundOn!==null&&b.refundOn<=state.clock))
   add('order',b.id,b.status==='unknown'?'旅行订单结果待核对':b.status==='failed'?'旅行订单未完成':'旅行退款待核对',`订单 ¥${(b.amountCents/100).toFixed(2)}；成功项不重跑，退款申请不当作到账。`,b.status==='failed'?'review':'query_service',['核对本订单和独立付款记录。','保留另一笔成功订单。','未知查原操作，退款核对独立到账凭证。']);
- for(const c of d.cards.filter(c=>c.status==='lost'))
-  add('card',c.id,'挂失卡片需要更换支付方式',`尾号${c.suffix}已挂失，不能普通解锁；已付订单不会自动撤销。`,'review',['核对挂失凭证。','选择其他有效卡并重新核对支付条件。','补卡需通过模拟服务支持渠道处理。']);
+ for(const c of d.cards.filter(c=>c.status==='lost'&&!cardImpact(d,c.id).replacementReady))
+  add('card',c.id,'挂失卡片需要更换支付方式',`尾号${c.suffix}已挂失，不能普通解锁；已付订单不会自动撤销。`,'review',['核对挂失凭证。','选择其他有效卡并重新核对支付条件。','进入卡片页核对补卡；新卡解锁仍需独立确认。']);
  for(const split of d.splits.filter(s=>['open','partial'].includes(s.status)&&s.dueDate<state.clock)){
   const other=split.payerId&&split.payerId!=='self',remaining=split.shares.filter(s=>other?s.recipientId==='self':s.recipientId!=='self').reduce((n,s)=>n+s.amountCents-s.collectedCents,0);
   if(remaining>0)add('split',split.id,'AA已过截止日期',`${other?'本人未付':'尚未收齐'} ¥${(remaining/100).toFixed(2)}；没有自动扣款或对外催收。`,'review',['核对每人应付和已结算金额。','本人应付款需单独确认；待收不计入余额。','不继续时关闭剩余请求，已收记录保留。']);
