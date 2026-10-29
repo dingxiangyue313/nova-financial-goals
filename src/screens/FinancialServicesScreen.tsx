@@ -5,7 +5,7 @@ import {CardApplications} from '../components/money-mission/CardApplications';
 import {CardManager} from '../components/money-mission/CardManager';
 import {TravelTaskPanel} from '../components/money-mission/TravelTaskPanel';
 import {InvestmentPlanner} from '../components/money-mission/InvestmentPlanner';
-import {SplitStatusCard} from '../components/money-mission/SplitStatusCard';
+import {SplitOverview} from '../components/money-mission/SplitOverview';
 import {ServiceIssueInbox} from '../components/money-mission/ServiceIssueInbox';
 import {MandateDraftBuilder} from '../components/money-mission/MandateDraftBuilder';
 import {GoalPortfolioPanel} from '../components/money-mission/GoalPortfolioPanel';
@@ -61,7 +61,7 @@ export function FinancialServicesScreen({onChanged,onBills,initialMessage=''}:{o
       <RecipientVerifier recipients={view.recipients} selectedId={recipient} busy={busy} onSelect={setRecipient} onPrepare={a=>void prepare(a)}/>
       <details className="mission-card"><summary className="font-bold min-h-11 py-2 cursor-pointer">旅行金转入安排</summary><p>先在首页新建目标并确认方案，再选择工资到账后按月转入或指定日期一次性转入。</p><ProductMissionPanel stage="transfer" onChanged={()=>{void refresh();onChanged();}}/></details>
       <SplitPlanner recipients={view.recipients} source={source} defaultDate={useBy} busy={busy} onPrepare={parseAction} />
-      {view.splits.map(s=><SplitStatusCard key={s.id} split={s} view={view} source={source} busy={busy} onPrepare={a=>void prepare(a)} onQuery={()=>void run(()=>api(`/api/services/splits/${s.id}/status`,'POST',{}))} />)}
+      <SplitOverview view={view} source={source} busy={busy} onPrepare={a=>void prepare(a)} onQuery={id=>void run(()=>api(`/api/services/splits/${id}/status`,'POST',{}))}/>
     </>}
     {tab==='wealth'&&<>
 <InvestmentPlanner view={view} busy={busy} amount={buyAmount} onAmount={setBuyAmount} onPrepare={a=>void prepare(a)} onCash={()=>setNotice('选择保留现金，不会创建申购或挪用保护资金。')} />
