@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {initializeServices,executeServiceAction,describeServiceAction} from './financial-services.ts';import {createJapanMoneyMissionFixture} from './money-mission-fixture.ts';import {DemoStateSchema} from '../shared/contracts.ts';
+test('AA freezes participant identity and exact shares independently of later contact changes',()=>{
+ const base=initializeServices(createJapanMoneyMissionFixture());const input={kind:'split',totalCents:39801,participantIds:['self','contact-1','contact-2','contact-3'],accountId:'checking',alreadyPaid:true,dueDate:'2026-12-01'};
+ const preview=describeServiceAction(base,input);const next=executeServiceAction(base,input,'split');const frozen=structuredClone(next.financialServices.splits[0].participants);assert.equal(frozen?.find(r=>r.id==='contact-1')?.suffix,'1001');assert.deepEqual(next.accounts,base.accounts);assert.deepEqual(preview.details.recipientVersions,frozen);
+ next.financialServices.recipients.find(r=>r.id==='contact-1')!.name='新备注姓名';assert.deepEqual(next.financialServices.splits[0].participants,frozen);assert.equal(next.financialServices.splits[0].shares.reduce((n,s)=>n+s.amountCents,0),39801);assert.ok(DemoStateSchema.safeParse(next).success);
+});

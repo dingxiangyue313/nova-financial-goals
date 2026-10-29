@@ -124,7 +124,7 @@ export function describeServiceAction(input:DemoState,raw:unknown,now=Date.now()
       if(shares.length!==ids.length||new Set(shares.map(s=>s.recipientId)).size!==ids.length||shares.some(s=>!ids.includes(s.recipientId))||shares.reduce((sum,s)=>sum+BigInt(s.amountCents),0n)!==BigInt(action.totalCents))throw new Error('SERVICE_SPLIT_SHARES_MISMATCH');
       account(state,action.accountId);if(!action.alreadyPaid)requireFunds(state,action.accountId,action.totalCents);
       amountCents=action.alreadyPaid?0:action.totalCents;
-      details={payer:d.recipients.find(r=>r.id===payerId),recipientVersions:ids.map(id=>{const r=d.recipients.find(r=>r.id===id)!;return {id:r.id,version:r.version,suffix:r.suffix};}),shares:ids.map(id=>{const share=shares.find(s=>s.recipientId===id)!;return {...share,collectedCents:id===payerId?share.amountCents:0};})};
+      details={payer:d.recipients.find(r=>r.id===payerId),recipientVersions:ids.map(id=>{const r=d.recipients.find(r=>r.id===id)!;return {id:r.id,name:r.name,alias:r.alias,version:r.version,suffix:r.suffix};}),shares:ids.map(id=>{const share=shares.find(s=>s.recipientId===id)!;return {...share,collectedCents:id===payerId?share.amountCents:0};})};
       label=`总额¥${action.totalCents/100}，${ids.length}人AA。${payerId!=='self'?'同行已垫付，本次只登记本人应付款；不会代同行收款或增加你的余额。':action.alreadyPaid?'你声明已经垫付，本次仅创建模拟收款请求，不再扣款。':'本次先垫付全额，再创建收款请求。'}待收不计入余额。`;break;
     }
     case 'pay_split_share':{
@@ -193,7 +193,7 @@ export function executeServiceAction(input:DemoState,raw:unknown,operationId:str
       else post(s,a.accountId,-a.amountCents,operationId,`transfer:${operationId}`,'联系人转账');break;
     case 'split':
       if(!a.alreadyPaid)post(s,a.accountId,-a.totalCents,operationId,`split-pay:${operationId}`,'AA垫付');
-      d.splits.push({id:operationId,accountId:a.accountId,totalCents:a.totalCents,alreadyPaid:a.alreadyPaid,dueDate:a.dueDate,...(a.payerId?{payerId:a.payerId}:{}),status:'open',shares:preview.details.shares as typeof d.splits[number]['shares']});break;
+      d.splits.push({id:operationId,accountId:a.accountId,totalCents:a.totalCents,alreadyPaid:a.alreadyPaid,dueDate:a.dueDate,...(a.payerId?{payerId:a.payerId}:{}),participants:preview.details.recipientVersions as typeof d.splits[number]['participants'],status:'open',shares:preview.details.shares as typeof d.splits[number]['shares']});break;
     case 'pay_split_share':{
       if(fault==='decline'){status='failed';break;}
       if(fault.startsWith('timeout')){
