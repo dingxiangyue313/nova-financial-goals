@@ -7,6 +7,8 @@ export type ServiceIssue={id:string;domain:'investment'|'card'|'order'|'transfer
 export function serviceIssues(state:DemoState):ServiceIssue[]{
  const d=state.financialServices,issues:ServiceIssue[]=[];
  const add=(domain:ServiceIssue['domain'],sourceId:string,title:string,summary:string,recovery:ServiceIssue['recovery'],steps:string[])=>issues.push({id:`${domain}:${sourceId}`,domain,sourceId,title,summary,recovery,steps});
+ for(const operation of d.cardOperations.filter(o=>o.status==='unknown'))add('card',operation.id,'卡片操作结果待核对','当前卡片或补发卡暂不可提交新变更或付款；查询原操作，不重复申请。','query_service',['核对原卡片及操作记录。','先查询原操作，不重复补卡或改卡。','结果确认后单独核对解锁和支付开关。']);
+ for(const application of d.applications.filter(a=>a.status==='unknown'))add('card',application.id,'卡片申请结果待核对','尚未确认商户是否受理；额度不是现金，不重复申请。','query_service',['查询原申请。','已受理则继续审核；未受理才重新准备。','核对新卡账户及初始限制。']);
  for(const r of d.receipts.filter(r=>['transfer','pay_split_share'].includes(r.kind)&&['unknown','failed'].includes(r.status)))
   add('transfer',r.operationId,r.status==='unknown'?'付款结果待核对':'付款未完成',`金额 ¥${(r.amountCents/100).toFixed(2)}；`+(r.status==='unknown'?'保留当前占用，先查原操作。':'没有成功凭证；重新操作需要新的核对和确认。'),r.status==='unknown'?'query_service':'review',['核对原操作记录与来源账户。','结果未知时不要新建同金额付款。','仅在确认未付款后重新准备。']);
  for(const o of d.investments.filter(o=>['unknown','failed'].includes(o.status)||o.status==='pending'&&o.settlesOn<=state.clock))

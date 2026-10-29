@@ -1,4 +1,5 @@
 import {SubscriptionCard} from './SubscriptionCard';
+import {SubscriptionReminderInbox} from './SubscriptionReminderInbox';
 import { useEffect, useRef, useState } from 'react';
 import type { ProductMission } from '../../../server/product-mission';
 import type { Snapshot, StatementImportBatch, ImportIssue, BillEvidenceDetail, BillBrief } from '../../../shared/contracts';
@@ -26,9 +27,10 @@ export function ProductMissionPanel({ stage, onSnapshot, onChanged,allowSchedule
   const [evidence, setEvidence] = useState<BillEvidenceDetail | null>(null), [showRows, setShowRows] = useState(false);
   const [selectedCategory,setSelectedCategory]=useState<string|null>(null);
   const [report,setReport]=useState<BillBrief|null>(null),[revokeBatch,setRevokeBatch]=useState<string|null>(null);
+  const [reportNotice,setReportNotice]=useState('');
   const [month, setMonth] = useState('2026-10'), [balance, setBalance] = useState('7240'), [uploadEnabled, setUploadEnabled] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null), lastFocus = useRef<HTMLElement | null>(null);
-  const refresh = async () => { const result = await api<ProductMission>('/api/product/mission'); setView(result); onSnapshot?.(result.snapshot); };
+  const refresh = async () => { const result = await api<ProductMission>('/api/product/mission'); setView(result); onSnapshot?.(result.snapshot); if(report&&report.twinVersion!==result.snapshot.twinVersion){setReport(null);setReportNotice('数据已更新，旧报告已失效。当前显示最新月份；可重新选择原期间生成报告。');setShowRows(false);setEvidence(null);} };
   useEffect(() => { let live = true; api<ProductMission>('/api/product/mission').then(result => { if (live) { setView(result); setMonth(result.snapshot.clock.slice(0, 7)); } }).catch(e => live && setError(e.message)); api<{uploadEnabled:boolean}>('/api/capabilities').then(v => live && setUploadEnabled(v.uploadEnabled)).catch(() => {}); return () => { live = false; }; }, []);
   useEffect(() => { setShowRows(false); setEvidence(null); }, [stage]);
   useEffect(() => {
@@ -59,6 +61,7 @@ export function ProductMissionPanel({ stage, onSnapshot, onChanged,allowSchedule
   if (!view || !brief) return <p role="status">{error || '正在核对财务数据…'}</p>;
   return <div className="space-y-4 min-w-0 text-[13px] leading-relaxed">
     {error && <p role="alert" className="rounded-xl bg-amber-50 text-amber-900 p-3">{error}</p>}
+    {reportNotice&&<p role="status" className="mission-card">{reportNotice}<button className="mission-link block" onClick={()=>setReportNotice('')}>知道了</button></p>}
     {view.migrationNotice&&<p role="status" className="mission-card">历史版本的数据已保留，余额、目标和原始凭证保持原值。旧版转账授权已归档停止执行，请核对当前余额并重新确认安排。</p>}
     <p className="text-xs text-[#5A616B]">模拟数据 · 数据截至 {view.snapshot.clock}。历史账单不会覆盖账户余额。</p>
     {stage === 'goal' && <div className="mission-card"><h3 className="font-bold">确认旅行目标</h3><p>{view.snapshot.goal.title} · {money(view.snapshot.goal.targetCents)} · {view.snapshot.goal.targetDate} 前；已存 {money(view.snapshot.goal.savedCents)}，应急金独立。</p></div>}
@@ -82,7 +85,7 @@ export function ProductMissionPanel({ stage, onSnapshot, onChanged,allowSchedule
       {view.subscriptions.map(item=><SubscriptionCard key={item.id} item={item} actions={view.snapshot.subscriptionActions} rows={view.rows} busy={busy}
         onPrepare={()=>void prepare('subscription',item.id)} onDecision={action=>void run(()=>api(`/api/subscriptions/${item.id}/prepare`,'POST',{action}))}
         onQuery={id=>void run(()=>api(`/api/subscriptions/actions/${id}/status`,'POST',{}))} />)}
-      {view.subscriptionReminders.some(reminder=>reminder.status==='due')&&<section className="mission-card"><h3 className="font-bold">待核对的续费提醒</h3>{view.subscriptionReminders.filter(r=>r.status==='due').map(r=><p key={r.id}>{r.title} · {r.dueDate} · 仅提醒，未自动取消。</p>)}</section>}
+      <SubscriptionReminderInbox twinVersion={view.snapshot.twinVersion}/>
       {view.subscriptionDisputes.length>0&&<section className="mission-card"><h3 className="font-bold">停扣后仍有新扣费，需要核对</h3><p>这不是退款成功。请核对原交易与商户取消凭证；账户余额不会自动增加。</p>{view.subscriptionDisputes.map(dispute=><button key={dispute.id} className="mission-link block" onClick={()=>void run(async()=>setEvidence(await api<BillEvidenceDetail>(`/api/money-mission/evidence/${dispute.evidenceId}`)))}>{dispute.title} · {dispute.date} · {money(dispute.amountCents)} · 查看扣费证据</button>)}</section>}
       <div className="mission-card"><p>按已知账单和工资假设，最低可用余额 {view.forecast.minimumBalanceCents === null ? '待确认' : money(view.forecast.minimumBalanceCents)}。</p><p className="text-xs">未来工资不是保证，取消结果必须由商户验证。</p></div>
     </>}

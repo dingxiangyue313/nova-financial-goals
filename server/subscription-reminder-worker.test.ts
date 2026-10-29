@@ -1,0 +1,23 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {mkdtempSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {spawnSync} from 'node:child_process';
+import {createJapanMoneyMissionFixture} from './money-mission-fixture.ts';
+import {prepareSubscriptionAction,persistSubscriptionDecision} from './subscription-service.ts';
+process.env.NOVA_DB_PATH=join(mkdtempSync(join(tmpdir(),'nova-reminder-worker-')),'worker.sqlite');
+const store=await import('./store.ts');
+test('background tick persists one delivery, survives process restart and remains session-scoped',()=>{
+ const id=randomUUID(),other=randomUUID();let state=createJapanMoneyMissionFixture();
+ state=persistSubscriptionDecision(state,prepareSubscriptionAction(state,{subscriptionId:'cloudbox-plus',action:'remind'}).action);
+ state={...state,clock:'2026-11-04'};store.mutateState(id,()=>state);store.getState(other);
+ store.tickSubscriptionReminderQueue(new Date('2026-11-04T04:00:00Z'));
+ const first=store.getState(id);assert.equal(first.financialServices.subscriptionNotifications.length,1);assert.equal(first.financialServices.subscriptionNotifications[0].status,'delivered');
+ const auditLength=first.audit.length;store.tickSubscriptionReminderQueue(new Date('2026-11-04T04:00:00Z'));assert.equal(store.getState(id).audit.length,auditLength);
+ assert.equal(store.getState(other).financialServices.subscriptionNotifications.length,0);
+ const script=`const store=await import('./server/store.ts');store.tickSubscriptionReminderQueue(new Date('2026-11-04T04:00:00Z'));const state=store.getState('${id}');if(state.financialServices.subscriptionNotifications.length!==1||state.audit.length!==${auditLength})throw new Error('REMINDER_REPLAY');`;
+ const child=spawnSync(process.execPath,['--import','tsx','--input-type=module','-e',script],{env:{...process.env},encoding:'utf8',timeout:60000});assert.equal(child.status,0,child.stderr);
+ assert.deepEqual(store.getState(id).finance,state.finance);
+});

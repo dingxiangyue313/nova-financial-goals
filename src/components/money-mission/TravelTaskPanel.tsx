@@ -1,0 +1,13 @@
+import {useEffect,useState} from 'react';
+import type {TravelTask,TravelProof} from '../../../shared/travel-task';
+import {api} from '../../api';
+export function TravelTaskPanel({goalId,twinVersion}:{goalId:string;twinVersion:number}){
+ const [task,setTask]=useState<TravelTask|null>(null),[error,setError]=useState('');
+ useEffect(()=>{let live=true;if(!goalId)return;api<TravelTask>(`/api/services/tasks/${encodeURIComponent(goalId)}`).then(t=>{if(live){setTask(t);setError('');}}).catch(e=>live&&setError(e.message));return()=>{live=false;};},[goalId,twinVersion]);
+ async function download(){try{const proof=await api<TravelProof>(`/api/services/tasks/${encodeURIComponent(goalId)}/proof`),url=URL.createObjectURL(new Blob([JSON.stringify(proof,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='nova-travel-task-proof.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){setError(e instanceof Error?e.message:'暂时无法下载证明包');}}
+ return <details className="mission-card"><summary className="font-bold cursor-pointer py-2">旅行任务步骤与证明</summary>{error&&<p role="alert">{error}</p>}{task&&<>
+  <h2 className="font-bold">{task.goalTitle} · {({planning:'准备中',needs_attention:'需要处理',booked:'预订已确认',refund_pending:'退款在途'})[task.status]}</h2><p>目标覆盖 ¥{task.coverageCents/100} / ¥{task.targetCents/100} · 数据截至 {task.asOf}</p>
+  <ol className="space-y-3 my-3">{task.nodes.map(node=><li key={node.id} className="border-t pt-2"><h3 className="font-bold">{node.label} · {({complete:'已核对',pending:'待准备',blocked:'需先处理',unknown:'结果待核对',needs_recovery:'需要恢复'})[node.status]}</h3><p>{node.detail}</p></li>)}</ol>
+  {task.limitations.map(l=><p className="text-xs text-[#5A616B]" key={l}>{l}</p>)}<button className="mission-secondary" onClick={()=>void download()}>下载旅行任务证明包</button>
+ </>}</details>;
+}

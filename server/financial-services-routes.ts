@@ -5,6 +5,10 @@ import { createAgentAction, createAgentThread, finishAgentAction, getAgentAction
 import { appendAuditEvent, createApprovalSnapshot, confirmApproval, consumeApproval } from './governance.ts';
 import { collectSplit, describeServiceAction, executeServiceAction, financialServicesView, reconcileServices, requestTravelQuotes,initializeServices } from './financial-services.ts';
 import {buildGoalPortfolio} from './goal-portfolio.ts';
+import {investmentProducts} from './financial-services.ts';
+import {compareInvestments} from './investment-matching.ts';
+import {travelTask,travelProof} from './travel-task.ts';
+import {tickSubscriptionNotifications,decideSubscriptionNotification} from './subscription-notifications.ts';
 import { containsPromptInjection } from './security.ts';
 import { listSkillDefinitions } from './skills/registry.ts';
 import { executeMoneyMissionSkill } from './skills/core-skills.ts';
@@ -12,8 +16,21 @@ import {serviceCasePack} from './service-monitor.ts';
 import {buildMandateDraft} from './mandate-draft.ts';
 
 export function registerFinancialServices(app:Express,sessionId:(req:Request,res:Response)=>string,route:(fn:(req:Request,res:Response)=>unknown)=>RequestHandler){
+  app.get('/api/services/subscription-reminders',route((req,res)=>{
+    const state=mutateState(sessionId(req,res),s=>tickSubscriptionNotifications(s));res.json({items:state.financialServices.subscriptionNotifications.filter(n=>n.status!=='cancelled'),asOf:state.clock});
+  }));
+  app.post('/api/services/subscription-reminders/:id',route((req,res)=>{
+    const body=z.object({action:z.enum(['read','snooze']),until:z.iso.date().optional()}).strict().parse(req.body);
+    const state=mutateState(sessionId(req,res),s=>decideSubscriptionNotification(s,req.params.id,body.action,body.until));res.json({items:state.financialServices.subscriptionNotifications.filter(n=>n.status!=='cancelled'),asOf:state.clock});
+  }));
+  app.get('/api/services/tasks/:goalId',route((req,res)=>res.json(travelTask(initializeServices(getState(sessionId(req,res))),req.params.goalId))));
+  app.get('/api/services/tasks/:goalId/proof',route((req,res)=>res.json(travelProof(initializeServices(getState(sessionId(req,res))),req.params.goalId))));
   app.get('/api/services/cases/:id',route((req,res)=>res.json(serviceCasePack(getState(sessionId(req,res)),req.params.id))));
   app.get('/api/services/portfolio',route((req,res)=>res.json(buildGoalPortfolio(initializeServices(getState(sessionId(req,res)))))));
+  app.post('/api/services/investments/compare',route((req,res)=>{
+    const {amountCents}=z.object({amountCents:z.number().int().positive().max(100000000)}).strict().parse(req.body);
+    res.json(compareInvestments(getState(sessionId(req,res)),investmentProducts,amountCents));
+  }));
   app.post('/api/services/mandate-draft',route((req,res)=>{
     const input=z.object({message:z.string().trim().min(1).max(1000)}).strict().parse(req.body);
     res.json(buildMandateDraft(input.message));

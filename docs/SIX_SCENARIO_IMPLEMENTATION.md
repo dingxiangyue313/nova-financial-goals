@@ -44,6 +44,8 @@ Registry 现在是 13 项。新增联系人与 AA、投资生命周期、卡片�
 
 ## 验证入口
 
+2026-10-29 新增续作：版本化多目标合同及共享日期现金流已完成3尺寸和414项全量验收；其后新增完整理财问卷/比较、卡片补发与未知恢复、旅行步骤证明、本地订阅提醒后台队列。对应最新日志与剩余限制统一见 `DEVELOPMENT_CHECKPOINT.md`，下方390项为历史基线，不代表最新数量。
+
 截至 2026-10-28：最新全量服务端回归 **390/390 通过**（独立临时数据库、逐文件串行）；类型检查与生产构建通过，入口 JS 约 **482.4 KB**。浏览器整轮 110/111，其中非 PWA **99/99 通过**；唯一 PWA 安装等待超时修复后，全部 PWA 三尺寸专项 **12/12 通过**。当前 111 个独立浏览器用例都有通过证据，但不将失败的原整轮日志改写成 111/111。日志为 `artifacts/resume-full-browser.log`、`resume-server-serial.log`、`resume-pwa-serial.log`。
 
 `npm run lint`；`npm test`；`npm run build`；`npm run test:e2e`；`npm run eval:money-mission`。

@@ -13,6 +13,7 @@ import { AgentComponentSchema, AgentMessageSchema, AgentTaskConstraintsSchema, A
   type TransferExecution, type DemoState, type GoalDraft } from '../shared/contracts.ts';
 import { createFirstUseFixture } from './fixtures.ts';
 import { reconcileServices, validateServiceBalances } from './financial-services.ts';
+import {tickSubscriptionNotifications} from './subscription-notifications.ts';
 import { migrateLegacyProduct } from './legacy-product-migration.ts';
 import { inspectEvidence } from './bill-analysis.ts';
 
@@ -1135,6 +1136,11 @@ export function tickFinancialServices() {
     OR EXISTS(SELECT 1 FROM json_each(state_json,'$.financialServices.bookings') WHERE json_extract(value,'$.status') = 'refund_pending' AND json_extract(value,'$.refundOn') <= json_extract(state_json,'$.clock')) LIMIT 100`).all() as Array<{id:string}>;
   for (const session of sessions) mutateState(session.id, s => reconcileServices(s));
   return sessions.length;
+}
+export function tickSubscriptionReminderQueue(now=new Date()){
+ const sessions=db.prepare(`SELECT id FROM demo_sessions WHERE EXISTS(SELECT 1 FROM json_each(state_json,'$.subscriptionActions') WHERE json_extract(value,'$.action')='remind') ORDER BY updated_at LIMIT 100`).all() as Array<{id:string}>;
+ for(const session of sessions)mutateState(session.id,state=>tickSubscriptionNotifications(state,now));
+ return sessions.length;
 }
 
 export interface MonitorEvent {
