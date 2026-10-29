@@ -16,7 +16,7 @@
 | B-A02 | 已有证据 | statement-import.test.ts / bill-analysis.test.ts：去重/退款/互转/纠错 |
 | B-A03 | 已有证据 | bill-analysis.test.ts：月/年/YTD/部分覆盖，ProductMissionPanel 可切换 |
 | B-A04 | 部分 | 基线异常与证据可下钻；跨期完整调查引导和全部误报评测待补 |
-| B-A05 | 部分 | 分类修正和报告重算已接入；所有旧报告显式失效标识待统一 |
+| B-A05 | 已有证据（支出变化） | 分类更正与旧报告失效；bill-review.test.ts/三尺寸：反馈按精确证据保存，变化后失效、事实保留、余额不改；其他异常类别仍待扩大评测 |
 | B-A06 | 已有证据 | statement-import.test.ts：批次撤销、其他批次与现金不变 |
 | B-A07 | 已有证据 | http.test.ts / statement-parser.test.ts：会话与不可信文字 |
 | B-A08 | 已有证据 | 产品 prepare/confirm 分离，取消选择无金融写操作 |

@@ -1,3 +1,4 @@
+import {billInvestigation,reviewBillChange} from './bill-review.ts';
 import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
@@ -151,6 +152,8 @@ app.post('/api/money-mission/transfer-schedules/:id/action', route((req, res) =>
 app.get('/api/money-mission/transfer-schedules/:id/status', route((req, res) => {
   res.json({ schedule: getTransferScheduleStatus(getState(sessionId(req, res)), req.params.id) });
 }));
+app.post('/api/product/bill-investigation',route((req,res)=>{res.setHeader('Cache-Control','no-store');res.json(billInvestigation(getState(sessionId(req,res)),req.body));}));
+app.post('/api/product/bill-review',route((req,res)=>{const state=mutateState(sessionId(req,res),s=>reviewBillChange(s,req.body));res.json({twinVersion:state.twinVersion});}));
 app.post('/api/money-mission/bill-brief', route((req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json(buildBillBrief(getState(sessionId(req, res)), BillPeriodInputSchema.parse(req.body)));

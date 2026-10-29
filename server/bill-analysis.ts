@@ -118,7 +118,7 @@ export function buildBillBrief(state: DemoState, input: { periodStart: string; p
       const now = accounting(current).filter(row => categoryOf(row) === category);
       const baselineCents = Math.max(0, Math.round(net(baseline) / baselineMonths.length * width));
       const currentCents = Math.max(0, net(now));
-      changes.push({ category, baselineCents, currentCents, increaseCents: currentCents - baselineCents,
+      changes.push({ category, baselineStart:monthName(historyStart)+'-01',baselineEnd:new Date(Date.UTC(Number(periodStart.slice(0,4)),Number(periodStart.slice(5,7))-1,0)).toISOString().slice(0,10), baselineCents, currentCents, increaseCents: currentCents - baselineCents,
         ...metadata([...baseline, ...now], ['基线取已提供的连续历史月份月均支出，按报告月份数计算；不是预测']) });
     }
   }

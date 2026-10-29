@@ -338,7 +338,7 @@ export const BillBriefSchema = z.object({
   categories: z.array(z.object({ category: z.string(), amountCents: MoneySchema, transactionCount: CountSchema,
     sourceRefs: SourceRefsSchema, dataAsOf: IsoDateSchema.optional(), confidence: ConfidenceSchema.optional(),
     limitations: z.array(z.string()).optional() })),
-  changes: z.array(z.object({ category: z.string(), baselineCents: MoneySchema, currentCents: MoneySchema,
+  changes: z.array(z.object({ category: z.string(), baselineStart:IsoDateSchema.optional(),baselineEnd:IsoDateSchema.optional(), baselineCents: MoneySchema, currentCents: MoneySchema,
     increaseCents: z.number().int(), confidence: ConfidenceSchema, sourceRefs: SourceRefsSchema,
     dataAsOf: IsoDateSchema.optional(), limitations: z.array(z.string()).optional() })),
   subscriptionCandidates: z.array(z.object({ subscriptionId: ArtifactIdSchema.nullable(), merchantId: ArtifactIdSchema,
@@ -602,7 +602,11 @@ export const MoneyMissionDecisionContextSchema = z.object({
 }).strict();
 export type MoneyMissionDecisionContext = z.infer<typeof MoneyMissionDecisionContextSchema>;
 
+export const BillReviewSchema=z.object({id:z.string(),fingerprint:z.string(),periodStart:IsoDateSchema,periodEnd:IsoDateSchema,category:z.string(),decision:z.enum(['expected','unrecognized','later']),sourceRefs:z.array(z.string()),reviewedOn:IsoDateSchema}).strict();
+export const BillReviewInputSchema=BillPeriodInputSchema.extend({fingerprint:z.string().min(1).max(64),decision:z.enum(['expected','unrecognized','later']),expectedTwinVersion:z.number().int().positive()}).strict();
+export type BillReview=z.infer<typeof BillReviewSchema>;
 const MoneyMissionArtifactCollections = {
+  billReviews:z.array(BillReviewSchema).default([]),
   accountSnapshots: z.array(AccountSnapshotSchema).default([]),
   statementImportBatches: z.array(StatementImportBatchSchema).default([]),
   importIssues: z.array(ImportIssueSchema).default([]),
