@@ -5,7 +5,7 @@
 | ID | 状态 | 实现/证据与剩余边界 |
 | --- | --- | --- |
 | T-A01 | 已有证据 | financial-services.test.ts / financial-services-http.test.ts：联系人与转账凭证 |
-| T-A02 | 部分 | 显式选择、尾号/备注/版本；独立未核验身份状态待实现 |
+| T-A02 | 已有证据（合成资料） | recipient-identity.test.ts及三尺寸：同名/尾号/备注、独立待核对、准确尾号确认、版本失效、转账/AA共同检查；不代表银行实名核验 |
 | T-A03 | 部分 | transfer-schedules.test.ts / transfer-worker.test.ts；消费者任意指定日编辑待补 |
 | T-A04 | 已有证据 | split-planner.test.ts：余分、自定义总额、已垫付不再扣 |
 | T-A05 | 部分 | 部分/重复/关闭有领域测试，逾期可见；12 个完整画像/协商未齐 |

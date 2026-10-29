@@ -1,3 +1,4 @@
+import {recipientReady} from '../shared/recipient-identity.ts';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import {serviceIssues} from './service-monitor.ts';
 import { ServiceActionSchema } from '../shared/financial-services.ts';
@@ -32,7 +33,7 @@ export function initializeServices(input: DemoState): DemoState {
   const s = structuredClone(input), d = s.financialServices;
   if (d.initialized) return s;
   d.initialized = true;
-  d.recipients = [{ id: 'self', name: '我', phone: '', alias: '本人', suffix: '自己', version: 1 }, ...Array.from({ length: 20 }, (_, i) => ({ id: `contact-${i+1}`, name: ['小林','小陈','小王','小林','Alex'][i%5], phone: `1990000${1001+i}`, alias: `${i%2 ? '同行朋友' : '同事'} ${i+1}`, suffix: String(1001+i), version: 1 }))];
+  d.recipients = [{ id: 'self', name: '我', phone: '', alias: '本人', suffix: '自己', version: 1 }, ...Array.from({ length: 20 }, (_, i) => ({ id: `contact-${i+1}`, name: ['小林','小陈','小王','小林','Alex'][i%5], phone: `1990000${1001+i}`, alias: `${i%2 ? '同行朋友' : '同事'} ${i+1}`, suffix: String(1001+i), version: 1,identityStatus:(i%5===3?'needs_review':'verified') as 'needs_review'|'verified',...(i%5===3?{}:{verifiedVersion:1}) }))];
   d.cards = [{ id:'card-main',label:'日常借记卡',suffix:'1001',type:'debit',accountId:'checking',status:'active',online:true,overseas:false,limitCents:500000,version:1 },{ id:'card-travel',label:'旅行借记卡',suffix:'2002',type:'debit',accountId:'goal-wallet',status:'active',online:false,overseas:false,limitCents:500000,version:1 },{ id:'card-credit',label:'日常信用卡',suffix:'3003',type:'credit',accountId:'checking',status:'active',online:true,overseas:false,limitCents:1000000,version:1 }];
   const wallet = s.accounts.find(a => a.id === 'goal-wallet');
   if (wallet) d.allocations.push({ goalId:s.goal.id,accountId:wallet.id,amountCents:wallet.balanceCents });
@@ -91,6 +92,8 @@ export function describeServiceAction(input:DemoState,raw:unknown,now=Date.now()
   const state=initializeServices(input),action=ServiceActionSchema.parse(raw),d=state.financialServices;
   let label='',amountCents=0;let details:Record<string,unknown>={};
   switch(action.kind){
+    case 'verify_recipient':case 'review_recipient':{const r=d.recipients.find(r=>r.id===action.id&&r.id!=='self');if(!r||r.version!==action.expectedVersion)throw new Error('SERVICE_RECIPIENT_CHANGED');if(action.kind==='verify_recipient'&&r.suffix!==action.suffix)throw new Error('SERVICE_RECIPIENT_SUFFIX_MISMATCH');details={recipientId:r.id,recipientVersion:r.version};label=action.kind==='verify_recipient'?`核对合成联系人${r.name}（${r.alias}，尾号${r.suffix}），仅保存本版本的用户核对记录；不是银行实名验证，不会转账或创建AA。`:`将${r.name}（${r.alias}，尾号${r.suffix}）标记为需重新核对；新转账与AA将暂停准备，既有付款结果仍按原操作查询。`;break;}
+
     case 'investment_questionnaire':{
       if(action.answers.useByDate<=state.clock)throw new Error('SERVICE_USE_DATE_PASSED');
       const level=investmentRiskLevel(action.answers);details={level,answers:action.answers,expiresOn:shift(state.clock,180)};
@@ -109,10 +112,11 @@ export function describeServiceAction(input:DemoState,raw:unknown,now=Date.now()
       for(const change of option.changes)changedGoalContract(state,portfolioRepairTerms(state,change));
       details={option,changes:option.changes};label=`采用「${option.label}」，调整${option.changedGoals}个目标。日期试算最低余额¥${option.minimumBalanceCents/100}（${option.minimumBalanceDate}）。只修改下列目标约束并暂停关联转账计划；没有转账、申购或新增付款授权，未来工资与预测不是保证。`;break;
     }
-    case 'transfer':{const r=d.recipients.find(r=>r.id===action.recipientId&&r.id!=='self');if(!r||r.version!==action.recipientVersion)throw new Error('SERVICE_RECIPIENT_CHANGED');requireFunds(state,action.accountId,action.amountCents);amountCents=action.amountCents;details={recipient:r,feesCents:0};label=`向${r.name}（尾号${r.suffix}，${r.alias}）转入¥${amountCents/100}，手续费¥0。备注只作说明。`;break;}
+    case 'transfer':{const r=d.recipients.find(r=>r.id===action.recipientId&&r.id!=='self');if(!r||r.version!==action.recipientVersion)throw new Error('SERVICE_RECIPIENT_CHANGED');if(!recipientReady(r))throw new Error('SERVICE_RECIPIENT_REVIEW_REQUIRED');requireFunds(state,action.accountId,action.amountCents);amountCents=action.amountCents;details={recipient:r,feesCents:0};label=`向${r.name}（尾号${r.suffix}，${r.alias}）转入¥${amountCents/100}，手续费¥0。备注只作说明。`;break;}
     case 'split':{
       const ids=action.participantIds,payerId=action.payerId??'self';
       if(new Set(ids).size!==ids.length||!ids.includes('self')||!ids.includes(payerId)||ids.some(id=>!d.recipients.some(r=>r.id===id)))throw new Error('SERVICE_INVALID_SPLIT');
+      if(ids.some(id=>!recipientReady(d.recipients.find(r=>r.id===id)!)))throw new Error('SERVICE_RECIPIENT_REVIEW_REQUIRED');
       if(action.dueDate<state.clock)throw new Error('SERVICE_SPLIT_DATE_PASSED');
       if(payerId!=='self'&&!action.alreadyPaid)throw new Error('SERVICE_OTHER_PAYER_NOT_PAID');
       const base=Math.floor(action.totalCents/ids.length),extra=action.totalCents%ids.length;
@@ -120,7 +124,7 @@ export function describeServiceAction(input:DemoState,raw:unknown,now=Date.now()
       if(shares.length!==ids.length||new Set(shares.map(s=>s.recipientId)).size!==ids.length||shares.some(s=>!ids.includes(s.recipientId))||shares.reduce((sum,s)=>sum+BigInt(s.amountCents),0n)!==BigInt(action.totalCents))throw new Error('SERVICE_SPLIT_SHARES_MISMATCH');
       account(state,action.accountId);if(!action.alreadyPaid)requireFunds(state,action.accountId,action.totalCents);
       amountCents=action.alreadyPaid?0:action.totalCents;
-      details={payer:d.recipients.find(r=>r.id===payerId),shares:ids.map(id=>{const share=shares.find(s=>s.recipientId===id)!;return {...share,collectedCents:id===payerId?share.amountCents:0};})};
+      details={payer:d.recipients.find(r=>r.id===payerId),recipientVersions:ids.map(id=>{const r=d.recipients.find(r=>r.id===id)!;return {id:r.id,version:r.version,suffix:r.suffix};}),shares:ids.map(id=>{const share=shares.find(s=>s.recipientId===id)!;return {...share,collectedCents:id===payerId?share.amountCents:0};})};
       label=`总额¥${action.totalCents/100}，${ids.length}人AA。${payerId!=='self'?'同行已垫付，本次只登记本人应付款；不会代同行收款或增加你的余额。':action.alreadyPaid?'你声明已经垫付，本次仅创建模拟收款请求，不再扣款。':'本次先垫付全额，再创建收款请求。'}待收不计入余额。`;break;
     }
     case 'pay_split_share':{
@@ -128,7 +132,7 @@ export function describeServiceAction(input:DemoState,raw:unknown,now=Date.now()
       if(!split||!['open','partial'].includes(split.status)||!split.payerId||split.payerId==='self'||!own||own.collectedCents>=own.amountCents)throw new Error('SERVICE_SPLIT_NOT_PAYABLE');
       if(d.receipts.some(r=>r.kind==='pay_split_share'&&r.status==='unknown'&&d.events.includes(`split-share-target:${r.operationId}:${split.id}`)))throw new Error('SERVICE_SPLIT_STATUS_REQUIRED');
       amountCents=own.amountCents-own.collectedCents;requireFunds(state,action.accountId,amountCents);
-      const payer=d.recipients.find(r=>r.id===split.payerId);if(!payer)throw new Error('SERVICE_RECIPIENT_CHANGED');
+      const payer=d.recipients.find(r=>r.id===split.payerId);if(!payer)throw new Error('SERVICE_RECIPIENT_CHANGED');if(!recipientReady(payer))throw new Error('SERVICE_RECIPIENT_REVIEW_REQUIRED');
       details={payer,splitId:split.id};label=`向垫付人${payer.name}（尾号${payer.suffix}，${payer.alias}）支付本人AA份额¥${amountCents/100}，来源${action.accountId}，手续费¥0。其他人的欠款不会由你支付。`;break;
     }
     case 'close_split':if(!d.splits.some(s=>s.id===action.id&&['open','partial'].includes(s.status)))throw new Error('SERVICE_SPLIT_NOT_OPEN');if(d.receipts.some(r=>r.kind==='pay_split_share'&&r.status==='unknown'&&d.events.includes(`split-share-target:${r.operationId}:${action.id}`)))throw new Error('SERVICE_SPLIT_STATUS_REQUIRED');label='关闭剩余收款请求，已收款和凭证保留；不撤销已经结算的本人付款。';break;
@@ -173,6 +177,8 @@ export function executeServiceAction(input:DemoState,raw:unknown,operationId:str
   const preview=describeServiceAction(input,raw,now),s=preview.state,d=s.financialServices,a=preview.action;
   let status:'succeeded'|'pending'|'failed'|'unknown'='succeeded';const fault=d.fault;d.fault='none';
   switch(a.kind){
+    case 'verify_recipient':case 'review_recipient':{const r=d.recipients.find(r=>r.id===a.id)!;r.version++;r.identityStatus=a.kind==='verify_recipient'?'verified':'needs_review';r.verifiedVersion=a.kind==='verify_recipient'?r.version:undefined;break;}
+
     case 'investment_questionnaire':d.risk={level:investmentRiskLevel(a.answers),tolerateLoss:investmentRiskLevel(a.answers)>0,useByDate:a.answers.useByDate,expiresOn:shift(s.clock,180),answers:a.answers};break;
     case 'goal_contract':Object.assign(s,applyGoalContract(s,GoalContractSchema.parse(preview.details.after)));break;
     case 'portfolio_repair':{

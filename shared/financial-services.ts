@@ -4,6 +4,8 @@ import {InvestmentAnswersSchema} from './investment-profile.ts';
 const money = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const quantity = z.string().regex(/^\d+$/);
 export const ServiceActionSchema = z.discriminatedUnion('kind', [
+  z.object({kind:z.literal('verify_recipient'),id:z.string(),expectedVersion:z.number().int().positive(),suffix:z.string().regex(/^\d{4}$/),acknowledged:z.literal(true)}).strict(),
+  z.object({kind:z.literal('review_recipient'),id:z.string(),expectedVersion:z.number().int().positive()}).strict(),
   GoalContractChangeSchema.extend({kind:z.literal('goal_contract')}).strict(),
   z.object({kind:z.literal('portfolio_repair'),optionId:z.string().min(1),expectedTwinVersion:z.number().int().positive()}).strict(),
   z.object({ kind: z.literal('transfer'), recipientId: z.string(), recipientVersion: z.number().int(), accountId: z.string(), amountCents: money.positive(), note: z.string().max(120).default('') }).strict(),
@@ -35,7 +37,7 @@ export const FinancialServicesSchema = z.object({
   goalContracts:z.array(GoalContractSchema).default([]),
   initialized: z.boolean().default(false),
   risk: z.object({ level: z.number().int(), tolerateLoss: z.boolean(), useByDate: z.iso.date(), expiresOn: z.iso.date(),answers:InvestmentAnswersSchema.optional() }).nullable().default(null),
-  recipients: z.array(z.object({ id: z.string(), name: z.string(), phone: z.string(), alias: z.string(), suffix: z.string(), version: z.number().int() })).default([]),
+  recipients: z.array(z.object({ id: z.string(), name: z.string(), phone: z.string(), alias: z.string(), suffix: z.string(), version: z.number().int(),identityStatus:z.enum(['verified','needs_review']).optional(),verifiedVersion:z.number().int().positive().optional() })).default([]),
   holds: z.array(z.object({ id: z.string(), operationId: z.string(), accountId: z.string(), goalId: z.string().nullable(), amountCents: money, status: z.enum(['active','consumed','released']) })).default([]),
   allocations: z.array(z.object({ goalId: z.string(), accountId: z.string(), amountCents: money })).default([]),
   journals: z.array(z.object({ id: z.string(), eventId: z.string(), operationId: z.string(), accountId: z.string(), amountCents: z.number().int(), date: z.iso.date(), reason: z.string() })).default([]),
