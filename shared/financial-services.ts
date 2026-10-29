@@ -1,7 +1,10 @@
 import { z } from 'zod';
+import {GoalContractSchema,GoalContractChangeSchema} from './goal-contract.ts';
 const money = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const quantity = z.string().regex(/^\d+$/);
 export const ServiceActionSchema = z.discriminatedUnion('kind', [
+  GoalContractChangeSchema.extend({kind:z.literal('goal_contract')}).strict(),
+  z.object({kind:z.literal('portfolio_repair'),optionId:z.string().min(1),expectedTwinVersion:z.number().int().positive()}).strict(),
   z.object({ kind: z.literal('transfer'), recipientId: z.string(), recipientVersion: z.number().int(), accountId: z.string(), amountCents: money.positive(), note: z.string().max(120).default('') }).strict(),
   z.object({ kind: z.literal('split'), totalCents: money.positive(), participantIds: z.array(z.string()).min(2).max(20), accountId: z.string(), alreadyPaid: z.boolean(), dueDate: z.iso.date(), payerId:z.string().optional(), shares:z.array(z.object({recipientId:z.string(),amountCents:money}).strict()).min(2).max(20).optional() }).strict(),
   z.object({ kind: z.literal('pay_split_share'), id: z.string(), accountId:z.string() }).strict(),
@@ -22,6 +25,7 @@ export const MandateDraftSchema=z.object({provider:z.literal('deterministic'),st
   missing:z.array(z.string()),explanation:z.string(),draft:z.object({merchants:z.array(z.enum(['air-demo','stay-demo'])).min(1),maxPerOrderCents:money.positive(),totalCents:money.positive(),expiresOn:z.iso.date()}).nullable()}).strict();
 export type MandateDraft=z.infer<typeof MandateDraftSchema>;
 export const FinancialServicesSchema = z.object({
+  goalContracts:z.array(GoalContractSchema).default([]),
   initialized: z.boolean().default(false),
   risk: z.object({ level: z.number().int(), tolerateLoss: z.boolean(), useByDate: z.iso.date(), expiresOn: z.iso.date() }).nullable().default(null),
   recipients: z.array(z.object({ id: z.string(), name: z.string(), phone: z.string(), alias: z.string(), suffix: z.string(), version: z.number().int() })).default([]),

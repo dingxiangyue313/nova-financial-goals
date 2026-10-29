@@ -10,6 +10,7 @@ import type {
   WeeklyRiskSummary,
 } from '../shared/contracts.ts';
 import { assessGoal } from './domain.ts';
+import {protectedCheckingReserve} from './financial-constraints.ts';
 
 const DAY = 86_400_000;
 export const RISK_RULE_VERSION = 'goal-aware-v1';
@@ -269,6 +270,10 @@ export function decideAgentRequest(state: DemoState, request: AgentRiskRequest):
     return result('block', 'MANDATE_MISSING_OR_EXPIRED', '授权缺失或已过期。');
   if (request.amountCents > state.finance.checkingCents)
     return result('block', 'INSUFFICIENT_BALANCE', '模拟活期余额不足；应急金保持隔离。');
+  if(state.finance.checkingCents-request.amountCents<protectedCheckingReserve(state))
+    return result('block','PROTECTED_FUNDS_UNAVAILABLE','这笔支出会触碰其他目标同样要求保留的保护底线。');
+  if(state.financialServices.goalContracts.find(c=>c.goalId===(mandate.goalId??state.goal.id))?.allowPayments===false)
+    return result('block','GOAL_PAYMENT_NOT_ALLOWED','此目标约束不允许新付款，需要明确修改后再核对。');
   if (request.amountCents > mandate.maxPerOperationCents
       || mandate.spentCents + request.amountCents > mandate.totalLimitCents)
     return result('block', 'MANDATE_LIMIT_EXCEEDED', '请求超出授权额度。');

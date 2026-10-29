@@ -1,6 +1,7 @@
 import type { DemoState, Mandate, Operation, Receipt } from '../shared/contracts.ts';
 import { appendAuditEvent, stableHash } from './governance.ts';
 import { decideAgentRequest } from './risk.ts';
+import {protectedCheckingReserve} from './financial-constraints.ts';
 
 export interface ExternalRequest {
   agentId: string; category: string; amountCents: number; idempotencyKey: string;
@@ -99,6 +100,8 @@ export function approveOperation(state: DemoState, operationId: string, verifica
   if (operation.status !== 'ask' && operation.status !== 'manual_review') throw new Error('OPERATION_NOT_APPROVABLE');
   if (operation.status === 'manual_review' && verification !== 'platform') throw new Error('USER_VERIFICATION_REQUIRED');
   if (operation.amountCents > state.finance.checkingCents) throw new Error('INSUFFICIENT_BALANCE');
+  if(state.finance.checkingCents-operation.amountCents<protectedCheckingReserve(state))throw new Error('PROTECTED_FUNDS_UNAVAILABLE');
+  if(state.financialServices.goalContracts.find(c=>c.goalId===(state.mandate?.goalId??state.goal.id))?.allowPayments===false)throw new Error('GOAL_PAYMENT_NOT_ALLOWED');
   if (!state.mandate || !state.mandate.active || state.mandate.expiresAt < state.clock) throw new Error('MANDATE_EXPIRED');
   if (operation.mandateId !== state.mandate.id || state.mandate.goalId !== state.goal.id ||
       operation.agentId !== 'travel-agent-demo' || state.goal.status !== 'active') throw new Error('MANDATE_CHANGED');

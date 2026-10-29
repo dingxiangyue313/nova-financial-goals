@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { ServiceActionSchema } from '../shared/financial-services.ts';
 import { createAgentAction, createAgentThread, finishAgentAction, getAgentAction, getState, mutateState } from './store.ts';
 import { appendAuditEvent, createApprovalSnapshot, confirmApproval, consumeApproval } from './governance.ts';
-import { collectSplit, describeServiceAction, executeServiceAction, financialServicesView, reconcileServices, requestTravelQuotes } from './financial-services.ts';
+import { collectSplit, describeServiceAction, executeServiceAction, financialServicesView, reconcileServices, requestTravelQuotes,initializeServices } from './financial-services.ts';
+import {buildGoalPortfolio} from './goal-portfolio.ts';
 import { containsPromptInjection } from './security.ts';
 import { listSkillDefinitions } from './skills/registry.ts';
 import { executeMoneyMissionSkill } from './skills/core-skills.ts';
@@ -12,6 +13,7 @@ import {buildMandateDraft} from './mandate-draft.ts';
 
 export function registerFinancialServices(app:Express,sessionId:(req:Request,res:Response)=>string,route:(fn:(req:Request,res:Response)=>unknown)=>RequestHandler){
   app.get('/api/services/cases/:id',route((req,res)=>res.json(serviceCasePack(getState(sessionId(req,res)),req.params.id))));
+  app.get('/api/services/portfolio',route((req,res)=>res.json(buildGoalPortfolio(initializeServices(getState(sessionId(req,res)))))));
   app.post('/api/services/mandate-draft',route((req,res)=>{
     const input=z.object({message:z.string().trim().min(1).max(1000)}).strict().parse(req.body);
     res.json(buildMandateDraft(input.message));

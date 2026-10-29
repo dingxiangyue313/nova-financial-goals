@@ -66,5 +66,17 @@ test('consumer financial confirmations isolate sessions, reject stale approvals 
     const afterServices=await (await call('/api/services')).json();
     assert.deepEqual(afterServices.accounts,beforeServices.accounts);
     assert.notEqual((await call('/api/product/goals',{title:'过期重放',targetCents:1200000,targetDate:'2027-06-30',protectedCents:2000000,expectedTwinVersion:beforeGoal.twinVersion})).status,200);
+    const portfolio=await (await call('/api/services/portfolio')).json();
+    const contract=portfolio.contracts.find((c:{goalId:string})=>c.goalId===created.primaryGoal.id);
+    const {revision,updatedAt:_updatedAt,requiredChecks:_checks,protectedAccountIds:_protected,...terms}=contract;
+    const contractInput={...terms,kind:'goal_contract',expectedRevision:revision,priority:1,targetCents:1300000};
+    const contractResponse=await call('/api/services/prepare',contractInput);assert.equal(contractResponse.status,200);
+    const preparedContract=await contractResponse.json();
+    assert.notEqual((await call('/api/services/confirm',{actionId:preparedContract.confirmation.actionId,decision:'confirm'},b)).status,200);
+    const preConfirm=await (await call('/api/session')).json();assert.equal(preConfirm.primaryGoal.targetCents,1200000);
+    const confirmedContract=await call('/api/services/confirm',{actionId:preparedContract.confirmation.actionId,decision:'confirm'});assert.equal(confirmedContract.status,200);
+    const contractState=await (await call('/api/session')).json();assert.equal(contractState.primaryGoal.targetCents,1300000);assert.equal(contractState.primaryGoal.status,'draft');
+    assert.deepEqual(contractState.accounts,preConfirm.accounts);assert.deepEqual(contractState.finance,preConfirm.finance);
+    assert.notEqual((await call('/api/services/prepare',contractInput)).status,200);
   } finally {child.kill();await new Promise<void>(resolve=>{if(child.exitCode!==null)resolve();else child.once('exit',()=>resolve());});rmSync(directory,{recursive:true,force:true});}
 });

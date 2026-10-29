@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import {protectedCheckingReserve} from './financial-constraints.ts';
 import { DatedCashflowForecastInputSchema, SubscriptionActionInputSchema, SubscriptionCancellationInputSchema, TransferScheduleInputSchema, type DemoState, type Operation,
   type Receipt, type ToolRecord } from '../shared/contracts.ts';
 import { executeSubscriptionCancellation, persistSubscriptionDecision, prepareSubscriptionAction, reconcileSubscriptionCancellation } from './subscription-service.ts';
@@ -291,8 +292,9 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       if (input.snapshotId && input.snapshotId !== financialTwin(state).snapshotId) throw new Error('TWIN_VERSION_CHANGED');
       const source = input.sourceAccountId ? account(state, input.sourceAccountId) : null;
       const amount = input.amountCents ?? 0;
-      return { state, result: { allowed: !source?.protected && (!source || source.balanceCents >= amount),
-        protectedFundsIntact: !source?.protected, balanceAfterCents: source ? source.balanceCents - amount : null } };
+      const protectedFundsIntact=!source?.protected&&(!source||source.type!=='checking'||source.balanceCents-amount>=protectedCheckingReserve(state));
+      return { state, result: { allowed: protectedFundsIntact && (!source || source.balanceCents >= amount),
+        protectedFundsIntact, balanceAfterCents: source ? source.balanceCents - amount : null } };
     }
     case 'prepare_transfer': {
       const source = account(state, input.sourceAccountId);
@@ -300,6 +302,7 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       if (source.protected) throw new Error('PROTECTED_ACCOUNT');
       if (source.currency !== destination.currency) throw new Error('CURRENCY_MISMATCH_USE_FX');
       if (source.balanceCents < input.amountCents) throw new Error('INSUFFICIENT_BALANCE');
+      if(source.type==='checking'&&source.balanceCents-input.amountCents<protectedCheckingReserve(state))throw new Error('PROTECTED_FUNDS_UNAVAILABLE');
       const item: ToolRecord = { id: randomUUID(), kind: 'transfer_draft', status: 'prepared', expiresAt: null,
         data: { ...input, twinVersion: state.twinVersion, snapshotId: financialTwin(state).snapshotId } };
       const next = appendAuditEvent(record(state, item), 'transfer_prepared', 'prepared', '模拟转账草案已生成');
@@ -317,6 +320,7 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       const source = account(next, sourceId), destination = account(next, destinationId);
       if (source.protected) throw new Error('PROTECTED_ACCOUNT');
       if (source.balanceCents < amountCents) throw new Error('INSUFFICIENT_BALANCE');
+      if(source.type==='checking'&&source.balanceCents-amountCents<protectedCheckingReserve(next))throw new Error('PROTECTED_FUNDS_UNAVAILABLE');
       next = { ...next, twinVersion: next.twinVersion + 1,
         accounts: next.accounts.map(item => item.id === sourceId ? { ...item, balanceCents: item.balanceCents - amountCents }
           : item.id === destinationId ? { ...item, balanceCents: item.balanceCents + amountCents } : item),

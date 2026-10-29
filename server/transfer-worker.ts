@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import {protectedCheckingReserve} from './financial-constraints.ts';
 import { TransferScheduleInputSchema, type DemoState, type Transaction, type TransferExecution,
   type TransferSchedule, type TransferScheduleInput } from '../shared/contracts.ts';
 import { runBankingTool } from './banking.ts';
@@ -116,7 +117,7 @@ function evaluate(sessionId: string, state: DemoState, scheduleId: string, perio
       destination.protected || source.currency !== schedule.currency || destination.currency !== schedule.currency)
       throw new Error('SCHEDULE_ACCOUNT_CHANGED');
     if (Math.min(source.balanceCents, state.finance.checkingCents) < schedule.amountCents) throw new Error('INSUFFICIENT_BALANCE');
-    if (source.balanceCents - schedule.amountCents < Math.max(0, state.goal.protectedCents - state.finance.emergencyCents))
+    if (source.balanceCents - schedule.amountCents < protectedCheckingReserve(state))
       throw new Error('PROTECTED_FUNDS_UNAVAILABLE');
     if (state.clock !== date || ![source, destination].every(account => state.accountSnapshots.some(item =>
       item.accountId === account.id && item.asOf === date && item.currency === account.currency &&
@@ -136,7 +137,7 @@ function evaluate(sessionId: string, state: DemoState, scheduleId: string, perio
         ? { ...item, balanceCents: item.balanceCents + delta(item.accountId) } : item) };
     const forecast = buildDatedCashflowForecast(postDebit, { accountId: source.id, horizonEnd: state.goal.targetDate, scenario: 'baseline' });
     if (!forecastHasExecutionAuthority(postDebit, forecast) || forecast.minimumBalanceCents === null ||
-      forecast.minimumBalanceCents < Math.max(0, state.goal.protectedCents - state.finance.emergencyCents))
+      forecast.minimumBalanceCents < protectedCheckingReserve(state))
       throw new Error('SCHEDULE_CASHFLOW_UNSAFE');
     let next = runBankingTool(state, 'prepare_transfer', { sourceAccountId: source.id,
       destinationAccountId: destination.id, amountCents: schedule.amountCents }).state;

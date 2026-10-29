@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FinancialServicesSchema } from './financial-services.ts';
+export {GoalContractSchema,GoalContractTermsSchema,GoalContractChangeSchema,type GoalContract} from './goal-contract.ts';
 
 export const MoneySchema = z.number().int().nonnegative();
 export const IsoDateSchema = z.iso.date();

@@ -20,6 +20,7 @@ function contextHash(state: DemoState): string {
     monthlyContributionCents: item.monthlyContributionCents, firstMonthContributionCents: item.firstMonthContributionCents,
     selectedPlanId: item.selectedPlanId });
   return stableHash({ clock: state.clock, goal: goal(state.goal), goals: state.goals.map(goal), finance: state.finance,
+    ...(state.financialServices.goalContracts.length?{goalContracts:state.financialServices.goalContracts}:{}),
     accounts: state.accounts, snapshots: state.accountSnapshots, transactions: state.transactions,
     bills: state.bills, subscriptions: state.subscriptions, subscriptionActions: state.subscriptionActions,
     receipts: state.receipts.filter(item => !item.tool.includes('transfer_schedule')) });

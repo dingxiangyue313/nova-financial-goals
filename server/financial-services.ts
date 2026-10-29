@@ -4,6 +4,9 @@ import { ServiceActionSchema } from '../shared/financial-services.ts';
 import type { DemoState } from '../shared/contracts.ts';
 import { appendAuditEvent, stableHash } from './governance.ts';
 import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
+import {buildGoalPortfolio,goalContract,changedGoalContract,applyGoalContract,portfolioRepairTerms} from './goal-portfolio.ts';
+import {GoalContractSchema} from '../shared/goal-contract.ts';
+import {protectedCheckingReserve} from './financial-constraints.ts';
 
 export const investmentProducts = [
   { id: 'liquid', name: '零钱周转（模拟）', risk: 1, lockDays: 0, feeBps: 0, buyFeeBps: 0, navScaled: '100000000', paused: false },
@@ -41,7 +44,8 @@ export function availableFunds(s: DemoState, id: string, goalId: string | null =
   const a=account(s,id),d=s.financialServices,h=d.holds.filter(h=>h.accountId===id&&h.status==='active');
   const held=h.reduce((n,h)=>n+h.amountCents,0);
   const other=d.allocations.filter(x=>x.accountId===id&&x.goalId!==goalId).reduce((n,x)=>n+Math.max(0,x.amountCents-h.filter(h=>h.goalId===x.goalId).reduce((n,h)=>n+h.amountCents,0)),0);
-  return Math.max(0,a.balanceCents-held-other-(a.type==='checking'?Math.max(0,s.goal.protectedCents-s.finance.emergencyCents):0));
+  const reserveFromChecking=protectedCheckingReserve(s);
+  return Math.max(0,a.balanceCents-held-other-(a.type==='checking'?reserveFromChecking:0));
 }
 function requireFunds(s: DemoState,id:string,amount:number,goalId:string|null=null) {
   const a=account(s,id); if(a.type==='goal'&&walletOwner(s)!==goalId)throw new Error('SERVICE_GOAL_FUNDS_PROTECTED');
@@ -85,6 +89,19 @@ export function describeServiceAction(input:DemoState,raw:unknown,now=Date.now()
   const state=initializeServices(input),action=ServiceActionSchema.parse(raw),d=state.financialServices;
   let label='',amountCents=0;let details:Record<string,unknown>={};
   switch(action.kind){
+    case 'goal_contract':{
+      const old=state.goals.find(g=>g.id===action.goalId);if(!old)throw new Error('SERVICE_GOAL_NOT_FOUND');
+      const before=goalContract(state,old);if(before.revision!==action.expectedRevision)throw new Error('GOAL_CONTRACT_CHANGED');
+      const {kind:_kind,expectedRevision:_revision,...terms}=action;
+      const after=changedGoalContract(state,terms);details={before,after};
+      label=`修改「${old.title}」目标约束：金额¥${before.targetCents/100}→¥${after.targetCents/100}，日期${before.targetDate}→${after.targetDate}，每月投入¥${before.monthlyContributionCents/100}→¥${after.monthlyContributionCents/100}，保护底线¥${after.protectedCents/100}，优先级${after.priority}（1最高）。最多允许月存增加¥${after.maxMonthlyIncreaseCents/100}、延期${after.maxExtensionDays}天。${after.allowPayments?'允许在独立确认后付款':'暂停此目标的新付款'}。本次不移动资金、不扩大原付款授权；关联转账计划暂停，需重新核对启用。`;break;
+    }
+    case 'portfolio_repair':{
+      if(action.expectedTwinVersion!==state.twinVersion)throw new Error('TWIN_VERSION_CHANGED');
+      const option=buildGoalPortfolio(state).options.find(o=>o.id===action.optionId);if(!option)throw new Error('PORTFOLIO_OPTION_STALE');
+      for(const change of option.changes)changedGoalContract(state,portfolioRepairTerms(state,change));
+      details={option,changes:option.changes};label=`采用「${option.label}」，调整${option.changedGoals}个目标。日期试算最低余额¥${option.minimumBalanceCents/100}（${option.minimumBalanceDate}）。只修改下列目标约束并暂停关联转账计划；没有转账、申购或新增付款授权，未来工资与预测不是保证。`;break;
+    }
     case 'transfer':{const r=d.recipients.find(r=>r.id===action.recipientId&&r.id!=='self');if(!r||r.version!==action.recipientVersion)throw new Error('SERVICE_RECIPIENT_CHANGED');requireFunds(state,action.accountId,action.amountCents);amountCents=action.amountCents;details={recipient:r,feesCents:0};label=`向${r.name}（尾号${r.suffix}，${r.alias}）转入¥${amountCents/100}，手续费¥0。备注只作说明。`;break;}
     case 'split':{
       const ids=action.participantIds,payerId=action.payerId??'self';
@@ -116,7 +133,7 @@ export function describeServiceAction(input:DemoState,raw:unknown,now=Date.now()
     case 'allocate':{if(!state.goals.some(g=>g.id===action.goalId))throw new Error('SERVICE_GOAL_NOT_FOUND');const a=account(state,action.accountId);if(a.type==='goal')throw new Error('SERVICE_GOAL_FUNDS_PROTECTED');requireFunds(state,a.id,action.amountCents,action.goalId);amountCents=action.amountCents;label=`将${a.label}的¥${amountCents/100}分配给此目标，不发生银行转账，不再供其他目标使用。`;break;}
     case 'mandate':{account(state,action.accountId);if(!state.goals.some(g=>g.id===action.goalId))throw new Error('SERVICE_GOAL_NOT_FOUND');if(action.maxPerOrderCents>action.totalCents||Date.parse(action.expiresAt)<=now||Date.parse(action.expiresAt)>now+30*86400000||action.merchants.some(m=>!['air-demo','stay-demo'].includes(m)))throw new Error('SERVICE_MANDATE_INVALID');if(action.id){const m=d.mandates.find(m=>m.id===action.id&&m.status==='active');if(!m||m.goalId!==action.goalId||m.accountId!==action.accountId||action.totalCents<m.spentCents+m.reservedCents)throw new Error('SERVICE_MANDATE_SCOPE');}label=`${action.id?'修改':'创建'}授权：${action.merchants.join('、')}服务此目标，来源${action.accountId}，单笔上限¥${action.maxPerOrderCents/100}、累计¥${action.totalCents/100}，有效至${action.expiresAt}。每份订单仍需核对确认，实质变更重新确认。`;break;}
     case 'revoke_mandate':if(!d.mandates.some(m=>m.id===action.id&&m.status==='active'))throw new Error('SERVICE_MANDATE_SCOPE');label='撤销此授权，停止新订单；已提交或未知订单仍按原操作核对，不自动退款。';break;
-    case 'book':{if(new Set(action.quoteIds).size!==action.quoteIds.length)throw new Error('SERVICE_DUPLICATE_QUOTE');const quotes=action.quoteIds.map(id=>{const q=d.quotes.find(q=>q.id===id);if(!q)throw new Error('SERVICE_QUOTE_NOT_FOUND');verifyQuote(q,now);return q;});const m=d.mandates.find(m=>m.id===action.mandateId&&m.status==='active');if(!m||m.accountId!==action.accountId||m.goalId!==action.goalId||Date.parse(m.expiresAt)<=now||quotes.some(q=>!m.merchants.includes(q.merchantId)||q.totalCents>m.maxPerOrderCents))throw new Error('SERVICE_MANDATE_SCOPE');const c=d.cards.find(c=>c.id===action.cardId);if(!c||c.type!=='debit'||c.accountId!==action.accountId||c.status!=='active'||!c.online||!c.overseas||quotes.some(q=>q.totalCents>c.limitCents))throw new Error('SERVICE_CARD_PAYMENT_BLOCKED');if(quotes.some(q=>d.bookings.some(b=>b.quoteId===q.id&&!['failed','refunded'].includes(b.status))))throw new Error('SERVICE_BOOKING_EXISTS');amountCents=integer(quotes.reduce((n,q)=>n+q.totalCents,0));if(m.spentCents+m.reservedCents+amountCents>m.totalCents)throw new Error('SERVICE_MANDATE_LIMIT');requireFunds(state,action.accountId,amountCents,action.goalId);details={quotes,cardVersion:c.version,mandateId:m.id};label=`预留并支付${quotes.map(q=>q.label).join('、')}，总计¥${amountCents/100}（含税费），来源${action.accountId}、卡尾号${c.suffix}。两单分别执行；失败只修未完成项，未知先查原操作，退款按已列条款。`;break;}
+    case 'book':{if(state.financialServices.goalContracts.find(c=>c.goalId===action.goalId)?.allowPayments===false)throw new Error('GOAL_PAYMENT_NOT_ALLOWED');if(new Set(action.quoteIds).size!==action.quoteIds.length)throw new Error('SERVICE_DUPLICATE_QUOTE');const quotes=action.quoteIds.map(id=>{const q=d.quotes.find(q=>q.id===id);if(!q)throw new Error('SERVICE_QUOTE_NOT_FOUND');verifyQuote(q,now);return q;});const m=d.mandates.find(m=>m.id===action.mandateId&&m.status==='active');if(!m||m.accountId!==action.accountId||m.goalId!==action.goalId||Date.parse(m.expiresAt)<=now||quotes.some(q=>!m.merchants.includes(q.merchantId)||q.totalCents>m.maxPerOrderCents))throw new Error('SERVICE_MANDATE_SCOPE');const c=d.cards.find(c=>c.id===action.cardId);if(!c||c.type!=='debit'||c.accountId!==action.accountId||c.status!=='active'||!c.online||!c.overseas||quotes.some(q=>q.totalCents>c.limitCents))throw new Error('SERVICE_CARD_PAYMENT_BLOCKED');if(quotes.some(q=>d.bookings.some(b=>b.quoteId===q.id&&!['failed','refunded'].includes(b.status))))throw new Error('SERVICE_BOOKING_EXISTS');amountCents=integer(quotes.reduce((n,q)=>n+q.totalCents,0));if(m.spentCents+m.reservedCents+amountCents>m.totalCents)throw new Error('SERVICE_MANDATE_LIMIT');requireFunds(state,action.accountId,amountCents,action.goalId);details={quotes,cardVersion:c.version,mandateId:m.id};label=`预留并支付${quotes.map(q=>q.label).join('、')}，总计¥${amountCents/100}（含税费），来源${action.accountId}、卡尾号${c.suffix}。两单分别执行；失败只修未完成项，未知先查原操作，退款按已列条款。`;break;}
     case 'cancel_booking':{const b=d.bookings.find(b=>b.id===action.id);if(!b||b.status!=='confirmed'||!b.refundable)throw new Error('SERVICE_BOOKING_NOT_REFUNDABLE');amountCents=b.amountCents;label=`取消此订单并申请原路退款¥${amountCents/100}，预计${nextTradingDay(state.clock)}到账；当前余额不立即增加。`;break;}
   }
   return {state,action,label,amountCents,details,manifestHash:stableHash({action,details,amountCents,twinVersion:state.twinVersion})};
@@ -142,6 +159,12 @@ export function executeServiceAction(input:DemoState,raw:unknown,operationId:str
   const preview=describeServiceAction(input,raw,now),s=preview.state,d=s.financialServices,a=preview.action;
   let status:'succeeded'|'pending'|'failed'|'unknown'='succeeded';const fault=d.fault;d.fault='none';
   switch(a.kind){
+    case 'goal_contract':Object.assign(s,applyGoalContract(s,GoalContractSchema.parse(preview.details.after)));break;
+    case 'portfolio_repair':{
+      const option=buildGoalPortfolio(s).options.find(o=>o.id===a.optionId);if(!option)throw new Error('PORTFOLIO_OPTION_STALE');
+      for(const change of option.changes)Object.assign(s,applyGoalContract(s,changedGoalContract(s,portfolioRepairTerms(s,change))));
+      break;
+    }
     case 'transfer':
       if(fault==='decline'){status='failed';break;}
       if(fault.startsWith('timeout')){d.holds.push({id:randomUUID(),operationId,accountId:a.accountId,goalId:null,amountCents:a.amountCents,status:'active'});d.events.push(`transfer-provider:${operationId}:${fault==='timeout_after'?'committed':'not_committed'}`);status='unknown';}
