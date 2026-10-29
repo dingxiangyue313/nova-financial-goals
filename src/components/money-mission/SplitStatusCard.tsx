@@ -9,6 +9,7 @@ export function SplitStatusCard({split,view,source,busy,onPrepare,onQuery}:{spli
  const payer=view.recipients.find(r=>r.id===(split.payerId??'self'));
  return <section className="mission-card" aria-label={`AA ${money(split.totalCents)}`}>
   <button className="mission-link block min-h-11" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(splitStatement(split,view.clock),null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='nova-aa-statement.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>导出此AA对账单</button>
+  {split.sampleLabel&&<p className="font-bold text-[#0F6B6D]">合成样例 · {split.sampleLabel}</p>}
   <strong>AA {money(split.totalCents)} · {split.status==='closed'?'已关闭':split.status==='collected'?'已结清':other?'本人应付款':'待收款'}</strong>
   <p>垫付人：{payer?.name} · {payer?.alias}。截止 {split.dueDate}。</p>
   {active&&split.dueDate<view.clock&&<p role="status" className="text-amber-800">已逾期，未自动扣款或催收；可核对状态或关闭剩余请求。</p>}

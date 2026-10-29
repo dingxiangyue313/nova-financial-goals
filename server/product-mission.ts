@@ -1,3 +1,4 @@
+import {aaCatalogFixture} from './aa-catalog.ts';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { parse } from 'csv-parse/sync';
@@ -73,8 +74,8 @@ export function registerProductMission(app: Express, sessionId: (req: Request, r
     });res.json(productMission(next).snapshot);
   }));
   app.post('/api/demo/services/scenario',route(async(req,res)=>{
-    const body=z.object({scenario:z.literal('funded_trip'),expectedTwinVersion:z.number().int().positive().optional()}).strict().parse(req.body);
-    const id=sessionId(req,res),fixture=await fundedConsumerFixture();
+    const body=z.object({scenario:z.enum(['funded_trip','aa_catalog']),expectedTwinVersion:z.number().int().positive().optional()}).strict().parse(req.body);
+    const id=sessionId(req,res),fixture=body.scenario==='aa_catalog'?aaCatalogFixture(await consumerFixture()):await fundedConsumerFixture();
     const next=mutateState(id,old=>{
       if(body.expectedTwinVersion!==undefined&&body.expectedTwinVersion!==old.twinVersion)throw new Error('TWIN_VERSION_CHANGED');
       return {...fixture,twinVersion:old.twinVersion+1};

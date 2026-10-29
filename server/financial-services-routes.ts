@@ -1,3 +1,5 @@
+import {ProviderEventSchema} from '../shared/financial-services.ts';
+import {applyProviderEvent,signProviderEvent} from './provider-events.ts';
 import type { Express, Request, Response, RequestHandler } from 'express';
 import { z } from 'zod';
 import { ServiceActionSchema } from '../shared/financial-services.ts';
@@ -16,6 +18,9 @@ import {serviceCasePack} from './service-monitor.ts';
 import {buildMandateDraft} from './mandate-draft.ts';
 
 export function registerFinancialServices(app:Express,sessionId:(req:Request,res:Response)=>string,route:(fn:(req:Request,res:Response)=>unknown)=>RequestHandler){
+  app.get('/api/services/provider-events',route((req,res)=>res.json({items:getState(sessionId(req,res)).financialServices.providerEventLog.map(({payloadHash:_hash,...entry})=>entry)})));
+  app.post('/api/demo/provider-events/send',route((req,res)=>{const event=ProviderEventSchema.parse(req.body),id=sessionId(req,res);res.json(financialServicesView(mutateState(id,s=>applyProviderEvent(s,id,event,signProviderEvent(id,event)))));}));
+  app.post('/api/demo/provider-events/receive',route((req,res)=>{const packet=z.object({event:ProviderEventSchema,signature:z.string().max(128)}).strict().parse(req.body),id=sessionId(req,res);res.json(financialServicesView(mutateState(id,s=>applyProviderEvent(s,id,packet.event,packet.signature))));}));
   app.get('/api/services/subscription-reminders',route((req,res)=>{
     const state=mutateState(sessionId(req,res),s=>tickSubscriptionNotifications(s));res.json({items:state.financialServices.subscriptionNotifications.filter(n=>n.status!=='cancelled'),asOf:state.clock});
   }));

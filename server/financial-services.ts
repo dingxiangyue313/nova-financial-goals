@@ -289,6 +289,7 @@ export function reconcileServices(input:DemoState,id?:string):DemoState{
       else{const p=d.positions.find(p=>p.productId===o.productId)!;p.reservedMicro=(BigInt(p.reservedMicro)-BigInt(o.quantityMicro)).toString();}
       o.status='failed';d.receipts.filter(r=>r.operationId===o.operationId).forEach(r=>r.status='failed');changed=true;continue;
     }
+    if(o.externalRevision&&o.providerStatus==='pending'){if(o.status==='unknown'){o.status='pending';changed=true;}continue;}
     if(o.settlesOn>s.clock){if(o.status==='unknown'){o.status='pending';changed=true;}continue;}
     const eventId=`settle:${o.id}`;if(d.events.includes(eventId))continue;
     if(o.kind==='buy'){const p=d.positions.find(p=>p.productId===o.productId);if(p){p.quantityMicro=(BigInt(p.quantityMicro)+BigInt(o.quantityMicro)).toString();p.acquiredOn=s.clock;}else d.positions.push({productId:o.productId,quantityMicro:o.quantityMicro,reservedMicro:'0',acquiredOn:s.clock});d.events.push(eventId);}
@@ -339,6 +340,6 @@ export function financialServicesView(input:DemoState){
     positions:d.positions.map(p=>({...p,valueCents:valuation((BigInt(p.quantityMicro)-BigInt(p.reservedMicro)).toString(),product(p.productId).navScaled)})),investments:d.investments.map(({providerStatus:_p,...o})=>o),
     cards:d.cards,applications:d.applications.map(({providerAccepted:_accepted,...application})=>application),cardOperations:d.cardOperations.map(({providerStatus:_provider,...operation})=>operation),splits:d.splits,quotes:d.quotes.map(q=>{let identityVerified=true;try{verifyQuote(q,Math.min(Date.now(),Date.parse(q.expiresAt)-1));}catch{identityVerified=false;}const {signature:_s,...fields}=q;return {...fields,identityVerified,expired:Date.parse(q.expiresAt)<=Date.now()};}),
     mandates:d.mandates,bookings:d.bookings.map(({providerStatus:_p,...b})=>b),receipts:d.receipts,journals:d.journals.slice(-80),
-    limitations:['所有商户、风险、净值、审核和到账均为模拟。','投资采用固定模拟报价；未结算和AA待收不可支付。','同产品合并持仓以最近一次份额确认日重新计算整笔最低持有期。','模拟交易日为周一至周五，不代表真实银行节假日日历。','信用卡暂不用于旅行付款，额度不进入现金。']};
+    limitations:['所有商户、风险、净值、审核和到账均为模拟。','投资采用固定模拟报价；未结算和AA待收不可支付。','同产品合并持仓以最近一次份额确认日重新计算整笔最低持有期。','理财使用固定模拟休市日及15:00截止规则；旅行退款仅周末顺延，均不代表真实银行日历。','信用卡暂不用于旅行付款，额度不进入现金。']};
 }
 export type FinancialServicesView=ReturnType<typeof financialServicesView>;

@@ -438,6 +438,7 @@ export default function App() {
       {demoControl && <aside aria-label="屏幕快速切换与调试" className="w-full max-w-[500px] px-3 mb-2 flex items-center justify-between text-xs">
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
           <span className="font-semibold text-[#5A616B] shrink-0 text-[11px]">快速直达:</span>
+            <button className="shrink-0 rounded-full border border-[#D0D5DD] bg-white px-2.5 py-1 text-[11px]" onClick={()=>{void mutate('/api/demo/services/scenario','POST',{scenario:'aa_catalog'}).then(()=>navigateTo('financial_services'));}}>载入12组AA样例（重置模拟会话）</button>
             <button className="shrink-0 rounded-full border border-[#D0D5DD] bg-white px-2.5 py-1 text-[11px]" onClick={()=>{void mutate('/api/demo/services/scenario','POST',{scenario:'funded_trip'}).then(()=>navigateTo('financial_services'));}}>载入旅行付款样例（重置模拟会话）</button>
           <button
             onClick={() => navigateTo('home')}

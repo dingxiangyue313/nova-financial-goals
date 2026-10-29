@@ -1,3 +1,21 @@
+## T-A05 / W-A08 / Q-A05验收完成（2026-10-29，最新最终）
+
+本轮三项按模拟R1原条款完成：12组独立AA目录（部分/重复/逾期/关闭/自定义/垫付与同行负债）；申购/赎回版本化回报不重复现金或份额；跨投资/订单的签名会话绑定、事件id冲突、revision乱序、终态不回退和SQLite原子持久。pending理财回报不会因日期到期自行settle，最终信号仍须满足结算日。所有回报推进原授权操作，不创建新金额/收款/付款。
+
+最终全量463/463通过（artifacts/aa-provider-final-full.log），类型通过（aa-provider-final-lint.log）；三尺寸9/9（provider-events-browser-verified.log）；新增最终领域6/6（provider-events-final-domain.log），实际HTTP服务重启1/1（provider-events-http-verified.log）。首次漏模拟账户初始化、成对分录测试错误的旧失败日志保留。手机AA目录截图已目视检查。
+
+75项现在63项有范围限定证据、12项部分，已同步PLAN_B_75_CASES.md、REMAINING_DEVELOPMENT.md、包映射及演示脚本。完整六画像/真实外部Outbox或Webhook/长期任务/模型与真人/最终发布仍未完成；模拟回报协议不冒充真实提供商网络集成。
+
+新增说明：AA_SCENARIO_CATALOG.md、SIMULATED_PROVIDER_EVENTS.md。仅/demo-control提供“载入12组AA样例（重置模拟会话）”，消费者页面没有结果选择器。服务结果记录可在金融任务底部展开查看。前端旧进程未在监听，已重新启动3190并实际验证/api/health返回200。用户独立产品经理文档未修改，功能分支本地提交、不推main。
+
+## AA目录与版本化服务回报（2026-10-29，最终回归中）
+
+本轮选T-A05/W-A08/Q-A05。实现12组独立AA冻结场景，仅/demo-control显式重置载入；实际收款/扣款通过原账本，重复收款不入两次，部分/关闭/逾期保留语义，另有目录说明。新增投资/订单签名模拟回报契约、会话绑定、事件id内容冲突拒绝、revision游标、过期回报忽略与终态不回退；理财pending不因到了日期自行结算；沿用原操作，不创造新付款。
+
+已验证领域组合24/24（provider-events-tests-verified.log）、最终新领域6/6（provider-events-final-domain.log）、实际HTTP服务重启1/1（provider-events-http-verified.log）、修正账户初始化后的三尺寸9/9（provider-events-browser-verified.log）。首轮测试漏初始化及成对分录求和错误均保留失败日志，业务余额与重复事件检查最终已通过。
+
+最终全量在exec session9419，artifacts/aa-provider-final-full.log，之后类型aa-provider-final-lint.log；先收结果，未提前记完成。当前最近额度剩74%（历史查询），不代表后续实时值。整体在最终结果前仍15项部分。用户独立产品经理文档未修改。
+
 ## 第二组三项完成（2026-10-29，最新最终）
 
 W-A06/W-A07/C-A01按模拟R1原条款验收完成。最终全量456/456（artifacts/settlement-acceptance-full.log）、类型通过（settlement-acceptance-lint.log）、三尺寸6/6（settlement-acceptance-browser-verified.log）、领域24/24。首次本机服务90秒启动超时保留日志，改为180秒测试启动等待后成功；未修改业务超时。
