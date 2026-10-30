@@ -1107,3 +1107,30 @@ export const SnapshotSchema = z.object({
   dataSyncBatches: z.array(DataSyncBatchSchema).default([]),
 });
 export type Snapshot = z.infer<typeof SnapshotSchema>;
+
+export const AiSafetyControlSchema = z.object({
+  mode: z.enum(['normal', 'safe_mode']),
+  activatedAt: z.iso.datetime({ offset: true }).nullable(),
+  reasonCode: z.enum(['manual_demo', 'provider_incident', 'evaluation_gate_failed']).nullable(),
+  modelCallsAllowed: z.boolean(),
+  aiWriteActionsAllowed: z.boolean(),
+  deterministicReadOnlyAvailable: z.literal(true),
+}).strict();
+export type AiSafetyControl = z.infer<typeof AiSafetyControlSchema>;
+
+export const AiSafetyPassportSchema = z.object({
+  skillId: SkillIdSchema,
+  version: z.string().min(1),
+  release: z.enum(['p0', 'p1_stretch']),
+  enabled: z.boolean(),
+  riskClass: z.enum(['read', 'recommend', 'prepare_write', 'write']),
+  canPrepareAction: z.boolean(),
+  canExecuteAction: z.literal(false),
+  allowedToolCount: z.number().int().nonnegative(),
+  maxToolCalls: z.number().int().positive(),
+  timeoutMs: z.number().int().positive(),
+  requiresEvidence: z.boolean(),
+  humanReview: z.enum(['required_before_write', 'not_applicable']),
+  fallbackMode: z.literal('deterministic_read_only'),
+}).strict();
+export type AiSafetyPassport = z.infer<typeof AiSafetyPassportSchema>;
