@@ -37,3 +37,10 @@ test('control requires complete strict fields, ISO timestamp and deterministic a
     assert.equal(AiSafetyControlSchema.safeParse({ ...control, ...patch }).success, false);
   }
 });
+
+test('overview accepts current passports and rejects injected private fields',async()=>{
+ const {AiSafetyOverviewSchema}=await import('../shared/contracts.ts');
+ const overview={control:{mode:'normal',activatedAt:null,reasonCode:null,modelCallsAllowed:true,aiWriteActionsAllowed:true,deterministicReadOnlyAvailable:true},passports:buildSkillSafetyPassports(),evaluation:null,demoControlsEnabled:false};
+ assert.equal(AiSafetyOverviewSchema.safeParse(overview).success,true);
+ assert.equal(AiSafetyOverviewSchema.safeParse({...overview,chainOfThought:'PRIVATE_MARKER'}).success,false);
+});

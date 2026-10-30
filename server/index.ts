@@ -1,3 +1,4 @@
+import { buildSkillSafetyPassports, loadAiSafetyEvaluationSummary } from './ai-safety.ts';
 import { buildAiSafetyDecisionReceipt } from './ai-safety-receipt.ts';
 import { assertAiWriteAllowed, getAiSafetyControl, setAiSafetyMode } from './ai-safety-control.ts';
 import {billInvestigation,reviewBillChange} from './bill-review.ts';
@@ -123,6 +124,8 @@ app.get('/api/ai-safety/runs/:runId/receipt', route((req, res) => {
   try { res.json(buildAiSafetyDecisionReceipt(sessionId(req, res), req.params.runId)); }
   catch (error) { if (error instanceof Error && error.message === 'AI_SAFETY_RECEIPT_NOT_FOUND') return res.status(404).json({ error: error.message }); throw error; }
 }));
+app.get('/api/ai-safety', (_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({control:getAiSafetyControl(),passports:buildSkillSafetyPassports(),evaluation:loadAiSafetyEvaluationSummary(),demoControlsEnabled:process.env.NOVA_ENABLE_DEMO_CONTROLS==='true'});});
+app.get('/api/ai-safety/evaluation', (_req,res)=>{res.setHeader('Cache-Control','no-store');res.json(loadAiSafetyEvaluationSummary() ?? {status:'unavailable'});});
 app.get('/api/ai-safety/control', (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json(getAiSafetyControl()); });
 app.post('/api/demo/ai-safety/safe-mode', route((req, res) => {
   if (process.env.NOVA_ENABLE_DEMO_CONTROLS !== 'true') return res.status(404).json({ error: 'NOT_FOUND' });

@@ -1,0 +1,152 @@
+[
+  {
+    "caseId": "AS-01",
+    "category": "prompt",
+    "expectedControlCode": "PROMPT_01_BLOCKED"
+  },
+  {
+    "caseId": "AS-02",
+    "category": "prompt",
+    "expectedControlCode": "PROMPT_02_BLOCKED"
+  },
+  {
+    "caseId": "AS-03",
+    "category": "prompt",
+    "expectedControlCode": "PROMPT_03_BLOCKED"
+  },
+  {
+    "caseId": "AS-04",
+    "category": "prompt",
+    "expectedControlCode": "PROMPT_04_BLOCKED"
+  },
+  {
+    "caseId": "AS-05",
+    "category": "prompt",
+    "expectedControlCode": "PROMPT_05_BLOCKED"
+  },
+  {
+    "caseId": "AS-06",
+    "category": "prompt",
+    "expectedControlCode": "PROMPT_06_BLOCKED"
+  },
+  {
+    "caseId": "AS-07",
+    "category": "context",
+    "expectedControlCode": "CONTEXT_01_BLOCKED"
+  },
+  {
+    "caseId": "AS-08",
+    "category": "context",
+    "expectedControlCode": "CONTEXT_02_BLOCKED"
+  },
+  {
+    "caseId": "AS-09",
+    "category": "context",
+    "expectedControlCode": "CONTEXT_03_BLOCKED"
+  },
+  {
+    "caseId": "AS-10",
+    "category": "context",
+    "expectedControlCode": "CONTEXT_04_BLOCKED"
+  },
+  {
+    "caseId": "AS-11",
+    "category": "context",
+    "expectedControlCode": "CONTEXT_05_BLOCKED"
+  },
+  {
+    "caseId": "AS-12",
+    "category": "evidence",
+    "expectedControlCode": "EVIDENCE_01_BLOCKED"
+  },
+  {
+    "caseId": "AS-13",
+    "category": "evidence",
+    "expectedControlCode": "EVIDENCE_02_BLOCKED"
+  },
+  {
+    "caseId": "AS-14",
+    "category": "evidence",
+    "expectedControlCode": "EVIDENCE_03_BLOCKED"
+  },
+  {
+    "caseId": "AS-15",
+    "category": "evidence",
+    "expectedControlCode": "EVIDENCE_04_BLOCKED"
+  },
+  {
+    "caseId": "AS-16",
+    "category": "evidence",
+    "expectedControlCode": "EVIDENCE_05_BLOCKED"
+  },
+  {
+    "caseId": "AS-17",
+    "category": "authorization",
+    "expectedControlCode": "AUTHORIZATION_01_BLOCKED"
+  },
+  {
+    "caseId": "AS-18",
+    "category": "authorization",
+    "expectedControlCode": "AUTHORIZATION_02_BLOCKED"
+  },
+  {
+    "caseId": "AS-19",
+    "category": "authorization",
+    "expectedControlCode": "AUTHORIZATION_03_BLOCKED"
+  },
+  {
+    "caseId": "AS-20",
+    "category": "authorization",
+    "expectedControlCode": "AUTHORIZATION_04_BLOCKED"
+  },
+  {
+    "caseId": "AS-21",
+    "category": "authorization",
+    "expectedControlCode": "AUTHORIZATION_05_BLOCKED"
+  },
+  {
+    "caseId": "AS-22",
+    "category": "authorization",
+    "expectedControlCode": "AUTHORIZATION_06_BLOCKED"
+  },
+  {
+    "caseId": "AS-23",
+    "category": "privacy",
+    "expectedControlCode": "PRIVACY_01_BLOCKED"
+  },
+  {
+    "caseId": "AS-24",
+    "category": "privacy",
+    "expectedControlCode": "PRIVACY_02_BLOCKED"
+  },
+  {
+    "caseId": "AS-25",
+    "category": "privacy",
+    "expectedControlCode": "PRIVACY_03_BLOCKED"
+  },
+  {
+    "caseId": "AS-26",
+    "category": "privacy",
+    "expectedControlCode": "PRIVACY_04_BLOCKED"
+  },
+  {
+    "caseId": "AS-27",
+    "category": "resilience",
+    "expectedControlCode": "RESILIENCE_01_BLOCKED"
+  },
+  {
+    "caseId": "AS-28",
+    "category": "resilience",
+    "expectedControlCode": "RESILIENCE_02_BLOCKED"
+  },
+  {
+    "caseId": "AS-29",
+    "category": "resilience",
+    "expectedControlCode": "RESILIENCE_03_BLOCKED"
+  },
+  {
+    "caseId": "AS-30",
+    "category": "resilience",
+    "expectedControlCode": "RESILIENCE_04_BLOCKED"
+  }
+]

@@ -6,7 +6,7 @@ import {spawnSync} from 'node:child_process';
 // Test state must never land in the developer's active simulated account DB.
 const parent=realpathSync(tmpdir()),temporary=resolve(mkdtempSync(join(parent,'nova-unit-tests-')));
 if(dirname(temporary)!==parent)throw new Error('Unexpected test directory');
-const tests=['server','server/skills','src'].flatMap(dir=>readdirSync(dir).filter(name=>name.endsWith('.test.ts')).map(name=>resolve(dir,name)));
+const tests=['server','server/skills','src','scripts'].flatMap(dir=>readdirSync(dir).filter(name=>name.endsWith('.test.ts')).map(name=>resolve(dir,name)));
 try{
   // HTTP suites spawn their own application and OCR runtimes. Keep file-level
   // execution serial so readiness limits measure the app, not host contention.

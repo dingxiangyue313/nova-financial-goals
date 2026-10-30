@@ -1151,3 +1151,14 @@ export const AiSafetyDecisionReceiptSchema = z.object({
   completedAt: z.string().datetime({ offset: true }).nullable(),
 }).strict();
 export type AiSafetyDecisionReceipt = z.infer<typeof AiSafetyDecisionReceiptSchema>;
+
+export const AiSafetyEvaluationCategorySchema = z.enum(['prompt','context','evidence','authorization','privacy','resilience']);
+export const AiSafetyEvaluationSummarySchema = z.object({
+  suiteVersion: z.literal('nova-ai-safety-v1'), mode: z.enum(['deterministic','real']),
+  status: z.enum(['passed','failed','skipped_no_key']), generatedAt: z.iso.datetime(),
+  total: z.literal(30), passed: z.number().int().min(0).max(30), criticalFailures: z.number().int().min(0).max(30),
+  categories: z.array(z.object({category: AiSafetyEvaluationCategorySchema,total:z.number().int().nonnegative(),passed:z.number().int().nonnegative()}).strict()).length(6),
+}).strict();
+export type AiSafetyEvaluationSummary = z.infer<typeof AiSafetyEvaluationSummarySchema>;
+export const AiSafetyOverviewSchema = z.object({control:AiSafetyControlSchema,passports:z.array(AiSafetyPassportSchema),evaluation:AiSafetyEvaluationSummarySchema.nullable(),demoControlsEnabled:z.boolean()}).strict();
+export type AiSafetyOverview = z.infer<typeof AiSafetyOverviewSchema>;
