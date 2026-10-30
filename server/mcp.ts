@@ -1,3 +1,4 @@
+import { assertAiWriteAllowed } from './ai-safety-control.ts';
 import type express from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -27,6 +28,7 @@ export function registerMcp(app: express.Express, authenticate: (token: string) 
         idempotencyKey: z.string().min(1).max(100), agentId: z.string().min(1) },
     }, async ({ category, amountCents, idempotencyKey, agentId }) => {
       try {
+        assertAiWriteAllowed();
         let operationId = '';
         mutateState(sessionId, old => {
           const outcome = runBankingTool(old, 'evaluate_external_request', { category, amountCents, idempotencyKey, agentId });
@@ -58,3 +60,4 @@ export function registerMcp(app: express.Express, authenticate: (token: string) 
   app.get('/mcp', (_req, res) => res.status(405).json({ error: 'METHOD_NOT_ALLOWED' }));
   app.delete('/mcp', (_req, res) => res.status(405).json({ error: 'METHOD_NOT_ALLOWED' }));
 }
+

@@ -1348,3 +1348,37 @@ export function storedAuditChain(sessionId: string) {
 }
 
 export function closeStore() { db.close(); }
+
+// Global control is deliberately independent of demo sessions and reset operations.
+db.exec(`CREATE TABLE IF NOT EXISTS ai_safety_control (
+  singleton INTEGER PRIMARY KEY CHECK(singleton=1), mode TEXT NOT NULL,
+  activated_at TEXT, reason_code TEXT);
+  INSERT OR IGNORE INTO ai_safety_control(singleton,mode,activated_at,reason_code) VALUES(1,'normal',NULL,NULL);`);
+ensureColumn('ai_safety_control', 'cancellation_generation', 'INTEGER NOT NULL DEFAULT 0');
+export function aiSafetyCancellationGeneration(): number {
+  return (db.prepare('SELECT cancellation_generation FROM ai_safety_control WHERE singleton=1').get() as { cancellation_generation: number }).cancellation_generation;
+}
+export function readAiSafetyControl() {
+  return db.prepare('SELECT mode, activated_at AS activatedAt, reason_code AS reasonCode FROM ai_safety_control WHERE singleton=1').get() as
+    Pick<import('../shared/contracts.ts').AiSafetyControl, 'mode' | 'activatedAt' | 'reasonCode'>;
+}
+export function persistAiSafetyMode(enabled: boolean, reasonCode: NonNullable<import('../shared/contracts.ts').AiSafetyControl['reasonCode']>): boolean {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const mode = enabled ? 'safe_mode' : 'normal';
+    if (readAiSafetyControl().mode === mode) { db.exec('COMMIT'); return false; }
+    const at = new Date().toISOString();
+    db.prepare('UPDATE ai_safety_control SET mode=?,activated_at=?,reason_code=?,cancellation_generation=cancellation_generation+? WHERE singleton=1')
+      .run(mode, enabled ? at : null, enabled ? reasonCode : null, enabled ? 1 : 0);
+    if (enabled) {
+      const rows = db.prepare("SELECT run_id,payload_json FROM agent_task_runs WHERE status='running'").all() as Array<{run_id:string;payload_json:string}>;
+      for (const row of rows) {
+        const run = AgentRunSchema.parse(JSON.parse(row.payload_json));
+        const next = AgentRunSchema.parse({ ...run, status: 'cancelled', reasonCode: 'AI_SAFE_MODE', revision: run.revision + 1, updatedAt: at });
+        db.prepare("UPDATE agent_task_runs SET status='cancelled',revision=?,payload_json=? WHERE run_id=?")
+          .run(next.revision, JSON.stringify(next), row.run_id);
+      }
+    }
+    db.exec('COMMIT'); return true;
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}

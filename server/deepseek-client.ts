@@ -1,8 +1,9 @@
+import { externalModelCallsAllowed } from './ai-safety-control.ts';
 import { z } from 'zod';
 import { MoneyMissionDecisionSchema, MoneyMissionDecisionContextSchema,
   type MoneyMissionDecisionContext, type MoneyMissionDecision } from '../shared/contracts.ts';
 
-export type DeepSeekFailure = 'DEEPSEEK_NOT_CONFIGURED' | 'DEEPSEEK_HTTP_ERROR' | 'DEEPSEEK_INVALID_OR_TIMEOUT';
+export type DeepSeekFailure = 'AI_SAFE_MODE' | 'DEEPSEEK_NOT_CONFIGURED' | 'DEEPSEEK_HTTP_ERROR' | 'DEEPSEEK_INVALID_OR_TIMEOUT';
 
 export type DeepSeekMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -15,6 +16,7 @@ export async function requestDeepSeekJson<T>(schema: z.ZodType<T>, options: {
   timeoutMs?: number;
   signal?: AbortSignal;
 }): Promise<{ ok: true; data: T } | { ok: false; reason: DeepSeekFailure }> {
+  if (!externalModelCallsAllowed()) return { ok: false, reason: 'AI_SAFE_MODE' };
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) return { ok: false, reason: 'DEEPSEEK_NOT_CONFIGURED' };
   try {
@@ -69,3 +71,4 @@ export async function requestMoneyMissionDecision(context: MoneyMissionDecisionC
     return { ok: false, reason: 'DEEPSEEK_INVALID_OR_TIMEOUT' };
   return result;
 }
+

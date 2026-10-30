@@ -1,3 +1,4 @@
+import { assertAiWriteAllowed, getAiSafetyControl, setAiSafetyMode } from './ai-safety-control.ts';
 import {billInvestigation,reviewBillChange} from './bill-review.ts';
 import 'dotenv/config';
 import express from 'express';
@@ -61,7 +62,7 @@ installApiRateLimits(app);
 const demoControlsEnabled = !production || process.env.NOVA_DEMO_CONTROLS === 'true';
 app.get('/api/capabilities', (_req, res) => res.json({ demoControls: demoControlsEnabled, uploadEnabled: process.env.NOVA_ALLOW_STATEMENT_UPLOAD === 'true' }));
 app.use((req, res, next) => {
-  if (!demoControlsEnabled && (req.path === '/demo-control' || req.path.startsWith('/api/demo/')))
+  if (!(req.path === '/api/demo/ai-safety/safe-mode' && process.env.NOVA_ENABLE_DEMO_CONTROLS === 'true') && !demoControlsEnabled && (req.path === '/demo-control' || req.path.startsWith('/api/demo/')))
     return res.status(404).json({ error: 'NOT_FOUND' });
   next();
 });
@@ -95,6 +96,7 @@ function sessionId(req: express.Request, res: express.Response): string {
 function respond(res: express.Response, state: DemoState) { return res.json(snapshot(state)); }
 function failure(res: express.Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
+  if (message === 'AI_SAFE_MODE_WRITE_BLOCKED') return res.status(409).json({ error: message });
   const bad = error instanceof z.ZodError || /^(SERVICE_|PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_|DATA_|STATEMENT_|IMPORT_|BILL_|EVIDENCE_|SUBSCRIPTION_|SCHEDULE_|FORECAST_)/.test(message);
   return res.status(bad ? 400 : 500).json({ error: bad ? message : '服务暂时不可用，请稍后重试。' });
 }
@@ -114,6 +116,12 @@ app.get('/api/health', route((req, res) => {
   res.json({ status: 'ok', mode: 'simulated', sqlite: 'ok', contracts: 'ok',
     deepseek: process.env.DEEPSEEK_API_KEY ? 'configured' : 'deterministic_fallback',
     auditChainValid: verifyAuditChain(getState(id).audit), artifacts: artifactCounts(id) });
+}));
+app.get('/api/ai-safety/control', (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json(getAiSafetyControl()); });
+app.post('/api/demo/ai-safety/safe-mode', route((req, res) => {
+  if (process.env.NOVA_ENABLE_DEMO_CONTROLS !== 'true') return res.status(404).json({ error: 'NOT_FOUND' });
+  const body = z.object({ enabled: z.boolean(), reasonCode: z.literal('manual_demo') }).strict().parse(req.body);
+  res.setHeader('Cache-Control', 'no-store'); res.json(setAiSafetyMode(sessionId(req, res), body));
 }));
 app.get('/api/session', route((req, res) => { const state=getState(sessionId(req,res)); res.json(state.goals.length&&state.accountSnapshots.length?productMission(state).snapshot:snapshot(state)); }));
 registerProductMission(app, sessionId, route);
@@ -277,6 +285,7 @@ const BankingCallSchema = z.object({ tool: z.string().refine(value => toolNames.
   input: z.record(z.string(), z.unknown()).default({}), userConfirmed: z.boolean().default(false),
   expectedTwinVersion: z.number().int().positive().optional() });
 function executeTool(session: string, call: z.infer<typeof BankingCallSchema>) {
+  if (['evaluate_external_request', 'approve_external_operation'].includes(call.tool)) assertAiWriteAllowed();
   let result: unknown;
   const state = mutateState(session, old => {
     if (call.expectedTwinVersion !== undefined && old.twinVersion !== call.expectedTwinVersion) throw new Error('TWIN_VERSION_CHANGED');
@@ -686,6 +695,7 @@ app.post('/api/demo/agent-request', route((req, res) => {
   return respond(res, state);
 }));
 app.post('/api/external-agent/request', route((req, res) => {
+  assertAiWriteAllowed();
   const id = sessionId(req, res);
   const envelope = z.object({ agentId: z.string().min(1), subject: z.string().min(1), timestamp: z.number().int(),
     nonce: z.string().min(8).max(100), body: z.object({ category: z.string(), amountCents: z.number().int().positive(),
@@ -701,6 +711,7 @@ app.post('/api/external-agent/request', route((req, res) => {
   res.json(result);
 }));
 app.post('/api/operations/:id/approve', route((req, res) => respond(res, mutateState(sessionId(req, res), old => {
+  assertAiWriteAllowed();
   const parameters = { operationId: req.params.id };
   const approval = runBankingTool(old, 'create_approval_snapshot', { action: 'approve_external_operation', parameters, expiresInSeconds: 300 });
   const confirmed = runBankingTool(approval.state, 'confirm_approval', {
@@ -709,10 +720,10 @@ app.post('/api/operations/:id/approve', route((req, res) => respond(res, mutateS
   return runBankingTool(confirmed.state, 'approve_external_operation', { ...parameters, approvalToken: confirmed.result.approvalToken }).state;
 }))));
 app.post('/api/operations/:id/quick-confirm', route((req, res) =>
-  respond(res, mutateState(sessionId(req, res), old => quickConfirmOperation(old, req.params.id)))));
+  respond(res, mutateState(sessionId(req, res), old => { assertAiWriteAllowed(); return quickConfirmOperation(old, req.params.id); }))));
 app.post('/api/operations/:id/retry', route((req, res) => {
   const id = sessionId(req, res);
-  const state = mutateState(id, old => retryOperation(old, req.params.id).state);
+  const state = mutateState(id, old => { assertAiWriteAllowed(); return retryOperation(old, req.params.id).state; });
   return respond(res, state);
 }));
 app.post('/api/operations/:id/reconcile', route((req, res) => respond(res, mutateState(sessionId(req, res), old =>
@@ -759,3 +770,8 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => {
   clearInterval(monitorTimer);
   server.close(() => process.exit(0));
 });
+
+
+
+
+

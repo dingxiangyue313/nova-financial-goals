@@ -1,3 +1,4 @@
+import { assertAiWriteAllowed } from './ai-safety-control.ts';
 import { z } from 'zod';
 import { applyConfirmedAccountSnapshot } from './account-snapshots.ts';
 import { AgentTurnSchema, GoalAssumptionsSchema, type AgentComponent, type AgentIntent,
@@ -487,6 +488,7 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
     finishAgentAction(sessionId, actionId, 'cancelled', subscriptionDenial || action.actionType.endsWith('_transfer_schedule') ? { messageId: message.id } : state);
     return { state, replayed: false, message, nextStep: null };
   }
+  assertAiWriteAllowed();
   let next = state;
   let detail = '操作已完成';
   let receiptStatus: 'succeeded' | 'failed' | 'unknown' = 'succeeded';
@@ -714,3 +716,5 @@ export function ensureWeeklyRiskSummary(sessionId: string, state: DemoState) {
 export function workspaceOverview(sessionId: string) {
   return { threads: listAgentThreads(sessionId, true) };
 }
+
+

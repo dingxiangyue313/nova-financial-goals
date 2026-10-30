@@ -1,3 +1,4 @@
+import { assertAiWriteAllowed } from './ai-safety-control.ts';
 import { createHash } from 'node:crypto';
 import {
   generateAuthenticationOptions, generateRegistrationOptions,
@@ -80,6 +81,7 @@ export async function verifyAuthentication(sessionId: string, challengeId: strin
     expectedOrigin: origin, expectedRPID: rpID, requireUserVerification: true,
     credential: { id: credential.credentialId, publicKey: new Uint8Array(credential.publicKey), counter: credential.counter, transports: credential.transports } });
   if (!result.verified || !result.authenticationInfo.userVerified) throw new Error('WEBAUTHN_AUTHENTICATION_FAILED');
+  assertAiWriteAllowed();
   return completePasskeyAuthentication(sessionId, challengeId, credential.credentialId,
     result.authenticationInfo.newCounter, (state, saved) => {
       const operation = verifyOperation(state, saved.operationId!);
@@ -89,3 +91,4 @@ export async function verifyAuthentication(sessionId: string, challengeId: strin
       return approveOperation(state, operation.operationId, 'platform');
     });
 }
+

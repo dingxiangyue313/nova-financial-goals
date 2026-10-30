@@ -1,3 +1,5 @@
+import { aiSafetyCancellationGeneration } from './store.ts';
+import { externalModelCallsAllowed } from './ai-safety-control.ts';
 import { randomUUID } from 'node:crypto';
 import { MoneyMissionDecisionSchema, MoneyMissionDecisionContextSchema, EnabledSkillIdSchema,
   type MoneyMissionDecisionContext, type MoneyMissionDecision, type SkillOutput } from '../shared/contracts.ts';
@@ -56,7 +58,10 @@ options: SkillExecutionOptions & { maxDecisions?: number } = {}): Promise<MoneyM
   let revision: number | undefined;
   const latestUserId = () => getAgentMessages(sessionId, threadId).filter(message => message.role === 'user').at(-1)?.id;
   let userId: string | undefined;
+  const safetyGeneration = aiSafetyCancellationGeneration();
   const check = () => {
+    if (aiSafetyCancellationGeneration() !== safetyGeneration) throw new Error('AI_SAFE_MODE');
+    if (!externalModelCallsAllowed()) throw new Error('AI_SAFE_MODE');
     if (options.signal?.aborted) throw new Error('SKILL_CANCELLED');
     if (Date.now() >= deadlineAt) throw new Error('SKILL_TIMEOUT');
     let thread;
@@ -142,7 +147,7 @@ options: SkillExecutionOptions & { maxDecisions?: number } = {}): Promise<MoneyM
     return finish('failed', 'SKILL_DECISION_BUDGET_EXHAUSTED');
   } catch (error) {
     const code = error instanceof Error ? error.message : 'SKILL_FAILED';
-    return finish(['SKILL_CANCELLED', 'SKILL_RUN_STALE'].includes(code) ? 'cancelled' : 'failed', code);
+    return finish(['AI_SAFE_MODE', 'SKILL_CANCELLED', 'SKILL_RUN_STALE'].includes(code) ? 'cancelled' : 'failed', code);
   }
 }
 
@@ -229,6 +234,7 @@ function appendStep(run: AgentRun, kind: AgentRun['steps'][number]['kind'], summ
 
 function checked(sessionId: string, threadId: string, runId: string,
   expectedTaskRevision: number, expectedTwinVersion: number): { run: AgentRun; task: AgentTask } {
+  if (!externalModelCallsAllowed()) throw new Error('AI_SAFE_MODE');
   const run = getAgentRun(sessionId, threadId, runId);
   if (run.status !== 'running') throw new Error('AGENT_RUN_STOPPED');
   if (Date.now() >= Date.parse(run.deadlineAt)) throw new Error('AGENT_RUN_TIMEOUT');
@@ -649,3 +655,4 @@ export function stopAgentRun(sessionId: string, threadId: string, runId: string)
         at: new Date().toISOString(), toolResultId: null } });
   return run;
 }
+
