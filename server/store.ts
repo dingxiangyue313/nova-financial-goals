@@ -1,3 +1,4 @@
+import { verifyAuditChain } from './governance.ts';
 import {tickGoalNotices} from './goal-notices.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -1381,4 +1382,39 @@ export function persistAiSafetyMode(enabled: boolean, reasonCode: NonNullable<im
     }
     db.exec('COMMIT'); return true;
   } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+/** Receipt projections deliberately exclude prompts, messages, payloads and thread-wide turns. */
+export function getAiSafetyReceiptFacts(sessionId: string, runId: string) {
+  const run = db.prepare(`SELECT run_id AS runId, status,
+    json_extract(payload_json,'$.provider') AS provider,
+    json_extract(payload_json,'$.reasonCode') AS reasonCode,
+    json_extract(payload_json,'$.decisionCount') AS decisionCount,
+    json_extract(payload_json,'$.toolCallCount') AS toolCallCount,
+    json_extract(payload_json,'$.startedAt') AS startedAt,
+    json_extract(payload_json,'$.updatedAt') AS updatedAt
+    FROM agent_task_runs WHERE session_id=? AND run_id=?
+    AND EXISTS (SELECT 1 FROM demo_sessions d WHERE d.id=agent_task_runs.session_id)`).get(sessionId, runId);
+  if (!run) return null;
+  const tools = db.prepare(`SELECT DISTINCT t.id AS evidenceId, t.tool AS name,
+    json_extract(t.payload_json,'$.status') AS status, t.twin_version AS twinVersion
+    FROM agent_task_runs r JOIN agent_tool_results t
+      ON t.session_id=r.session_id AND t.thread_id=r.thread_id
+      AND t.task_id=r.task_id AND t.run_id=r.demo_run_id
+    WHERE r.session_id=? AND r.run_id=? AND (
+      EXISTS (SELECT 1 FROM json_each(r.payload_json,'$.steps') s
+        WHERE json_extract(s.value,'$.toolResultId')=t.id)
+      OR EXISTS (SELECT 1 FROM json_each(r.payload_json,'$.recommendedResultIds') s WHERE s.value=t.id))`)
+    .all(sessionId, runId);
+  const audit = db.prepare(`SELECT json_extract(d.state_json,'$.audit') AS events
+    FROM demo_sessions d JOIN agent_task_runs r ON r.session_id=d.id
+    WHERE r.session_id=? AND r.run_id=?`).get(sessionId,runId) as {events:string}|undefined;
+  const actions = db.prepare(`SELECT a.status FROM agent_task_runs r JOIN agent_actions a
+    ON a.session_id=r.session_id AND a.thread_id=r.thread_id
+    AND json_extract(a.payload_json,'$.taskId')=r.task_id
+    AND json_extract(a.payload_json,'$.demoRunId')=r.demo_run_id
+    WHERE r.session_id=? AND r.run_id=? AND a.action_type='apply_verified_candidate'
+    AND EXISTS (SELECT 1 FROM json_each(r.payload_json,'$.recommendedResultIds') x
+      WHERE x.value=json_extract(a.payload_json,'$.resultId'))`).all(sessionId,runId);
+  return { run, tools, actions, auditChainValid: audit ? verifyAuditChain(JSON.parse(audit.events)) : null };
 }

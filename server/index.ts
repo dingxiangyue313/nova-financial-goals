@@ -1,3 +1,4 @@
+import { buildAiSafetyDecisionReceipt } from './ai-safety-receipt.ts';
 import { assertAiWriteAllowed, getAiSafetyControl, setAiSafetyMode } from './ai-safety-control.ts';
 import {billInvestigation,reviewBillChange} from './bill-review.ts';
 import 'dotenv/config';
@@ -116,6 +117,11 @@ app.get('/api/health', route((req, res) => {
   res.json({ status: 'ok', mode: 'simulated', sqlite: 'ok', contracts: 'ok',
     deepseek: process.env.DEEPSEEK_API_KEY ? 'configured' : 'deterministic_fallback',
     auditChainValid: verifyAuditChain(getState(id).audit), artifacts: artifactCounts(id) });
+}));
+app.get('/api/ai-safety/runs/:runId/receipt', route((req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try { res.json(buildAiSafetyDecisionReceipt(sessionId(req, res), req.params.runId)); }
+  catch (error) { if (error instanceof Error && error.message === 'AI_SAFETY_RECEIPT_NOT_FOUND') return res.status(404).json({ error: error.message }); throw error; }
 }));
 app.get('/api/ai-safety/control', (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json(getAiSafetyControl()); });
 app.post('/api/demo/ai-safety/safe-mode', route((req, res) => {
@@ -770,8 +776,3 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => {
   clearInterval(monitorTimer);
   server.close(() => process.exit(0));
 });
-
-
-
-
-

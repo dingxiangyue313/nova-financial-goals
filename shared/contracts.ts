@@ -1134,3 +1134,20 @@ export const AiSafetyPassportSchema = z.object({
   fallbackMode: z.literal('deterministic_read_only'),
 }).strict();
 export type AiSafetyPassport = z.infer<typeof AiSafetyPassportSchema>;
+
+export const AiSafetyDecisionReceiptSchema = z.object({
+  runId: z.string().uuid(), status: AgentRunSchema.shape.status,
+  provider: z.enum(['deepseek', 'deterministic']).nullable(),
+  fallbackReason: z.enum(['AGENT_RUN_BUDGET_EXHAUSTED', 'AI_SAFE_MODE', 'MODEL_UNAVAILABLE', 'MODEL_TIMEOUT', 'INVALID_MODEL_RESPONSE']).nullable(),
+  skillId: SkillIdSchema.nullable(), decisionCount: z.number().int().nonnegative(),
+  toolCallCount: z.number().int().nonnegative(),
+  tools: z.array(z.object({ name: AgentReadToolNameSchema,
+    status: z.enum(['ok', 'insufficient_data', 'constraint_violation', 'unsupported']),
+    evidenceIds: z.array(z.string().uuid()), twinVersion: z.number().int().positive() }).strict()),
+  evidenceIds: z.array(z.string().uuid()), twinVersion: z.number().int().positive().nullable(),
+  requiresHumanConfirmation: z.boolean(),
+  confirmationStatus: z.enum(['not_required', 'awaiting_confirmation', 'confirmed', 'cancelled', 'blocked']),
+  auditChainValid: z.boolean(), startedAt: z.string().datetime({ offset: true }),
+  completedAt: z.string().datetime({ offset: true }).nullable(),
+}).strict();
+export type AiSafetyDecisionReceipt = z.infer<typeof AiSafetyDecisionReceiptSchema>;
