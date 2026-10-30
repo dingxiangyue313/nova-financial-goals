@@ -8,7 +8,7 @@ function funded(){let s=initializeServices(createJapanMoneyMissionFixture());s.a
 function book(s:ReturnType<typeof funded>){return executeServiceAction(s,{kind:'book',goalId:s.goal.id,accountId:'goal-wallet',cardId:'card-travel',mandateId:'grant',quoteIds:s.financialServices.quotes.map(q=>q.id)},'book');}
 test('task is derived, versioned and replayable without submitting any operation',()=>{
  const state=initializeServices(createJapanMoneyMissionFixture()),before=structuredClone(state),task=travelTask(state,state.goal.id);
- assert.equal(task.schemaVersion,1);assert.equal(task.id,`travel-task:${state.goal.id}`);assert.equal(task.status,'planning');assert.equal(task.nodes.length,7);
+ assert.equal(task.schemaVersion,2);assert.equal(task.id,`travel-task:${state.goal.id}`);assert.equal(task.status,'planning');assert.equal(task.nodes.length,8);
  assert.deepEqual(travelTask(DemoStateSchema.parse(JSON.parse(JSON.stringify(state))),state.goal.id),task);assert.deepEqual(state,before);
  assert.throws(()=>travelTask(state,'foreign-goal'),/GOAL_NOT_FOUND/);
 });

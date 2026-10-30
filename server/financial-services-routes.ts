@@ -1,3 +1,8 @@
+import {tickGoalNotices} from './goal-notices.ts';
+import {travelRecoveryOptions} from './travel-recovery.ts';
+import {serviceEvidence} from './service-evidence.ts';
+import {receiveFulfillment,signFulfillment,FulfillmentEventSchema} from './fulfillment.ts';
+import {syncMissionCheckpoint} from './mission-checkpoint.ts';
 import {requestSignedTravelQuotes,requestTravelCounteroffer,receiveTravelRequest,TravelEnvelopeSchema} from './travel-inbox.ts';
 import {ProviderEventSchema} from '../shared/financial-services.ts';
 import {applyProviderEvent,signProviderEvent} from './provider-events.ts';
@@ -19,6 +24,11 @@ import {serviceCasePack} from './service-monitor.ts';
 import {buildMandateDraft} from './mandate-draft.ts';
 
 export function registerFinancialServices(app:Express,sessionId:(req:Request,res:Response)=>string,route:(fn:(req:Request,res:Response)=>unknown)=>RequestHandler){
+  app.get('/api/services/evidence/:id',route((req,res)=>res.json(serviceEvidence(getState(sessionId(req,res)),req.params.id))));
+  app.get('/api/services/recovery/:goalId',route((req,res)=>res.json(travelRecoveryOptions(getState(sessionId(req,res)),req.params.goalId))));
+  app.post('/api/services/recovery/:goalId/quotes',route((req,res)=>{z.object({}).strict().parse(req.body);const id=sessionId(req,res);let quoteIds:string[]=[];const state=mutateState(id,s=>{const options=travelRecoveryOptions(s,req.params.goalId);if(!options.options.some(o=>o.id==='retry_failed'))throw new Error('SERVICE_RECOVERY_NOT_AVAILABLE');const failedIds=options.options.find(o=>o.id==='retry_failed')!.operationIds;const failed=s.financialServices.bookings.filter(b=>failedIds.includes(b.id)),next=requestSignedTravelQuotes(s,id,Date.now(),req.params.goalId);quoteIds=next.financialServices.quotes.slice(-2).filter(q=>failed.some(b=>b.merchantId===q.merchantId)&&!s.financialServices.bookings.some(b=>b.merchantId===q.merchantId&&b.goalId===req.params.goalId&&['confirmed','unknown'].includes(b.status))).map(q=>q.id);return next;});res.json({view:financialServicesView(state),quoteIds});}));
+  app.get('/api/services/goal-notices',route((req,res)=>res.json({items:mutateState(sessionId(req,res),s=>tickGoalNotices(s)).financialServices.goalNotices.filter(n=>['delivered','read'].includes(n.status))})));
+  app.post('/api/services/goal-notices/:id/read',route((req,res)=>{z.object({}).strict().parse(req.body);mutateState(sessionId(req,res),s=>{const n=s.financialServices.goalNotices.find(n=>n.id===req.params.id&&['delivered','read'].includes(n.status));if(!n)throw new Error('SERVICE_NOTICE_NOT_FOUND');if(n.status==='read')return s;n.status='read';return appendAuditEvent(s,'goal_notice_read','recorded','用户已读本地目标提醒，资金与授权保持不变。');});res.json({read:true});}));
   app.get('/api/services/provider-events',route((req,res)=>res.json({items:getState(sessionId(req,res)).financialServices.providerEventLog.map(({payloadHash:_hash,...entry})=>entry)})));
   app.post('/api/demo/provider-events/send',route((req,res)=>{const event=ProviderEventSchema.parse(req.body),id=sessionId(req,res);res.json(financialServicesView(mutateState(id,s=>applyProviderEvent(s,id,event,signProviderEvent(id,event)))));}));
   app.post('/api/demo/provider-events/receive',route((req,res)=>{const packet=z.object({event:ProviderEventSchema,signature:z.string().max(128)}).strict().parse(req.body),id=sessionId(req,res);res.json(financialServicesView(mutateState(id,s=>applyProviderEvent(s,id,packet.event,packet.signature))));}));
@@ -29,8 +39,10 @@ export function registerFinancialServices(app:Express,sessionId:(req:Request,res
     const body=z.object({action:z.enum(['read','snooze']),until:z.iso.date().optional()}).strict().parse(req.body);
     const state=mutateState(sessionId(req,res),s=>decideSubscriptionNotification(s,req.params.id,body.action,body.until));res.json({items:state.financialServices.subscriptionNotifications.filter(n=>n.status!=='cancelled'),asOf:state.clock});
   }));
-  app.get('/api/services/tasks/:goalId',route((req,res)=>res.json(travelTask(initializeServices(getState(sessionId(req,res))),req.params.goalId))));
-  app.get('/api/services/tasks/:goalId/proof',route((req,res)=>res.json(travelProof(initializeServices(getState(sessionId(req,res))),req.params.goalId))));
+  app.post('/api/services/fulfillment/receive',route((req,res)=>{const body=z.object({event:FulfillmentEventSchema,signature:z.string().max(128)}).strict().parse(req.body),id=sessionId(req,res);res.json(financialServicesView(mutateState(id,s=>receiveFulfillment(s,id,body.event,body.signature))));}));
+  app.post('/api/demo/fulfillment/send',route((req,res)=>{const event=FulfillmentEventSchema.parse(req.body),id=sessionId(req,res);res.json(financialServicesView(mutateState(id,s=>receiveFulfillment(s,id,event,signFulfillment(id,event)))));}));
+  app.get('/api/services/tasks/:goalId',route((req,res)=>res.json(travelTask(mutateState(sessionId(req,res),s=>syncMissionCheckpoint(initializeServices(s),req.params.goalId)),req.params.goalId))));
+  app.get('/api/services/tasks/:goalId/proof',route((req,res)=>res.json(travelProof(mutateState(sessionId(req,res),s=>syncMissionCheckpoint(initializeServices(s),req.params.goalId)),req.params.goalId))));
   app.get('/api/services/cases/:id',route((req,res)=>res.json(serviceCasePack(getState(sessionId(req,res)),req.params.id))));
   app.get('/api/services/portfolio',route((req,res)=>res.json(buildGoalPortfolio(initializeServices(getState(sessionId(req,res)))))));
   app.post('/api/services/investments/compare',route((req,res)=>{

@@ -44,7 +44,7 @@ import { getTransferScheduleStatus, resumeTransferSchedule } from './transfer-sc
 import { moneyMissionReadModel } from './money-mission.ts';
 import { registerProductMission, productMission } from './product-mission.ts';
 import { registerFinancialServices } from './financial-services-routes.ts';
-import { tickFinancialServices,tickSubscriptionReminderQueue } from './store.ts';
+import { tickFinancialServices,tickSubscriptionReminderQueue,tickGoalNoticeQueue } from './store.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -746,6 +746,7 @@ if (production) {
 }
 const server = app.listen(port, '0.0.0.0', () => console.log(`NOVA original UI + new simulated backend: http://localhost:${port}`));
 function runMonitorTick() {
+  try { tickGoalNoticeQueue(); } catch { console.error('Goal notice queue failed'); }
   try { tickFinancialServices(); } catch { console.error('Financial service reconciliation failed'); }
   try { tickSubscriptionReminderQueue(); } catch { console.error('Subscription reminder queue failed'); }
   try { tickTransferWorker(); } catch { console.error('Transfer worker tick failed'); }

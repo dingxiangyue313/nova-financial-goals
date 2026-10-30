@@ -1,0 +1,14 @@
+import {inspectEvidence} from './bill-analysis.ts';
+import {buildGoalPortfolio} from './goal-portfolio.ts';
+import type {DemoState} from '../shared/contracts.ts';
+export function serviceEvidence(s:DemoState,id:string){
+ const ref=s.evidenceRefs.find(r=>r.id===id),snapshot=s.accountSnapshots.find(a=>a.id===id);if(ref||snapshot){let summary=ref?.label??`权威余额快照截至${snapshot!.asOf}：${snapshot!.balanceCents/100}元`;if(ref){try{const row=inspectEvidence(s,id);summary=row.transaction?`历史交易 ${row.transaction.date}，${row.transaction.amountCents/100}元，分类${row.transaction.category}`:row.label;}catch{/* Non-transaction facts keep their allowlisted label. */}}return {id,asOf:snapshot?.asOf??ref?.dataAsOf??s.clock,twinVersion:snapshot?.twinVersion??ref?.twinVersion??s.twinVersion,kind:snapshot?'account_snapshot':'evidence',summary,stages:[],approvalRefs:[],limitations:['历史账单不覆盖权威余额；仅返回归一化来源摘要。']};}
+ if(id.startsWith('forecast-')){const p=buildGoalPortfolio(s);if(p.sourceRefs.includes(id))return {id,asOf:s.clock,twinVersion:s.twinVersion,kind:'prediction',summary:`共享日期账本预测到${p.horizonEnd}，最低余额${p.current.minimumBalanceCents/100}元；未来工资与账单不是保证。`,stages:[],approvalRefs:[],limitations:p.assumptions};}
+ const d=s.financialServices,receipt=d.receipts.find(r=>r.operationId===id||r.id===id),b=d.bookings.find(b=>b.id===id),q=d.quotes.find(q=>q.id===id),card=d.cards.find(c=>c.id===id),mandate=d.mandates.find(m=>m.id===id),hold=d.holds.find(h=>h.id===id),goal=s.goals.find(g=>g.id===id),fulfillment=d.fulfillmentRecords.find(f=>f.evidenceRef===id),approval=s.approvals.find(a=>a.id===id);
+ if(!receipt&&!b&&!q&&!card&&!mandate&&!hold&&!goal&&!fulfillment&&!approval)throw new Error('SERVICE_EVIDENCE_NOT_FOUND');
+ const operationId=receipt?.operationId??b?.operationId??(fulfillment&&d.bookings.find(b=>b.id===fulfillment.bookingId)?.operationId);
+ const audits=s.audit.filter(a=>operationId&&a.operationId===operationId);
+ return {id,asOf:s.clock,twinVersion:s.twinVersion,kind:receipt?'receipt':b?'order':q?'quote':card?'card':mandate?'mandate':hold?'hold':goal?'goal':fulfillment?'fulfillment':'approval',
+ summary:receipt?`${receipt.label} · ${receipt.status}`:b?`订单${b.status}，付款${b.payment}`:q?`${q.label}，${q.totalCents/100}元，${q.refundable?'可退':'不可退'}`:card?`${card.label}尾号${card.suffix}，${card.status}`:mandate?`授权${mandate.status}，单笔${mandate.maxPerOrderCents/100}元，累计${mandate.totalCents/100}元`:hold?`预留${hold.amountCents/100}元，${hold.status}`:goal?`${goal.title}，目标${goal.targetCents/100}元`:fulfillment?`签名模拟履约${fulfillment.status}`:`原批准${approval!.status}`,
+ stages:audits.map(a=>({stage:a.action,outcome:a.outcome,date:a.at,hash:a.eventHash??null})),approvalRefs:audits.map(a=>a.approvalId).filter((id):id is string=>Boolean(id)),limitations:['只返回脱敏摘要和来源引用，批准令牌/签名/密钥/完整账号不导出。','账单来源使用账单逐笔证据入口；这里只覆盖当前会话金融执行工件。']};
+}

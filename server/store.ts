@@ -1,3 +1,4 @@
+import {tickGoalNotices} from './goal-notices.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -1137,6 +1138,7 @@ export function tickFinancialServices() {
   for (const session of sessions) mutateState(session.id, s => reconcileServices(s));
   return sessions.length;
 }
+export function tickGoalNoticeQueue(){const sessions=db.prepare('SELECT id FROM demo_sessions ORDER BY updated_at LIMIT 100').all() as Array<{id:string}>;for(const session of sessions)mutateState(session.id,s=>tickGoalNotices(s));return sessions.length;}
 export function tickSubscriptionReminderQueue(now=new Date()){
  const sessions=db.prepare(`SELECT id FROM demo_sessions WHERE EXISTS(SELECT 1 FROM json_each(state_json,'$.subscriptionActions') WHERE json_extract(value,'$.action')='remind') ORDER BY updated_at LIMIT 100`).all() as Array<{id:string}>;
  for(const session of sessions)mutateState(session.id,state=>tickSubscriptionNotifications(state,now));

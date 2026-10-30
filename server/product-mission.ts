@@ -1,3 +1,4 @@
+import {fixedMonthlyRange} from '../shared/fixed-monthly.ts';
 import {aaCatalogFixture} from './aa-catalog.ts';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -117,7 +118,8 @@ export function registerProductMission(app: Express, sessionId: (req: Request, r
   app.post('/api/product/prepare', route((req, res) => {
     const body = z.object({ kind: z.enum(['plan', 'subscription', 'schedule', 'pause', 'cancel', 'resume', 'balance']),
       id: z.string().optional(), recurrence: z.enum(['one_time', 'monthly']).default('monthly'),
-      scheduledDate:z.iso.date().optional(), balanceCents: z.number().int().nonnegative().optional(), asOf: z.iso.date().optional() }).strict().parse(req.body);
+      fixedDay:z.number().int().min(1).max(31).optional(), scheduledDate:z.iso.date().optional(), balanceCents: z.number().int().nonnegative().optional(), asOf: z.iso.date().optional() }).strict().parse(req.body);
+    if(body.fixedDay&&(body.kind!=='schedule'||body.recurrence!=='monthly'||body.scheduledDate))throw new Error('SCHEDULE_INVALID_SCOPE');
     if(body.scheduledDate&&(body.kind!=='schedule'||body.recurrence!=='one_time'))throw new Error('SCHEDULE_INVALID_SCOPE');
     const sid = sessionId(req, res), thread = createAgentThread(sid, { title: '旅行任务操作', dedupeKey: 'product-confirmations' });
     let confirmation: { actionId: string; title: string; body: string } | null = null;
@@ -147,11 +149,12 @@ export function registerProductMission(app: Express, sessionId: (req: Request, r
       const plan = view.plans.find(item => item.monthlyCents === state.goal.monthlyContributionCents && item.firstMonthContributionCents === state.goal.firstMonthContributionCents);
       if (!plan) throw new Error('SCHEDULE_PLAN_CHANGED');
       const salaryStartDate = view.forecast.events.filter(item => item.kind === 'income' && item.label === '工资').map(item => new Date(Date.parse(`${item.date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10))[0];
-      const startDate=body.scheduledDate??salaryStartDate;
+      const fixedDates=body.fixedDay?fixedMonthlyRange(state.clock,body.fixedDay,plan.occurrences):[];
+      const startDate=body.scheduledDate??fixedDates[0]??salaryStartDate;
       const input = { goalId: state.goal.id, planOptionId: plan.id, sourceAccountId: 'checking', destinationAccountId: 'goal-wallet',
         amountCents: body.recurrence === 'one_time' ? plan.upfrontCents || plan.monthlyCents : plan.monthlyCents, currency: 'CNY', recurrence: body.recurrence,
-        startDate, endDate: body.scheduledDate?startDate:plan.projectedDate, stopAtGoal: true, forecastId: view.forecast.id, twinVersion: state.twinVersion,
-        trigger: body.scheduledDate?{type:'fixed_day' as const,day:Number(startDate.slice(-2))}:{ type: 'salary_event' as const, accountId: 'checking', sourceKind: 'bank' as const, category: 'income' as const, classification: 'salary' as const,
+        startDate, endDate: body.scheduledDate?startDate:body.fixedDay?fixedDates.at(-1)!:plan.projectedDate, stopAtGoal: true, forecastId: view.forecast.id, twinVersion: state.twinVersion,
+        trigger: body.scheduledDate||body.fixedDay?{type:'fixed_day' as const,day:body.fixedDay??Number(startDate.slice(-2))}:{ type: 'salary_event' as const, accountId: 'checking', sourceKind: 'bank' as const, category: 'income' as const, classification: 'salary' as const,
           expectedAmountCents: state.finance.monthlyIncomeCents, toleranceBps: 1000, expectedDay: 25, windowStartDay: 23, graceEndDay: 27,
           graceEndTime: '23:59' as const, executeOffsetDays: 1, executeTime: '09:00' as const, missingEventPolicy: 'skip_no_catchup' as const } };
       const p = prepareTransferScheduleConfirmation(sid, thread.id, state, { action: 'activate', input });

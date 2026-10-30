@@ -1,0 +1,2 @@
+export function fixedMonthlyDate(period:string,day:number){const [y,m]=period.split('-').map(Number);return new Date(Date.UTC(y,m-1,Math.min(day,new Date(Date.UTC(y,m,0)).getUTCDate()))).toISOString().slice(0,10);}
+export function fixedMonthlyRange(clock:string,day:number,count:number){const dates:string[]=[];const cursor=new Date(clock.slice(0,7)+'-01T00:00:00Z');while(dates.length<count&&dates.length<366){const date=fixedMonthlyDate(cursor.toISOString().slice(0,7),day);if(date>clock)dates.push(date);cursor.setUTCMonth(cursor.getUTCMonth()+1);}return dates;}

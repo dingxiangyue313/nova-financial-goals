@@ -1,0 +1,6 @@
+import type {DemoState} from '../shared/contracts.ts';import {stableHash,appendAuditEvent} from './governance.ts';import {goalProgress} from './fulfillment.ts';
+export function syncMissionCheckpoint(input:DemoState,goalId:string){
+ const goal=input.goals.find(g=>g.id===goalId);if(!goal)throw new Error('SERVICE_GOAL_NOT_FOUND');const d=input.financialServices,orders=d.bookings.filter(b=>b.goalId===goalId);const operationIds=[...new Set([...orders.map(b=>b.operationId),...d.mandates.filter(m=>m.goalId===goalId).map(m=>m.id)])].sort();
+ const hash=stableHash({goal,progress:goalProgress(input,goalId),orders,mandates:d.mandates.filter(m=>m.goalId===goalId),fulfillment:d.fulfillmentRecords.filter(r=>orders.some(b=>b.id===r.bookingId))});const old=d.missionCheckpoints.find(c=>c.goalId===goalId);if(old?.schemaVersion===2&&old.stateHash===hash)return input;
+ const s=structuredClone(input);s.financialServices.missionCheckpoints=s.financialServices.missionCheckpoints.filter(c=>c.goalId!==goalId);s.financialServices.missionCheckpoints.push({id:old?.id??`mission:${goalId}`,goalId,schemaVersion:2,revision:(old?.revision??0)+1,stateHash:hash,updatedOn:s.clock,operationIds,...(old?.schemaVersion===1?{migratedFrom:1 as const}:old?.migratedFrom?{migratedFrom:old.migratedFrom}:{})});return appendAuditEvent(s,'mission_checkpoint','saved','已持久保存同一任务版本与原操作引用，没有重新执行付款。');
+}

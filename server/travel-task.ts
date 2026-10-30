@@ -1,3 +1,5 @@
+import {serviceEvidence} from './service-evidence.ts';
+import {goalProgress} from './fulfillment.ts';
 import type {DemoState} from '../shared/contracts.ts';
 import {TravelTaskSchema,TravelProofSchema,type TravelTask} from '../shared/travel-task.ts';
 
@@ -30,16 +32,22 @@ export function travelTask(state:DemoState,goalId:string,now=Date.now()):TravelT
   const status=!b?'pending':b.status==='confirmed'?'complete':b.status==='unknown'?'unknown':b.status==='submitted'?'pending':'needs_recovery';
   node(merchant,label,['funds'],status,!b?'尚未提交，不会自动预订。':b.status==='confirmed'?'商户订单已确认；不代表服务已经实际履约。':b.status==='unknown'?'保留本单预留，先查询原操作；另一笔成功单不重跑。':b.status==='refund_pending'?'退款在途，尚未计入现金。':b.status==='failed'?'本单未完成；可重新询价，仅处理失败项。':'本单已取消或退款，若仍需旅行请重新核对计划。',b?[b.id,b.operationId,b.quoteId,b.mandateId]:[]);
  }
- const recovery=unknown||refund||bookings.some(b=>['failed','cancelled','refunded'].includes(b.status));
+ const progress=goalProgress(state,goalId);
+ node('fulfillment','服务履约证据',['air-demo','stay-demo'],progress.fulfilled?'complete':paidComplete?'pending':'blocked',progress.fulfilled?'所需服务均有模拟签名履约证据；不是实际旅行提供商证明。':'预订付款不等于履约；需来自模拟服务的独立证据，不凭余额或用户点击推断。',d.fulfillmentRecords.filter(r=>bookings.some(b=>b.id===r.bookingId)).map(r=>r.evidenceRef));
+ const recovery=unknown||refund||['air-demo','stay-demo'].some(merchant=>{
+  const latest=bookings.filter(b=>b.merchantId===merchant).at(-1);
+  return latest&&['failed','cancelled','refunded'].includes(latest.status);
+ });
  node('verify','结果验证与恢复',['air-demo','stay-demo'],unknown?'unknown':recovery?'needs_recovery':paidComplete?'complete':'pending',paidComplete?'两份独立订单均已确认，可导出证明包；旅行履约仍需后续证据。':'按原订单核对未知、失败或退款。任务不提供自动重付或强制回滚。',bookings.map(b=>b.operationId));
- return TravelTaskSchema.parse({id:`travel-task:${goalId}`,schemaVersion:1,goalId,goalTitle:goal.title,twinVersion:state.twinVersion,asOf:state.clock,
+ return TravelTaskSchema.parse({id:`travel-task:${goalId}`,schemaVersion:2,checkpointRevision:d.missionCheckpoints.find(c=>c.goalId===goalId)?.revision,progress,goalId,goalTitle:goal.title,twinVersion:state.twinVersion,asOf:state.clock,
   status:refund?'refund_pending':paidComplete?'booked':recovery?'needs_attention':'planning',coverageCents:cash+booked,targetCents:goal.targetCents,nodes,
-  limitations:['任务图是现有工件的只读视图，不产生付款权。','预订确认与真实旅行履约分开；未提供实际履约证明。','任务schema版本1；仅支持本地模拟状态，不承诺外部webhook兼容。']});
+  limitations:['任务图是现有工件的只读视图，不产生付款权。','履约为独立签名模拟证据；不是现实旅行证明，实际履约需现实服务机构的证据。','任务schema版本2，兼容本地v1检查点迁移；只支持本地模拟协议。']});
 }
 export function travelProof(state:DemoState,goalId:string,now=Date.now()){
  const task=travelTask(state,goalId,now),operationIds=new Set(state.financialServices.bookings.filter(b=>b.goalId===goalId).map(b=>b.operationId));
  for(const mandate of state.financialServices.mandates.filter(m=>m.goalId===goalId))operationIds.add(mandate.id);
  const operations=state.financialServices.receipts.filter(r=>operationIds.has(r.operationId)).map(r=>({operationId:r.operationId,kind:r.kind,status:r.status,amountCents:r.amountCents,date:r.date}));
  const audit=state.audit.filter(a=>a.operationId&&operationIds.has(a.operationId)&&a.eventHash&&a.previousHash).map(a=>({id:a.id,stage:a.action,status:a.outcome,hash:a.eventHash!,previousHash:a.previousHash!}));
- return TravelProofSchema.parse({schemaVersion:1,task,operations,audit,limitations:['只导出当前会话相关任务的脱敏证据，不含签名、密钥或批准令牌。','这是原审计链的选择性摘录；核验完整链需保留服务端全链，不把摘录宣称为独立完整链。','生成与下载不发送给任何外部机构。']});
+ const refs=[...new Set(task.nodes.flatMap(n=>n.sourceRefs))],checkpoint=state.financialServices.missionCheckpoints.find(c=>c.goalId===goalId);const sources=refs.flatMap(id=>{try{const e=serviceEvidence(state,id);return [{id,summary:e.summary,kind:e.kind}];}catch{return [];}});
+ return TravelProofSchema.parse({schemaVersion:2,task,operations,audit,sources,checkpoint,fulfillment:state.financialServices.fulfillmentRecords.filter(r=>state.financialServices.bookings.some(b=>b.id===r.bookingId&&b.goalId===goalId)).map(({payloadHash:_hash,...r})=>r),limitations:['只导出当前会话相关任务的脱敏证据，不含签名、密钥或批准令牌。','这是原审计链的选择性摘录；核验完整链需保留服务端全链，不把摘录宣称为独立完整链。','生成与下载不发送给任何外部机构。']});
 }

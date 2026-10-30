@@ -1,3 +1,4 @@
+import {fixedMonthlyDate} from '../shared/fixed-monthly.ts';
 import { randomUUID } from 'node:crypto';
 import {protectedCheckingReserve} from './financial-constraints.ts';
 import { TransferScheduleInputSchema, type DemoState, type Transaction, type TransferExecution,
@@ -43,7 +44,7 @@ function requireAuthority(sessionId: string, state: DemoState, schedule: Transfe
     stableHash(getTransferScheduleAuthority(sessionId, schedule.id)) !== stableHash(transferScheduleAuthority(state, schedule)))
     throw new Error('SCHEDULE_AUTHORITY_CHANGED');
   const trigger = schedule.trigger;
-  if(trigger.type==='fixed_day'){if(schedule.recurrence!=='one_time'||schedule.sourceAccountId!=='checking'||trigger.day!==Number(schedule.startDate.slice(-2))||!schedule.stopAtGoal)throw new Error('SCHEDULE_INVALID_SCOPE');return original;}
+  if(trigger.type==='fixed_day'){if(schedule.sourceAccountId!=='checking'||(schedule.recurrence==='one_time'&&trigger.day!==Number(schedule.startDate.slice(-2)))||!schedule.stopAtGoal)throw new Error('SCHEDULE_INVALID_SCOPE');return original;}
   if (trigger.type !== 'salary_event' || trigger.accountId !== 'checking' || schedule.sourceAccountId !== 'checking' ||
     trigger.expectedAmountCents !== 850000 || trigger.toleranceBps > 1000 || trigger.windowStartDay !== 23 ||
     trigger.graceEndDay !== 27 || trigger.executeOffsetDays !== 1 || !schedule.stopAtGoal)
@@ -58,7 +59,7 @@ function saveOutcome(state: DemoState, schedule: TransferSchedule, execution: Tr
   if (execution.status !== 'scheduled') {
     const [year, month] = execution.period.split('-').map(Number);
     const nextPeriod = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
-    nextEvaluationAt = `${nextPeriod}-23T09:00:00+08:00`;
+    nextEvaluationAt = `${schedule.trigger.type==='fixed_day'?fixedMonthlyDate(nextPeriod,schedule.trigger.day):nextPeriod+'-23'}T09:00:00+08:00`;
     if ((execution.status === 'unknown' || execution.status === 'failed') && schedule.status === 'active') status = stop ?? 'paused';
     if (schedule.recurrence === 'one_time' || nextPeriod > (schedule.endDate ?? state.goal.targetDate).slice(0, 7) ||
       state.goal.savedCents >= state.goal.targetCents) status = 'completed';
@@ -100,7 +101,8 @@ function evaluate(sessionId: string, state: DemoState, scheduleId: string, perio
     const original = requireAuthority(sessionId, state, schedule);
     let dueAt:string;
     if(schedule.trigger.type==='fixed_day'){
-      dueAt=`${schedule.startDate}T09:00:00+08:00`;
+      dueAt=`${schedule.recurrence==='monthly'?fixedMonthlyDate(period,schedule.trigger.day):schedule.startDate}T09:00:00+08:00`;
+      if(date>dueAt.slice(0,10))throw new Error('SCHEDULE_MISSED_FIXED_DATE');
       execution={...execution,triggerTransactionId:null,scheduledAt:dueAt,updatedAt:at};
     }else{
       const candidate = matchSalaryEvent({ ...schedule, nextEvaluationAt: `${period}-23T09:00:00+08:00` },state.transactions.filter(item=>item.date<=date&&item.date<=state.clock));

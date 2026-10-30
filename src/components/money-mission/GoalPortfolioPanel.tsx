@@ -1,3 +1,4 @@
+import {EvidenceLink} from './EvidenceLink';
 import {useEffect,useState} from 'react';
 import type {GoalContract} from '../../../shared/contracts';
 import type {ServiceAction} from '../../../shared/financial-services';
@@ -41,6 +42,6 @@ export function GoalPortfolioPanel({twinVersion,busy,onPrepare}:{twinVersion:num
   </article>)}
   {portfolio.options.map(option=><article className="mission-card" key={option.id}><h3 className="font-bold">{option.label}</h3>{option.changes.map(c=><p key={c.goalId}>{c.title}：每月 {money(c.beforeMonthlyCents)} → {money(c.monthlyCents)}；{c.beforeDate} → {c.targetDate}。</p>)}<p>调整后预测最低余额 {money(option.minimumBalanceCents)}（{option.minimumBalanceDate}）。</p><button className="mission-primary" disabled={busy} onClick={()=>onPrepare({kind:'portfolio_repair',optionId:option.id,expectedTwinVersion:portfolio.twinVersion})}>核对这个调整</button></article>)}
   {portfolio.status==='needs_adjustment'&&!portfolio.options.length&&<p role="status" className="mission-card">在当前允许的加存和延期范围内，没有可确认的共同方案。可先编辑约束，或核对数据缺口；不会自动牺牲其他目标。</p>}
-  <details className="mission-card"><summary className="font-bold">试算依据与限制</summary>{portfolio.assumptions.map(text=><p key={text}>{text}</p>)}<p>本页只解释资金准备，不表示服务已经实际履约。</p></details>
+  <details className="mission-card"><summary className="font-bold">试算依据与限制</summary>{portfolio.assumptions.map(text=><p key={text}>{text}</p>)}<p>本页只解释资金准备，不表示服务已经实际履约。</p>{portfolio.sourceRefs.map(ref=><EvidenceLink id={ref} key={ref} label="核对预测与来源"/>)}</details>
  </section>;
 }

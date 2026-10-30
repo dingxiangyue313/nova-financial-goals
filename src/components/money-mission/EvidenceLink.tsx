@@ -1,0 +1,5 @@
+import {useState} from 'react';import {api} from '../../api';
+type Detail={id:string;summary:string;asOf:string;kind:string;stages:Array<{stage:string;outcome:string;date:string}>;approvalRefs:string[];limitations:string[]};
+export function EvidenceLink({id,label='核对来源'}:{id:string;label?:string}){
+ const [detail,setDetail]=useState<Detail|null>(null),[error,setError]=useState('');return <div><button className="mission-link min-h-11 break-all text-left" onClick={()=>{if(detail){setDetail(null);return;}void api<Detail>('/api/services/evidence/'+encodeURIComponent(id)).then(v=>{setDetail(v);setError('');}).catch(()=>setError('此引用暂不可读取，请从原操作凭证核对。'));}}>{label} · {id}</button>{error&&<p role="alert">{error}</p>}{detail&&<section aria-label="金融来源详情" className="rounded-xl bg-[#F4F7F7] p-3"><strong>{detail.summary}</strong><p>来源类型{detail.kind} · 截至{detail.asOf}</p>{detail.stages.map((s,i)=><p key={i}>{s.stage} · {s.outcome} · {s.date}</p>)}{detail.approvalRefs.map(ref=><EvidenceLink id={ref} label="原批准" key={ref}/>)}{detail.limitations.map(l=><p key={l} className="text-xs">{l}</p>)}</section>}</div>;
+}

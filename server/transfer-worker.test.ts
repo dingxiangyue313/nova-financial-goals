@@ -20,7 +20,7 @@ const salary = (patch: Partial<Transaction> = {}): Transaction => ({ id: 'salary
   date: '2026-11-25', title: '工资', category: 'income', amountCents: 850000,
   sourceKind: 'bank', provenance: 'connected_data', ...patch });
 
-export function workerFixture(withSalary = true, fixedDate?:string) {
+export function workerFixture(withSalary = true, fixedDate?:string, fixedMonthly=false) {
   let state = createJapanMoneyMissionFixture();
   const forecast = buildDatedCashflowForecast(state, { accountId: 'checking', horizonEnd: state.goal.targetDate, scenario: 'baseline' });
   const plan = buildMoneyMissionPlans(state, forecast)[1];
@@ -28,7 +28,7 @@ export function workerFixture(withSalary = true, fixedDate?:string) {
   state.goals = [state.goal];
   const preview = simulateTransferSchedule(state, { goalId: state.goal.id, planOptionId: plan.id, forecastId: forecast.id,
     twinVersion: 1, sourceAccountId: 'checking', destinationAccountId: 'goal-wallet', currency: 'CNY', amountCents: 100000,
-    recurrence: fixedDate?'one_time':'monthly', startDate: fixedDate??'2026-11-26', endDate: fixedDate??'2027-04-26', stopAtGoal: true,
+    recurrence: fixedDate&&!fixedMonthly?'one_time':'monthly', startDate: fixedDate??'2026-11-26', endDate:fixedMonthly?'2027-04-28':fixedDate??'2027-04-26', stopAtGoal: true,
     trigger: fixedDate?{type:'fixed_day',day:Number(fixedDate.slice(-2))}:{ type: 'salary_event', accountId: 'checking', sourceKind: 'bank', category: 'income', classification: 'salary',
       expectedAmountCents: 850000, toleranceBps: 1000, expectedDay: 25, windowStartDay: 23, graceEndDay: 27,
       graceEndTime: '23:59', executeOffsetDays: 1, executeTime: '09:00', missingEventPolicy: 'skip_no_catchup' } });
@@ -318,3 +318,9 @@ test('first-period salary on the 23rd cannot execute on the 24th before the auth
  assert.equal(processDue(f,new Date('2026-11-20T09:00:00+08:00')).status,'failed');assert.equal(store.getState(f.sessionId).finance.checkingCents,50000);
  const missed=workerFixture(false,'2026-11-20'),before=store.getState(missed.sessionId);assert.equal(processDue(missed,new Date('2026-11-21T09:00:00+08:00')).reason,'SCHEDULE_STOP_CONDITION');assert.deepEqual(store.getState(missed.sessionId).accounts,before.accounts);
  });
+
+test('fixed monthly runs without salary once per month, advances to next fixed date, skips missed date without catchup',()=>{
+ const f=workerFixture(false,'2026-11-28',true);const before=store.getState(f.sessionId);assert.equal(processDue(f,new Date('2026-11-28T09:00:00+08:00')).status,'succeeded');assert.equal(store.getState(f.sessionId).transferSchedules.find(s=>s.id===f.schedule.id)!.nextEvaluationAt,'2026-12-28T09:00:00+08:00');assert.equal(processDue(f,new Date('2026-11-28T10:00:00+08:00')).status,'succeeded');assert.equal(store.getState(f.sessionId).finance.checkingCents,before.finance.checkingCents-100000);
+ change(f,s=>({...s,clock:'2026-12-28',accountSnapshots:s.accountSnapshots.map(a=>({...a,asOf:'2026-12-28',balanceCents:s.accounts.find(x=>x.id===a.accountId)!.balanceCents}))}));assert.equal(processDue(f,new Date('2026-12-28T09:00:00+08:00')).status,'succeeded');assert.equal(store.getState(f.sessionId).finance.checkingCents,before.finance.checkingCents-200000);
+ const missed=workerFixture(false,'2026-11-28',true);assert.equal(processDue(missed,new Date('2026-11-29T09:00:00+08:00')).reason,'SCHEDULE_MISSED_FIXED_DATE');assert.equal(store.getState(missed.sessionId).finance.checkingCents,724000);
+});

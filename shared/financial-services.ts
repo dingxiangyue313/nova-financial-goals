@@ -4,6 +4,8 @@ import {InvestmentAnswersSchema} from './investment-profile.ts';
 const money = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const quantity = z.string().regex(/^\d+$/);
 export const ServiceActionSchema = z.discriminatedUnion('kind', [
+  z.object({kind:z.literal('subscription_card'),subscriptionId:z.string(),cardId:z.string(),expectedBindingVersion:z.number().int().nonnegative()}).strict(),
+  z.object({kind:z.literal('goal_notifications'),goalId:z.string(),mode:z.enum(['all','critical','muted'])}).strict(),
   z.object({kind:z.literal('travel_request_decision'),id:z.string(),decision:z.enum(['accept','decline'])}).strict(),
   z.object({kind:z.literal('verify_recipient'),id:z.string(),expectedVersion:z.number().int().positive(),suffix:z.string().regex(/^\d{4}$/),acknowledged:z.literal(true)}).strict(),
   z.object({kind:z.literal('review_recipient'),id:z.string(),expectedVersion:z.number().int().positive()}).strict(),
@@ -36,6 +38,12 @@ export type MandateDraft=z.infer<typeof MandateDraftSchema>;
 export const ProviderEventSchema=z.object({id:z.string().min(1).max(100),provider:z.literal('nova-sim-provider'),domain:z.enum(['investment','booking']),subjectId:z.string().min(1).max(200),revision:z.number().int().positive().max(1000000000),status:z.enum(['pending','settled','confirmed','failed']),reportedOn:z.iso.date()}).strict();
 export type ProviderEvent=z.infer<typeof ProviderEventSchema>;
 export const FinancialServicesSchema = z.object({
+  missionCheckpoints:z.array(z.object({id:z.string(),goalId:z.string(),schemaVersion:z.union([z.literal(1),z.literal(2)]),revision:z.number().int().positive(),stateHash:z.string(),updatedOn:z.iso.date(),operationIds:z.array(z.string()),migratedFrom:z.literal(1).optional()})).default([]),
+  fulfillmentRecords:z.array(z.object({eventId:z.string(),bookingId:z.string(),revision:z.number().int().positive(),status:z.enum(['fulfilled','not_fulfilled']),reportedOn:z.iso.date(),evidenceRef:z.string(),payloadHash:z.string()})).default([]),
+  subscriptionCardBindings:z.array(z.object({subscriptionId:z.string(),cardId:z.string(),version:z.number().int().positive(),operationId:z.string()})).default([]),
+  subscriptionCardOperations:z.array(z.object({id:z.string(),subscriptionId:z.string(),cardId:z.string(),status:z.enum(['unknown','succeeded','failed']),providerStatus:z.enum(['succeeded','failed'])})).default([]),
+  goalNotices:z.array(z.object({id:z.string(),goalId:z.string(),label:z.string(),critical:z.boolean(),status:z.enum(['pending','delivered','read','cancelled']),createdOn:z.iso.date()})).default([]),
+  goalNotificationPreferences:z.array(z.object({goalId:z.string(),mode:z.enum(['all','critical','muted'])})).default([]),
   travelRequests:z.array(z.object({id:z.string(),agentId:z.literal('travel-agent-demo'),goalId:z.string(),quoteIds:z.array(z.string()),status:z.enum(['received','accepted','declined','superseded']),expiresAt:z.iso.datetime(),receivedAt:z.iso.datetime(),revision:z.number().int().positive(),replacesRequestId:z.string().optional()})).default([]),
   providerEventLog:z.array(z.object({id:z.string(),payloadHash:z.string(),subjectId:z.string(),domain:z.enum(['investment','booking']),revision:z.number().int(),outcome:z.enum(['applied','stale','terminal_ignored']),reportedOn:z.iso.date()})).default([]),
   providerRevisions:z.array(z.object({subjectId:z.string(),domain:z.enum(['investment','booking']),revision:z.number().int()})).default([]),

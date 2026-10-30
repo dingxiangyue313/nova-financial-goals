@@ -95,7 +95,7 @@ export function simulateTransferSchedule(state: DemoState, raw: TransferSchedule
     throw new Error('SCHEDULE_PLAN_CHANGED');
   const plan = resolved[0];
   if (input.amountCents !== (input.recurrence === 'one_time' && plan.upfrontCents ? plan.upfrontCents : plan.monthlyCents) ||
-    input.endDate > plan.projectedDate) throw new Error('SCHEDULE_PLAN_SCOPE_CHANGED');
+    input.endDate > plan.projectedDate&&!(input.recurrence==='monthly'&&input.trigger.type==='fixed_day')) throw new Error('SCHEDULE_PLAN_SCOPE_CHANGED');
   const dates = input.recurrence === 'one_time' ? [input.startDate] : monthlyDates(input);
   if (!dates.length || dates[0] !== input.startDate || (input.recurrence === 'monthly' && dates.length !== plan.occurrences) ||
     (input.recurrence === 'one_time' && monthlyDates({ ...input, endDate: input.startDate })[0] !== input.startDate))

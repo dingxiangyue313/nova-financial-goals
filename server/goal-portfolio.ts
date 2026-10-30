@@ -107,6 +107,7 @@ export function buildGoalPortfolio(state:DemoState){
   candidate('在允许范围内延后，减少改动',true,false);
   candidate('降低月存，保留更多流动资金',true,true);
  }
+ options.sort((a,b)=>a.changedGoals-b.changedGoals||a.monthlyChangeCents-b.monthlyChangeCents||a.extensionDays-b.extensionDays||a.id.localeCompare(b.id));
  return {twinVersion:state.twinVersion,asOf:state.clock,horizonEnd,reservedCents:reserve,contracts,goals:goals.map(g=>({...g,projectedDate:current.completion.get(g.goalId)??null})),
   eligible,status:!eligible?'insufficient_data' as const:current.shortfallCents||current.unfulfilled.length?'needs_adjustment' as const:'on_track' as const,
   current:{minimumBalanceCents:current.minimumBalanceCents,minimumBalanceDate:current.minimumBalanceDate,shortfallCents:current.shortfallCents,unfulfilled:current.unfulfilled},options,
