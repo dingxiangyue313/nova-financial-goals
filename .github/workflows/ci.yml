@@ -41,7 +41,34 @@ jobs:
       - run: npm test
       - run: npm run eval:promptfoo
       - run: npm run build
+
+  e2e:
+    name: E2E (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [mobile-360, tablet-768, desktop-1440]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npx playwright install --with-deps chrome
-      - run: npm run test:e2e
+      # Playwright's webServer command builds the app before starting it.
+      - run: npm run test:e2e -- --project=${{ matrix.project }} --reporter=line,html
         env:
           DEEPSEEK_API_KEY: ''
+      - name: Upload browser test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.project }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
