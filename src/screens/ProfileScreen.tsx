@@ -40,6 +40,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
       </div>
 
+      <button onClick={() => onNavigate('ai_safety')} className="w-full rounded-xl border border-[#E5E8EB] bg-white p-4 text-left font-semibold text-[#0F6B6D]">NOVA AI 安全</button>
       {/* Safety & Risk Settings */}
       <div className="bg-white border border-[#E5E8EB] rounded-xl p-4 shadow-sm space-y-3">
         <h3 className="text-[13px] font-bold text-[#1F2329] flex items-center gap-1.5">

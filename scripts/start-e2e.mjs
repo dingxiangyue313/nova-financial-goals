@@ -6,6 +6,7 @@ if(dirname(temporary)!==parent)throw new Error('Unexpected browser test director
 process.env.PORT = '3177';
 process.env.NODE_ENV = 'production';
 process.env.NOVA_DEMO_CONTROLS = 'true';
+process.env.NOVA_ENABLE_DEMO_CONTROLS = process.env.NOVA_E2E_AI_SAFETY_CONTROLS === 'true' ? 'true' : 'false';
 process.env.NOVA_RP_ID = 'localhost';
 process.env.NOVA_ORIGIN = 'http://localhost:3177';
 process.env.NOVA_DB_PATH = join(temporary,'e2e.sqlite');

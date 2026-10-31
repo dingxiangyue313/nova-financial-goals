@@ -1,3 +1,4 @@
+import { AISafetyScreen } from './screens/AISafetyScreen';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ScreenId, Goal, type MoneyMissionReadModel } from './types';
 import { api, cents, displayGoal, displayImpact } from './api';
@@ -228,6 +229,8 @@ export default function App() {
       }
     } else if (currentScreen === 'create_goal') {
       setCurrentScreen('home');
+    } else if (currentScreen === 'ai_safety') {
+      setCurrentScreen('profile');
     } else if (currentScreen === 'data_connections') {
       setCurrentScreen(previousScreen === 'profile' ? 'profile' : 'create_goal');
     } else if (currentScreen === 'impact') {
@@ -406,6 +409,7 @@ export default function App() {
         return '我的目标';
       case 'activity':
         return '动态脉络';
+      case 'ai_safety': return 'NOVA AI 安全';
       case 'profile':
         return '个人设置';
       case 'banking_demo':
@@ -628,6 +632,7 @@ export default function App() {
             starter={workspaceStarter} onSnapshot={setSnapshot} onNavigate={navigateTo}
             onFinancialTask={message=>{setFinancialStarter(message);navigateTo('financial_services');}} onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} />}
 
+          {currentScreen === 'ai_safety' && <AISafetyScreen />}
           {currentScreen === 'profile' && goal && (
             <ProfileScreen
               goal={goal}

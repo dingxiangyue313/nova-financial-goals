@@ -3,6 +3,7 @@ import type { ScreenId } from '../types';
 import { api } from '../api';
 
 const SCREENS: { id: ScreenId; label: string }[] = [
+  { id: 'ai_safety', label: 'NOVA AI 安全' },
   { id: 'home', label: '1. 首页' },
   { id: 'create_goal', label: '2. 创建目标' },
   { id: 'impact', label: '3. 目标影响' },

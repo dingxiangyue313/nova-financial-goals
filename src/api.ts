@@ -1,4 +1,4 @@
-import { MoneyMissionReadModelSchema, SnapshotSchema, type Snapshot } from '../shared/contracts';
+import { AiSafetyOverviewSchema, AiSafetyDecisionReceiptSchema, AiSafetyControlSchema, MoneyMissionReadModelSchema, SnapshotSchema, type Snapshot } from '../shared/contracts';
 import type { Goal, ImpactScenario } from './types';
 
 export class ApiError extends Error {
@@ -21,6 +21,9 @@ export async function api<T = Snapshot>(url: string, method = 'GET', body?: unkn
   if(!response.headers.get('content-type')?.includes('application/json')) throw new ApiError(response.status,'接口未返回有效数据，请刷新页面；若仍出现，请确认打开的是当前服务端口。','INVALID_API_RESPONSE');
   const json = await response.json();
   if (!response.ok) throw new ApiError(response.status, json.error || '请求失败，请稍后重试', json.code || json.error);
+  if (url === '/api/ai-safety') return AiSafetyOverviewSchema.parse(json) as T;
+  if (url === '/api/ai-safety/control' || url === '/api/demo/ai-safety/safe-mode') return AiSafetyControlSchema.parse(json) as T;
+  if (/^\/api\/ai-safety\/runs\/[^/]+\/receipt$/.test(url)) return AiSafetyDecisionReceiptSchema.parse(json) as T;
   if (url === '/api/money-mission') return MoneyMissionReadModelSchema.parse(json) as T;
   if (/^\/api\/(statement-import|account-snapshots|services|capabilities|subscriptions)/.test(url) || url.startsWith('/api/money-mission/') || url.startsWith('/api/product/') && !url.endsWith('/start') && !url.endsWith('/confirm')) return json as T;
   return url === '/api/goal/interpret' || url === '/api/goals' || url === '/api/ui/cards' || url === '/api/mcp/token' || url.startsWith('/api/operations/') || url.startsWith('/api/agent') || url.startsWith('/api/risk/') || url.startsWith('/api/data-connections') || url.startsWith('/api/demo/data-connections/')
