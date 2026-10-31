@@ -81,9 +81,12 @@ test('real production HTTP restart preserves control and explicit demo boundary'
       NODE_ENV: 'production', NOVA_SESSION_SECRET: 'test-only-session-secret-at-least-32-characters', NOVA_DB_PATH: db, PORT: String(port), NOVA_ENABLE_DEMO_CONTROLS: flag,
       NOVA_DEMO_CONTROLS: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
     let output = ''; child.stdout.on('data', chunk => { output += chunk; }); child.stderr.on('data', chunk => { output += chunk; });
-    try { for (let n = 0; n < 150; n++) {
+    // Production startup imports the full server graph. Cold CI workers can
+    // take longer than 15 seconds; bound both readiness and individual requests.
+    const deadline = Date.now() + 60_000;
+    try { while (Date.now() < deadline) {
       if (child.exitCode !== null) throw new Error(output);
-      try { if ((await fetch(base + '/api/ai-safety/control')).ok) return child; } catch { /* waiting for listener */ }
+      try { if ((await fetch(base + '/api/ai-safety/control', {signal: AbortSignal.timeout(1000)})).ok) return child; } catch { /* waiting for listener */ }
       await new Promise(resolve => setTimeout(resolve, 100));
     } throw new Error('HTTP startup timeout: ' + output); } catch(error) { child.kill(); throw error; }
   }

@@ -1,4 +1,4 @@
-import {randomUUID} from 'node:crypto';
+import {randomUUID,randomBytes} from 'node:crypto';
 import assert from 'node:assert/strict';
 import { readFileSync,writeFileSync,mkdirSync,mkdtempSync,realpathSync,rmSync } from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -39,7 +39,7 @@ async function runEvaluation(real=false){
  checks.push(()=>assert.throws(()=>gov.confirmApproval(createFixture(),'forged','hash'),/APPROVAL_NOT_FOUND/));
  checks.push(()=>{const p=gov.createApprovalSnapshot(createFixture(),'transfer',{},'2099-01-01T00:00:00Z');assert.throws(()=>gov.confirmApproval(p.state,p.approval.id,'forged'),/APPROVAL_SNAPSHOT_CHANGED/);});
  checks.push(()=>{const p=gov.createApprovalSnapshot(createFixture(),'transfer',{},'2099-01-01T00:00:00Z');const c=gov.confirmApproval(p.state,p.approval.id,p.approval.snapshotHash);assert.throws(()=>gov.consumeApproval(c.state,c.token,'other',{}),/APPROVAL_PARAMETERS_CHANGED/);});
- const secret='0123456789abcdef0123456789abcdef', envelope={agentId:'synthetic',subject:'session-a',timestamp:Date.now(),nonce:'nonce-0001',body:{amountCents:100}};
+ const secret=randomBytes(32).toString('hex'), envelope={agentId:'synthetic',subject:'session-a',timestamp:Date.now(),nonce:'nonce-0001',body:{amountCents:100}};
  checks.push(()=>{const sig=security.signExternalRequest(secret,envelope),accepted=security.verifyExternalRequest(createFixture(),secret,envelope,sig);assert.throws(()=>security.verifyExternalRequest(accepted.state,secret,envelope,sig),/NONCE_REPLAY/);});
  checks.push(()=>assert.throws(()=>security.verifyExternalRequest(createFixture(),secret,envelope,security.signExternalRequest(secret,envelope),envelope.timestamp,'session-b'),/SUBJECT_MISMATCH/));
  checks.push(async()=>{const {parseStatementBuffer}=await import('../server/statement-parser.ts');await assert.rejects(parseStatementBuffer({buffer:Buffer.from('synthetic'),fileName:'synthetic.pdf',mimeType:'application/pdf',templateId:'bank-csv-v1'}),/STATEMENT_FORMAT_MISMATCH/);});

@@ -1,0 +1,11 @@
+# Historical synthetic HMAC fixture (not a provider credential). Current tests
+# generate a fresh ephemeral signing key. Keep the exception scoped to this finding.
+8a737c3cb92a665a348cc4b6720c5005befa903a:scripts/run-ai-safety-eval.ts:generic-api-key:42
+# Older synthetic HTTP/security fixtures and a SQL excluded-column reference.
+3dee4e200b10f9cb9fb606921edad1d1edf9725e:server/statement-import-http.test.ts:generic-api-key:26
+e285c731b3a1f27f9474c569d7e8191c9c8107ce:server/store.ts:generic-api-key:360
+80f40df8acc34208ce902db4e49a7c5fe2f9ee9b:server/data-connections-http.test.ts:generic-api-key:26
+4c0d2be22faa4964dceac691b6e33a4ab311e933:server/http.test.ts:generic-api-key:11
+4c0d2be22faa4964dceac691b6e33a4ab311e933:server/http.test.ts:generic-api-key:29
+4c0d2be22faa4964dceac691b6e33a4ab311e933:server/security.test.ts:generic-api-key:6
+1e40821d6748030ceebeea86ede0d88b8e1f6280:server/http.test.ts:generic-api-key:26
