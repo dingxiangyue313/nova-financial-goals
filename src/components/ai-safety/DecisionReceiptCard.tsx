@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AiSafetyDecisionReceipt, AgentReadToolName } from '../../../shared/contracts';
 import { api } from '../../api';
 import { skillLabels } from './SafetyPassportCard';
@@ -9,15 +9,16 @@ const tools: Record<AgentReadToolName, string> = {
 };
 const confirmation = { not_required: '无需确认', awaiting_confirmation: '等待你确认', confirmed: '已确认', cancelled: '已取消', blocked: '已阻断' };
 const fallback = { AGENT_RUN_BUDGET_EXHAUSTED: '调查预算用尽', AI_SAFE_MODE: '安全模式', MODEL_UNAVAILABLE: '模型不可用', MODEL_TIMEOUT: '模型超时', INVALID_MODEL_RESPONSE: '模型响应无效' };
-export function DecisionReceiptCard({ runId, onClose }: { runId: string; onClose: () => void }) {
+export function DecisionReceiptCard({ runId, onClose, returnFocusTo }: { runId: string; onClose: () => void; returnFocusTo: HTMLElement | null }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [receipt, setReceipt] = useState<AiSafetyDecisionReceipt | null>(null);
   const [error, setError] = useState(false);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    dialog.current?.showModal();
-    return () => { dialog.current?.close(); previous?.focus(); };
-  }, []);
+  useLayoutEffect(() => {
+    const modal = dialog.current;
+    modal?.showModal();
+    // Close before React removes the dialog and makes its ref unavailable.
+    return () => { modal?.close(); if (returnFocusTo?.isConnected) returnFocusTo.focus(); };
+  }, [returnFocusTo]);
   useEffect(() => {
     let active = true;
     setReceipt(null); setError(false);
@@ -27,7 +28,7 @@ export function DecisionReceiptCard({ runId, onClose }: { runId: string; onClose
   }, [runId]);
   return <dialog ref={dialog} aria-labelledby="decision-receipt-title" onCancel={event => { event.preventDefault(); onClose(); }} className="m-auto w-[calc(100%-2rem)] max-w-md max-h-[85dvh] overflow-y-auto rounded-2xl bg-white p-5 text-sm text-[#1F2329] backdrop:bg-black/40">
     <h2 id="decision-receipt-title" className="text-lg font-bold">AI 决策回执</h2>
-    <button autoFocus type="button" onClick={onClose} className="mission-secondary my-3">关闭回执</button>
+    <button type="button" onClick={onClose} className="mission-secondary my-3">关闭回执</button>
     {error ? <p role="alert">○ 回执暂不可用，尚未验证。</p> : !receipt ? <p role="status">正在读取回执…</p> : <div className="space-y-2">
       <p>运行结果：{({running:'进行中',completed:'已完成',awaiting_user:'等待补充信息',cancelled:'已取消',failed:'未完成',timed_out:'已超时',fallback:'已使用规则完成'})[receipt.status]}</p>
       <p>处理来源：{receipt.provider === 'deepseek' ? 'DeepSeek 模型' : receipt.provider === 'deterministic' ? '确定性规则' : '未记录'}</p>

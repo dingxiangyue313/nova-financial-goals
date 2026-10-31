@@ -94,13 +94,14 @@ test('完成运行后查看结构化回执，Escape 与关闭恢复焦点',async
   const opener=page.getByRole('button',{name:'查看 AI 决策回执'});
   await opener.click();
   const dialog=page.getByRole('dialog');
+  await expect(dialog.getByRole('button',{name:'关闭回执'})).toBeFocused();
   await expect(dialog.getByText(/处理来源：/)).toBeVisible();
   for(const text of ['降级原因：','工具计数：','证据引用：','人审状态：','审计链']) await expect(dialog.getByText(text,{exact:false})).toBeVisible();
   await expect(dialog).not.toContainText(privateMessage);
   await expect(dialog).not.toContainText('已存 0 元');
   await page.keyboard.press('Tab'); expect(await dialog.evaluate(el=>el.contains(document.activeElement))).toBe(true);
-  await page.keyboard.press('Escape'); await expect(opener).toBeFocused();
-  await opener.click(); await dialog.getByRole('button',{name:'关闭回执'}).click(); await expect(opener).toBeFocused();
+  await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(opener).toBeFocused();
+  await opener.click(); await dialog.getByRole('button',{name:'关闭回执'}).click(); await expect(dialog).toHaveCount(0); await expect(opener).toBeFocused();
 });
 test('旧写卡被服务端阻断后仍可取消',async({page})=>{
   test.skip(process.env.NOVA_E2E_AI_SAFETY_CONTROLS!=='true','requires explicit safety demo test flag');

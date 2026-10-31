@@ -17,6 +17,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
   onFinancialTask?:(message:string)=>void;
 }) {
   const [receiptRunId, setReceiptRunId] = useState<string | null>(null);
+  const receiptOpener = useRef<HTMLButtonElement | null>(null);
   const [threads, setThreads] = useState<AgentThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -203,7 +204,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
   const activeThread = threads.find(item => item.id === activeThreadId);
 
   const conversation = <section className="flex min-h-0 flex-1 flex-col bg-[#F5F7F8]">
-    {receiptRunId && <DecisionReceiptCard runId={receiptRunId} onClose={() => setReceiptRunId(null)} />}
+    {receiptRunId && <DecisionReceiptCard runId={receiptRunId} returnFocusTo={receiptOpener.current} onClose={() => setReceiptRunId(null)} />}
     <header className="border-b border-[#E5E8EB] bg-white px-4 py-3">
       <div className="flex items-center justify-between"><div><h1 className="text-[16px] font-bold">NOVA 目标工作台</h1><p className="text-[10px] text-[#5A616B]">对话生成界面 · 操作前始终确认</p></div><button onClick={() => onNavigate('home')} aria-label="返回首页" className="rounded-lg border border-[#E5E8EB] px-2 py-1 text-[11px] text-[#5A616B]">返回首页</button></div>
       <div className="mt-2 flex gap-2"><button type="button" onClick={() => setHistoryOpen(value => !value)} className="rounded-full border border-[#D8E7E7] px-3 py-1.5 text-[11px] font-semibold text-[#0F6B6D]">{historyOpen ? '收起会话' : `会话历史 ${threads.length}`}</button>
@@ -217,7 +218,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
       {run && <div className="mx-auto mb-3 max-w-xl rounded-2xl border border-[#D8E7E7] bg-white p-3 text-[11px] text-[#5A616B]" aria-live="polite">
         <div className="flex items-center justify-between gap-2"><b className="text-[#1F2329]">{run.status === 'running' ? '正在调查模拟数据' : run.status === 'completed' ? '调查已完成' : run.status === 'fallback' ? '规则试算已完成' : run.status === 'awaiting_user' ? '等待补充信息' : '调查已停止'}</b>{run.status === 'running' && <button type="button" onClick={() => void stopRun()} className="rounded-lg border border-[#D0D5DD] px-2 py-1 text-[#5A616B]">停止调查</button>}</div>
         <p className="mt-1">{run.status === 'running' ? '正在核对目标金额、可用现金和完成日期…' : run.status === 'completed' || run.status === 'fallback' ? '已完成本次核对，请查看下方方案；选择后仍需确认。' : run.status === 'awaiting_user' ? '补充下方信息后可以继续试算。' : '本次调查已结束，尚未应用方案。'}</p>
-        <button type="button" className="mission-link mt-2" onClick={() => setReceiptRunId(run.runId)}>查看 AI 决策回执</button>
+        <button type="button" className="mission-link mt-2" onClick={event => { receiptOpener.current = event.currentTarget; setReceiptRunId(run.runId); }}>查看 AI 决策回执</button>
         <ol className="mt-2 space-y-1">{run.steps.map((step, index) =>
           <li key={`${step.at}-${index}`} className="rounded-lg bg-[#F5F7F8] px-2 py-1.5">{step.summary.replace('financial_overview：ok','已核对账户与目标').replace('data_sufficiency：ok','已核对数据覆盖').replace('search_goal_options：ok','已完成目标方案试算').replace('search_goal_options：no_result','当前条件下需要调整方案')}</li>)}</ol>
       </div>}
