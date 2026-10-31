@@ -1,6 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+// These tests mock safety API responses. A registered service worker can own
+// requests after navigation and bypass Playwright routing, returning live data.
+// PWA behavior is covered separately in pwa.spec.ts.
+test.use({ serviceWorkers: 'block' });
+
 async function openSafety(page: Page) {
   await page.goto('/');
   await page.getByTitle('个人设置', {exact:true}).click();
