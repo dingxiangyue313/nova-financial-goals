@@ -99,7 +99,12 @@ test('real production HTTP restart preserves control and explicit demo boundary'
     assert.equal((await post()).status,200);
     const control = await fetch(base + '/api/ai-safety/control'); assert.equal(control.headers.get('cache-control'),'no-store');
     assert.equal((await control.json()).mode,'safe_mode');
-    for (const path of ['/api/session','/api/money-mission','/api/audit']) assert.equal((await fetch(base+path)).status,200,path);
+    for (const path of ['/api/session','/api/money-mission','/api/audit/export']) {
+      const response = await fetch(base+path);
+      assert.equal(response.status,200,path);
+      assert.match(response.headers.get('content-type') ?? '', /application\/json/, path);
+      await response.json();
+    }
     assert.equal((await fetch(base+'/api/demo/reset',{method:'POST'})).status,404);
     const tokenResponse = await fetch(base+'/api/mcp/token');
     const token = (await tokenResponse.json()).token;
