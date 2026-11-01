@@ -16,6 +16,7 @@ import { PlanChangeScreen } from './screens/PlanChangeScreen';
 import { GoalImpactScreen } from './screens/GoalImpactScreen';
 import { GoalsListScreen } from './screens/GoalsListScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
+import { DemoGovernanceActivityScreen } from './screens/DemoGovernanceActivityScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { BankingDemoScreen } from './screens/BankingDemoScreen';
 import { DataConnectionScreen } from './screens/DataConnectionScreen';
@@ -670,6 +671,9 @@ export default function App() {
           )}
 
           {currentScreen === 'activity' && (
+            demoControl ? <DemoGovernanceActivityScreen snapshot={snapshot} mutate={mutate}
+              hasImpactPending={hasImpactPending} onNavigateToImpact={() => navigateTo('impact')}
+              onNavigateToBanking={() => navigateTo('banking_demo')} /> :
             <ActivityScreen twinVersion={snapshot.twinVersion}
               onChanged={() => { void api<Snapshot>('/api/session').then(setSnapshot).catch(error => showToast(error.message)); }} />
           )}

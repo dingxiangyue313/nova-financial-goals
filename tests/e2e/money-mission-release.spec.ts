@@ -1,3 +1,4 @@
+import { openCategory } from './fixtures';
 import { test, expect } from './fixtures';
 test.use({serviceWorkers:'block'});
 test('subscription cancellation stays verified after reload without changing account cash',async({page})=>{
@@ -25,7 +26,7 @@ test('empty-history import preserves authoritative balances',async({page})=>{
 });
 
 test('dated cashflow explains salary stress and editable expense without changing money or authorization',async({page})=>{
- await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByRole('button',{name:'订阅管理',exact:true}).click();await page.getByRole('button',{name:'NOVA',exact:true}).click();await page.getByRole('textbox',{name:'告诉 NOVA 你的需求'}).fill('收支试算');await page.getByRole('button',{name:'发送',exact:true}).click();
+ await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByRole('button',{name:'订阅管理',exact:true}).click();await page.getByRole('button',{name:'NOVA',exact:true}).click();await openCategory(page,'目标资金');await page.getByRole('button',{name:'收支试算',exact:true}).click();
  const timeline=page.getByRole('region',{name:'日期现金流试算'});
  await expect(timeline).toContainText('最低余额 ¥3,172');
  const before=await (await page.request.get('/api/session')).json();

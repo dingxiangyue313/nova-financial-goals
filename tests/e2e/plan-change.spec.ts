@@ -1,3 +1,4 @@
+import { test as entryTest } from '@playwright/test';
 import { test, expect } from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -69,7 +70,7 @@ test('a stale preview refreshes its version and preserves the draft for recomput
   await expect(page.getByRole('heading', { name: /第二步/ })).toBeVisible();
 });
 
-test('the dated main prototype can activate its first plan and open Stage 04', async ({ page }) => {
+entryTest('the dated main prototype can activate its first plan and open Stage 04', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '连接模拟数据', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '连接并开始智能守护', exact: true }).click();

@@ -10,7 +10,7 @@ test('custom AA with another payer records liability, then confirms only my exac
  await page.getByLabel('自定义每人份额').check();
  const fields=page.getByLabel(/的份额（元）/);
  await fields.nth(0).fill('110');await fields.nth(1).fill('100');await fields.nth(2).fill('90');await fields.nth(3).fill('100');
- await page.getByRole('button',{name:'预览整数分拆分'}).click();
+ await page.getByRole('button',{name:'下一步，核对AA份额'}).click();
  const dialog=page.getByRole('dialog');await expect(dialog).toContainText('同行已垫付');
  await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(dialog).toBeHidden();
  await page.getByRole('button',{name:'我的收付款',exact:true}).click();const split=page.getByRole('region',{name:'AA ¥400'});
