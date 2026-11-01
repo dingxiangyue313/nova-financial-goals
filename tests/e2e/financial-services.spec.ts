@@ -18,7 +18,7 @@ test('six scenario entry preserves goal-first home and explicit money confirmati
   const dialog=page.getByRole('dialog');await expect(dialog).toContainText('尾号1001');
   await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByText('已提交模拟操作，请核对下方结果与凭证。')).toBeVisible();
+  await expect(page.getByText('已提交模拟操作，请前往动态查看结果与凭证。')).toBeVisible();
   await openCategory(page,'理财');
   await expect(page.getByRole('heading',{name:'当前评估'})).toBeVisible();
   await openCategory(page,'卡片');
@@ -39,7 +39,7 @@ test('funded trip checks card controls, bounded mandate, signed orders and refun
   await expect(page.getByRole('heading',{name:'目标资金',exact:true}).last()).toBeVisible();
   const confirm=async()=>{const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(dialog).toBeHidden();};
   await openCategory(page,'卡片');
-  const card=page.locator('section').filter({has:page.getByRole('heading',{name:'旅行借记卡 · 尾号2002'})});
+  const card=page.getByRole('region',{name:'旅行借记卡尾号2002',exact:true});
   await card.getByRole('button',{name:'开启线上交易'}).click();await confirm();
   await card.getByRole('button',{name:'开启境外交易'}).click();await confirm();
   await openCategory(page,'旅行请求');

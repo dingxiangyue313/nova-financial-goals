@@ -4,6 +4,12 @@ import { test as base, expect } from '@playwright/test';
 // The dedicated input/navigation suites exercise that entry explicitly.
 export const test = base.extend({
   page: async ({ page }, use) => {
+    // Keep business scenarios on their explicitly created goals. Sample-gallery
+    // seeding is independent of the banking operations exercised by these suites.
+    await page.route('**/api/product/goal-samples', async route => {
+      const session = await page.request.get('/api/session');
+      await route.fulfill({ json: await session.json() });
+    });
     const goto = page.goto.bind(page);
     const reload = page.reload.bind(page);
     const finishEntry = async () => {

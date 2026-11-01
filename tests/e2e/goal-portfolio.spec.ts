@@ -9,12 +9,12 @@ test('two goals share one dated budget, edit exact constraints and confirm a bou
  await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();await openCategory(page,'目标资金');await page.getByRole('button',{name:'计划调整',exact:true}).click();
  const before=await (await page.request.get('/api/services')).json();
  const confirm=async()=>{const dialog=page.getByRole('dialog');await expect(dialog).toContainText('不移动资金');await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(dialog).toBeHidden();};
- await page.getByRole('button',{name:'编辑「日本旅行」目标约束'}).click();
- await page.getByLabel('目标优先级',{exact:true}).selectOption('1');await page.getByRole('button',{name:'预览目标约束修改'}).click();await confirm();
- await page.getByRole('button',{name:'编辑「培训目标」目标约束'}).click();
+ await page.getByRole('button',{name:'编辑「日本旅行」资金计划'}).click();
+ await page.getByLabel('目标优先级',{exact:true}).selectOption('1');await page.getByRole('button',{name:'下一步，核对计划修改'}).click();await confirm();
+ await page.getByRole('button',{name:'编辑「培训目标」资金计划'}).click();
  await page.getByLabel('当前每月投入（元）').fill('6000');await page.getByLabel('目标优先级',{exact:true}).selectOption('5');
  await page.getByLabel('允许最多延期（天）').fill('0');
- await page.getByRole('button',{name:'预览目标约束修改'}).click();await confirm();
+ await page.getByRole('button',{name:'下一步，核对计划修改'}).click();await confirm();
  const portfolio=await (await page.request.get('/api/services/portfolio')).json();expect(portfolio.status).toBe('needs_adjustment');expect(portfolio.current.shortfallCents).toBeGreaterThan(0);
  const option=portfolio.options.find((o:{label:string})=>o.label==='保持目标日期，先调整低优先级目标');expect(option).toBeTruthy();
  const card=page.getByRole('article').filter({has:page.getByRole('heading',{name:'保持目标日期，先调整低优先级目标',exact:true})});
