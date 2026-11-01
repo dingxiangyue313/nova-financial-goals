@@ -1,4 +1,4 @@
-export type ScreenId = 'ai_safety' | 'financial_services' | 'home' | 'workspace' | 'money_mission' | 'create_goal' | 'data_connections' | 'feasibility' | 'impact' | 'goals_list' | 'activity' | 'profile' | 'banking_demo';
+export type ScreenId = 'ai_safety' | 'financial_services' | 'home' | 'workspace' | 'money_mission' | 'create_goal' | 'data_connections' | 'feasibility' | 'plan_change' | 'impact' | 'goals_list' | 'activity' | 'profile' | 'banking_demo';
 export type { MoneyMissionReadModel } from '../../shared/contracts';
 
 export interface Goal {

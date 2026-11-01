@@ -71,7 +71,7 @@ export function PlanChangePanel({ snapshot, onApplied, onRefresh, onCancel }: {
       value={draft[key] / 100} onChange={event => setDraft(value => ({ ...value, [key]: Math.round(Number(event.target.value) * 100) }))}
       className="mt-1 min-h-11 w-full rounded-lg border border-[#D0D5DD] bg-white px-3" /></label>;
   return <section id="plan-change-panel" aria-label="修改方案" className="rounded-xl border border-[#D8E7E7] bg-white p-3.5 space-y-3">
-    <h3 ref={heading} tabIndex={-1} className="text-base font-bold">{preview ? '第二步 · 比较新方案' : '第一步 · 调整目标与存钱条件'}</h3>
+    <h2 ref={heading} tabIndex={-1} className="text-base font-bold">{preview ? '第二步 · 比较新方案' : '第一步 · 调整目标与存钱条件'}</h2>
     <p className="text-xs text-[#5A616B]">试算期间当前计划继续生效，确认后一次性更新。</p>
     {!preview ? <form onSubmit={event => { event.preventDefault(); void calculate(); }} className="space-y-3">
       {field('targetCents', '目标金额（元）')}
@@ -92,7 +92,7 @@ export function PlanChangePanel({ snapshot, onApplied, onRefresh, onCancel }: {
         {candidate.blockingReasons.length > 0 && <span className="block text-xs mt-1">{candidate.blockingReasons.map(reason => reasons[reason] ?? '需核对当前数据').join('；')}</span>}
       </button>)}
       {chosen && <div className="rounded-xl bg-[#F5F7F8] p-3 space-y-2 text-xs">
-        <h4 className="font-bold text-sm">确认变更</h4>
+        <h3 className="font-bold text-sm">确认变更</h3>
         {[
           ['目标金额', money(snapshot.goal.targetCents), money(draft.targetCents)],
           ['目标日期', snapshot.goal.targetDate, chosen.effectiveTargetDate],

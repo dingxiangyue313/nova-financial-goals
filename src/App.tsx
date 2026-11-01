@@ -10,6 +10,7 @@ import { HomeScreen } from './screens/HomeScreen';
 import { CreateGoalScreen } from './screens/CreateGoalScreen';
 import { NewGoalScreen } from './screens/NewGoalScreen';
 import { FeasibilityScreen } from './screens/FeasibilityScreen';
+import { PlanChangeScreen } from './screens/PlanChangeScreen';
 import { GoalImpactScreen } from './screens/GoalImpactScreen';
 import { GoalsListScreen } from './screens/GoalsListScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
@@ -221,7 +222,9 @@ export default function App() {
   };
 
   const handleBack = () => {
-    if (currentScreen === 'feasibility') {
+    if (currentScreen === 'plan_change') {
+      setCurrentScreen('feasibility');
+    } else if (currentScreen === 'feasibility') {
       if (previousScreen === 'create_goal') {
         setCurrentScreen('create_goal');
       } else {
@@ -401,6 +404,8 @@ export default function App() {
         return '账单与消费';
       case 'feasibility':
         return '目标可行性';
+      case 'plan_change':
+        return '修改方案';
       case 'data_connections':
         return '数据连接';
       case 'impact':
@@ -574,8 +579,7 @@ export default function App() {
           {currentScreen === 'feasibility' && goal && (
             <FeasibilityScreen
               snapshot={snapshot}
-              onRefresh={setSnapshot}
-              onPlanChanged={(next, review) => { setSnapshot(next); showToast(review ? '方案已更新；请单独核对已有转入安排' : '方案已更新'); }}
+              onModifyPlan={() => navigateTo('plan_change')}
               goal={goal}
               assessment={snapshot.assessment}
               selectedPlanId={snapshot.goal.selectedPlanId}
@@ -583,6 +587,19 @@ export default function App() {
               onUpdateRiskPreferences={handleRiskPreferences}
               onConfirmPlan={handleConfirmPlan}
               onBack={handleBack}
+            />
+          )}
+
+          {currentScreen === 'plan_change' && goal && (
+            <PlanChangeScreen
+              snapshot={snapshot}
+              onRefresh={setSnapshot}
+              onCancel={() => setCurrentScreen('feasibility')}
+              onApplied={(next, review) => {
+                setSnapshot(next);
+                setCurrentScreen('feasibility');
+                showToast(review ? '方案已更新；请单独核对已有转入安排' : '方案已更新');
+              }}
             />
           )}
 
