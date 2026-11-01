@@ -6,18 +6,18 @@ import { recipientReady } from '../../../shared/recipient-identity';
 import { money } from '../../lib/format';
 import { RecipientVerifier } from './RecipientVerifier';
 
-export function ContactTransferPanel({ view, busy, onPrepare }: {
-  view: FinancialServicesView; busy: boolean; onPrepare: (action: ServiceAction) => void;
+export function ContactTransferPanel({ view, busy, onPrepare, initialMessage='',initialDraft,onDraftChanged }: {
+  view: FinancialServicesView; busy: boolean; onPrepare: (action: ServiceAction) => void; initialMessage?:string;initialDraft?:import('../../../shared/chat-routing').ChatMemory;onDraftChanged?:(draft:{recipientQuery:string;amountCents:number|null;sourceAccount:string})=>void;
 }) {
-  const [query, setQuery] = useState(''), [recipientId, setRecipientId] = useState('');
-  const [source, setSource] = useState('checking'), [amount, setAmount] = useState(''), [note, setNote] = useState('');
+  const [query, setQuery] = useState(initialDraft?.recipientQuery || (initialMessage.match(/给(.{1,12}?)(?:转账|转|汇|打)/)?.[1]?.trim()??'')), [recipientId, setRecipientId] = useState('');
+  const [source, setSource] = useState(view.accounts.find(a=>a.id===initialDraft?.sourceAccount||a.label===initialDraft?.sourceAccount)?.id??'checking'), [amount, setAmount] = useState(initialDraft?.amountCents!=null?String(initialDraft.amountCents/100):initialMessage.match(/(?:转账|转|汇|打)\s*[¥￥]?\s*(\d+(?:\.\d{1,2})?)(?![\d.万千])\s*元?/)?.[1]??''), [note, setNote] = useState('');
   const recipient = view.recipients.find(item => item.id === recipientId);
   const account = view.accounts.find(item => item.id === source);
   const contacts = view.recipients.filter(item => item.id !== 'self' && `${item.name} ${item.alias} ${item.phone} ${item.suffix}`.includes(query));
   let cents = 0;
   try { cents = amountCents(amount); } catch { /* Keep incomplete input editable. */ }
   const ready = recipient && recipientReady(recipient);
-  return <section className="mission-card" aria-label="联系人转账流程">
+  return <section className="mission-card" aria-label="联系人转账流程" onBlur={()=>onDraftChanged?.({recipientQuery:query,amountCents:amount.trim()?cents:null,sourceAccount:source})}>
     <h2 className="font-bold">联系人转账</h2>
     <h3 className="font-semibold">1 · 选择并核对收款人</h3>
     <label>搜索联系人<input className="mission-input" placeholder="姓名、手机号、备注或尾号" value={query} onChange={e => { setQuery(e.target.value); setRecipientId(''); }} /></label>

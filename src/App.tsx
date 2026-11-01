@@ -51,7 +51,10 @@ export default function App() {
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
   const [workspaceStarter, setWorkspaceStarter] = useState('');
+  const [workspaceThreadId,setWorkspaceThreadId]=useState<string|null>(null);
+  const [financialMemory,setFinancialMemory]=useState<import('../shared/chat-routing').ChatMemory|undefined>();
   const [financialStarter,setFinancialStarter]=useState('');
+  const [financialSection,setFinancialSection]=useState<string|undefined>();
   const [detailGoalId, setDetailGoalId] = useState<string | null>(null);
   const [financialTab,setFinancialTab]=useState<FinancialTab>('overview');
   const [pendingConnectionThreadId, setPendingConnectionThreadId] = useState<string | null>(null);
@@ -580,10 +583,11 @@ export default function App() {
           )}
 
           {currentScreen === 'money_mission' && <MoneyMissionScreen model={missionModel} loading={missionLoading}
+            initialSection={previousScreen==='workspace'?financialSection:undefined}
             onSnapshot={setSnapshot}
             error={missionError} compact={deviceFrame} onRefresh={() => void refreshMission()}
             onNavigate={() => { setWorkspaceStarter('请继续日本旅行目标的当前任务'); navigateTo('workspace'); }} />}
-          {currentScreen === 'financial_services' && <FinancialServicesScreen initialMessage={financialStarter} initialTab={financialTab} onBills={() => navigateTo('money_mission')}
+          {currentScreen === 'financial_services' && <FinancialServicesScreen initialMessage={financialStarter} initialTab={financialTab} initialSection={financialSection} initialDraft={financialMemory} onDraftChanged={draft=>{if(workspaceThreadId)void api<import('../shared/chat-routing').ChatMemory>('/api/agent/threads/'+workspaceThreadId+'/navigation-draft','POST',draft).then(setFinancialMemory).catch(error=>showToast(error.message));}} onBills={() => navigateTo('money_mission')}
             onChanged={() => { void api<Snapshot>('/api/session').then(setSnapshot).catch(error => showToast(error.message)); }} />}
 
           {currentScreen === 'create_goal' && !demoControl && <NewGoalScreen snapshot={snapshot} onSnapshot={setSnapshot} onDone={()=>navigateTo('home')} />}
@@ -673,20 +677,16 @@ export default function App() {
             onNavigateActivity={() => navigateTo('activity')} />}
 
           {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame}
-            starter={workspaceStarter} onSnapshot={setSnapshot} onNavigate={navigateTo}
-            onFinancialCategory={category=>{setFinancialStarter('');if(category==='bills'){navigateTo('money_mission');return;}setFinancialTab(category);navigateTo('financial_services');}}
-            onFinancialTask={message=>{setFinancialStarter(message);setFinancialTab('overview');navigateTo('financial_services');}} onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} />}
+            starter={workspaceStarter} preferredThreadId={workspaceThreadId} onThreadChange={setWorkspaceThreadId} onSnapshot={setSnapshot} onNavigate={navigateTo}
+            onFinancialCategory={category=>{setFinancialMemory(undefined);setFinancialStarter('');setFinancialSection(undefined);if(category==='bills'){navigateTo('money_mission');return;}setFinancialTab(category);navigateTo('financial_services');}}
+            onFinancialTask={(message,destination,memory)=>{setFinancialMemory(memory);setFinancialStarter(message);setFinancialSection(destination.section);if(destination.category==='bills'){navigateTo('money_mission');return;}setFinancialTab(destination.category);navigateTo('financial_services');}} onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} />}
 
           {currentScreen === 'ai_safety' && <AISafetyScreen />}
           {currentScreen === 'profile' && goal && (
             <ProfileScreen
               goal={goal}
               onNavigate={navigateTo}
-              onResetData={handleResetData}
               onDataConnections={() => navigateTo('data_connections')}
-              installState={installState}
-              onInstall={() => void handleInstall()}
-              onClearOffline={() => void handleClearOffline()}
             />
           )}
         </Suspense></main>

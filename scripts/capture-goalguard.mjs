@@ -1,0 +1,35 @@
+import {chromium} from '@playwright/test';
+import {mkdir} from 'node:fs/promises';
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const page=await browser.newPage({viewport:{width:1100,height:1100},deviceScaleFactor:1});
+const base='http://127.0.0.1:3001';
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.goto(base+'/demo-control');
+await page.getByRole('button',{name:'载入旅行付款样例（重置模拟会话）',exact:true}).click();
+await page.getByText('资金分配',{exact:true}).first().waitFor({timeout:60000});
+const call=async(path,data)=>{const r=await page.request.post(base+path,{data});if(!r.ok())throw new Error(path+': '+await r.text());return r.json();};
+const act=async(input)=>{const p=await call('/api/services/prepare',input);return call('/api/services/confirm',{actionId:p.confirmation.actionId,decision:'confirm'});};
+await act({kind:'card',id:'card-travel',action:'controls',online:true,overseas:true});
+const quotes=await call('/api/services/quotes',{}),request=quotes.travelRequests[0],goalId=quotes.goals[0].id;
+await act({kind:'travel_request_decision',id:request.id,decision:'accept'});
+const granted=await act({kind:'mandate',goalId,accountId:'goal-wallet',maxPerOrderCents:300000,totalCents:500000,merchants:['air-demo','stay-demo'],expiresAt:new Date(Date.now()+86400000).toISOString()});
+const paid=await act({kind:'book',quoteIds:request.quoteIds,goalId,accountId:'goal-wallet',cardId:'card-travel',mandateId:granted.mandates[0].id});
+console.log('PAID',paid.goals[0]);
+await page.getByRole('button',{name:'NOVA 工作台',exact:true}).click();
+await page.getByRole('button',{name:'目标资金',exact:true}).click();
+await page.getByText('¥3,000',{exact:true}).first().waitFor();
+await mkdir('artifacts/goalguard',{recursive:true});
+await page.screenshot({path:'artifacts/goalguard/funds.png'});
+await page.getByRole('region',{name:'目标资金明细',exact:true}).screenshot({path:'artifacts/goalguard/funds-detail.png'});
+await page.getByRole('button',{name:'NOVA 工作台',exact:true}).click();
+await page.getByRole('button',{name:'旅行请求',exact:true}).click();
+await page.getByRole('button',{name:'核对付款',exact:true}).first().click();
+await page.getByRole('region',{name:'GoalGuard 统一流程'}).screenshot({path:'artifacts/goalguard/flow.png'});
+for(const result of ['Ask','Manual Review','Block']){
+ await page.getByRole('region',{name:'GoalGuard 统一流程'}).getByRole('button',{name:new RegExp('· '+result+'$')}).click();
+ await page.getByRole('region',{name:'GoalGuard 统一流程'}).screenshot({path:'artifacts/goalguard/flow-'+result.replace(' ','-')+'.png'});
+}
+await page.getByRole('button',{name:'查看订单与恢复',exact:true}).click();
+await page.screenshot({path:'artifacts/goalguard/orders.png'});
+console.log('ERRORS',errors);
+await browser.close();

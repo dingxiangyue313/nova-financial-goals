@@ -259,6 +259,9 @@ function verifiedCandidates(sessionId: string, threadId: string, task: AgentTask
       result.output.input.scenario.kind !== 'baseline' ||
       !['on_track', 'at_risk'].includes(result.output.assessment.status) ||
       result.output.assessment.bufferCents < 0) return null;
+    const cap = task.constraints.monthlyContributionCapCents;
+    if (cap !== null && (result.output.input.monthlyContributionCents > cap ||
+      (result.output.input.firstMonthContributionCents ?? 0) > cap)) return null;
     results.push(result);
   }
   return results.filter(result => result.tool === 'candidate_preview' && result.output.assessment &&
@@ -419,6 +422,11 @@ function finishRun(sessionId: string, threadId: string, runId: string,
     }
   }
   const { run, task } = checked(sessionId, threadId, runId, expectedTaskRevision, expectedTwinVersion);
+  // Enforce the user's ceiling again at the shared model/fallback output boundary.
+  const monthlyCap = task.constraints.monthlyContributionCapCents;
+  if (monthlyCap !== null) results = results.filter(result => result.tool !== 'candidate_preview' ||
+    (result.output.input.monthlyContributionCents <= monthlyCap &&
+      (result.output.input.firstMonthContributionCents ?? 0) <= monthlyCap));
   const endKind = status === 'awaiting_user' ? 'waiting' : status === 'failed' || status === 'timed_out' ? 'stopped' : 'finished';
   const final = updateAgentRun(sessionId, threadId, runId, run.revision, { status,
     provider: status === 'fallback' ? 'deterministic' : 'deepseek', reasonCode,

@@ -34,6 +34,11 @@ export async function interpretAgentRequest(text: string, deterministicIntent: A
       financialState: safeContext?.twin ?? null, currentMessage: text }) },
   ] });
   if (!result.ok) return fallback(result.reason);
+  // Explicit goal facts must not disappear when the model objects to a request
+  // to skip confirmation. Planning is read-only; execution remains gated later.
+  if (deterministicIntent === 'goal_planning' && result.data.intent === 'clarification' &&
+    /预算|目标金额|存够|攒够/.test(text))
+    return { intent: 'goal_planning', explanation: null, provider: 'deterministic', fallbackReason: 'EXPLICIT_GOAL_FACTS' };
   return { intent: result.data.intent, explanation: result.data.explanation, provider: 'deepseek', fallbackReason: null };
 }
 
