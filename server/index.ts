@@ -419,6 +419,67 @@ app.get('/api/agent/threads/:id/messages', route((req, res) => {
   markAgentThreadRead(id, req.params.id); res.json({ messages,
     monitor: MonitorStatusSchema.parse(monitorStatus(id, req.params.id)) });
 }));
+app.post('/api/agent/route', route(async (req, res) => {
+  const body = z.object({ message: z.string().trim().min(1).max(500), threadId: z.string().nullable().default(null) }).strict().parse(req.body);
+  const id = sessionId(req, res);
+  const context = body.threadId ? getAgentMessages(id, body.threadId).map(item => ({ role: item.role, content: item.content })) : [];
+  const { routeChat } = await import('./chat-routing.ts');
+  const { ChatRouteResponseSchema } = await import('../shared/chat-routing.ts');
+  res.json(ChatRouteResponseSchema.parse(await routeChat(body.message, context)));
+}));
+app.post('/api/agent/chat', route(async(req,res)=>{
+  const body=z.object({message:z.string().trim().min(1).max(500),threadId:z.string().nullable().default(null)}).strict().parse(req.body);
+  const id=sessionId(req,res);
+  const store=await import('./store.ts');
+  const thread=body.threadId?store.getAgentThread(id,body.threadId):createAgentThread(id,{title:body.message.slice(0,40)});
+  if(thread.status==='archived'||thread.readOnly)throw new Error('THREAD_ARCHIVED');
+  const memory=store.getChatMemory(id,thread.id);
+  const context=getAgentMessages(id,thread.id).map(m=>({role:m.role,content:m.content}));
+  const {routeChat}=await import('./chat-routing.ts');
+  const routed=await routeChat(body.message,context,{...memory,goalDraft:store.getGoalDraft(id,thread.id)});
+  const {ChatRouteDecisionSchema}=await import('../shared/chat-routing.ts');
+  const decision=ChatRouteDecisionSchema.parse(routed.decision);
+  if(routed.provider==='unavailable')return res.json({...routed,threadId:thread.id,memory,turn:null});
+  // An old cancellation in the conversation cannot cancel a new current request.
+  if(decision.memoryAction==='cancel'&&!/取消|不做|不转|停止|算了|先不|别做/.test(body.message))decision.memoryAction='continue';
+  if(decision.mode==='navigate'&&memory.status==='cancelled'&&decision.memoryAction!=='new'&&decision.destination===memory.destination)
+    return res.json({...routed,decision:{mode:'clarify',destination:null,question:'刚才的草稿已取消。要新建一项任务吗？'},threadId:thread.id,memory,turn:null});
+  const {parseYuan}=await import('./understanding.ts');
+  const {ChatMemorySchema}=await import('../shared/chat-routing.ts');
+  let next=decision.memoryAction==='new'&&decision.mode!=='clarify'||(decision.mode==='navigate'&&decision.destination!==memory.destination)
+    ?ChatMemorySchema.parse({destination:decision.destination}):{...memory};
+  if(decision.memoryAction==='cancel')next={...next,status:'cancelled'};
+  else if(decision.mode==='navigate'){
+    next={...next,destination:decision.destination,status:'active'};
+    if(decision.draft?.recipientQuery!==undefined)next.recipientQuery=decision.draft.recipientQuery;
+    if(decision.draft?.sourceAccount!==undefined)next.sourceAccount=decision.draft.sourceAccount;
+    if(decision.draft?.amount!==undefined){
+      const quote=decision.draft.amount;
+      const value=body.message.includes(quote)?parseYuan(quote):null;
+      if(value===null)return res.json({...routed,decision:{mode:'clarify',destination:null,question:'请确认本次金额。'},threadId:thread.id,memory,turn:null});
+      next.amountCents=value;
+    }
+  }
+  if(JSON.stringify(store.getChatMemory(id,thread.id))!==JSON.stringify(memory))
+    return res.json({...routed,decision:{mode:'clarify',destination:null,question:'任务信息刚刚更新，请重新确认本次修改。'},threadId:thread.id,memory:store.getChatMemory(id,thread.id),turn:null});
+  next=store.saveChatMemory(id,thread.id,next);
+  if(decision.memoryAction==='cancel'){decision.mode='clarify';decision.destination=null;decision.question='已取消当前任务草稿，未执行资金操作。';}
+  if(decision.mode!=='chat'){
+    saveAgentMessage(id,thread.id,{role:'user',content:body.message,components:[]});
+    saveAgentMessage(id,thread.id,{role:'assistant',content:decision.mode==='navigate'?'已打开对应功能，请继续核对信息。':decision.question??'请确认要办理的事项。',components:[]});
+    return res.json({...routed,decision,threadId:thread.id,memory:next,turn:null});
+  }
+  const turn=await createAgentTurn(id,thread.id,body.message,getState(id),{intent:decision.chatIntent??'goal_planning',explanation:decision.answer??null,provider:'deepseek',fallbackReason:null});
+  const latest=getAgentMessages(id,thread.id).filter(m=>m.role==='user').at(-1);
+  const run=turn.intent==='goal_planning'&&turn.components.some(c=>c.type==='goal_input_card')&&!turn.components.some(c=>c.type==='clarification'||c.type==='data_connection_prompt')&&latest?startAgentRun(id,thread.id,latest.id):null;
+  res.json({...routed,threadId:thread.id,memory:next,turn:AgentTurnWithRunSchema.parse({...turn,run})});
+}));
+app.post('/api/agent/threads/:id/navigation-draft',route(async(req,res)=>{
+  const body=z.object({recipientQuery:z.string().max(60),amountCents:z.number().int().nonnegative().nullable(),sourceAccount:z.string().max(60)}).strict().parse(req.body);
+  const store=await import('./store.ts');const id=sessionId(req,res),before=store.getChatMemory(id,req.params.id);
+  if(before.status!=='active'||before.destination!=='transfer')throw new Error('INVALID_DRAFT_STATE');
+  res.json(store.saveChatMemory(id,req.params.id,{...before,...body}));
+}));
 app.post('/api/agent/turn', route(async (req, res) => {
   const body = z.object({ threadId: z.string().nullable().default(null), message: z.string().min(1).max(500) }).parse(req.body);
   const id = sessionId(req, res);

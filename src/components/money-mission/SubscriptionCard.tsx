@@ -13,9 +13,7 @@ export function SubscriptionCard({item,actions,rows,busy,onPrepare,onDecision,on
  const cancelled=last?.nextChargeSuppressed===true;
  return <article className="mission-card" aria-label={`${item.title}订阅处理`}>
   <h3 className="font-bold">{item.classification==='confirmed'?'订阅与代扣':'可能是订阅'}：{item.title}</h3>
-  <p>{subscriptionCycleLabel(item)}扣费 {money(amount)}，{cancelled?'原定':'预计'}下次扣费 {item.nextChargeDate}。当前付费期至 {paidThrough}。{previous!==null&&amount>previous?`比此前扣费增加 ${money(amount-previous)}。`:null}使用情况需要你自己确认。</p>
-  {item.billingCycle==='annual'&&<p className="text-xs text-[#5A616B]">按原周期每年扣 {money(amount)}；不会按月扣费或立刻增加可用余额。</p>}
-  {item.billingCycle==='once'&&<p className="text-xs text-[#5A616B]">单次或短期项目，不外推为永久月费；需要先核对是否存在后续扣款。</p>}
+  <p>{subscriptionCycleLabel(item)}扣费 {money(amount)}，{cancelled?'原定':'预计'}下次扣费 {item.nextChargeDate}。当前付费期至 {paidThrough}。{previous!==null&&amount>previous?`比此前扣费增加 ${money(amount-previous)}。`:null}</p>
   {item.necessary&&<p className="text-amber-800">必要代扣，取消前请先确认替代安排。</p>}
   <div className="my-3 text-xs text-[#5A616B] space-y-1">{history.map(row=><p key={row.id}>{row.date} · {money(Math.abs(row.amountCents))} · {({bank:'银行卡',wechat_pay:'微信支付',alipay:'支付宝'} as Record<string,string>)[row.sourceKind]??row.sourceKind}</p>)}</div>
   {cancelled?<p role="status">已关闭自动续费：{item.title}。服务保持至 {paidThrough}；本次不退款。</p>:last?.status==='unknown'?<><p role="status">结果待核对，暂不计入节省，也不会重复取消。</p><button className="mission-primary" disabled={busy} onClick={()=>onQuery(last.id)}>查询商户结果</button></>:<>

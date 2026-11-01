@@ -585,3 +585,19 @@ test('quiet hours defer an immediate risk thread without suppressing the saved s
   const promoted = ensureImpactThread(sessionId, state, new Date('2026-09-22T00:30:00.000Z'));
   assert.equal(promoted?.unread, true);
 });
+
+
+test('summer clarification remembers total and savings and only asks for the date',async()=>{
+ const keyBefore=process.env.DEEPSEEK_API_KEY;delete process.env.DEEPSEEK_API_KEY;
+ try{
+ const state=createFixture(),sessionId=randomUUID();
+ const first=await createAgentTurn(sessionId,null,'我想去日本旅行，已存2000元',state);
+ const second=await createAgentTurn(sessionId,first.thread.id,'一共10000，明年暑假去',state);
+ const draft=getGoalDraft(sessionId,first.thread.id)!;
+ assert.equal(draft.targetCents,1000000);assert.equal(draft.savedCents,200000);assert.equal(draft.title,'日本旅行');assert.equal(draft.targetDate,null);
+ assert.match(second.message.content,/10,000|10000/);assert.match(second.message.content,/暑假/);assert.doesNotMatch(second.message.content,/一共需要多少钱/);
+ const third=await createAgentTurn(sessionId,first.thread.id,'7月15日',state);
+ const updated=getGoalDraft(sessionId,third.thread.id)!;
+ assert.equal(updated.targetDate,'2027-07-15');assert.equal(updated.targetCents,1000000);assert.equal(updated.savedCents,200000);
+ }finally{if(keyBefore===undefined)delete process.env.DEEPSEEK_API_KEY;else process.env.DEEPSEEK_API_KEY=keyBefore;}
+});

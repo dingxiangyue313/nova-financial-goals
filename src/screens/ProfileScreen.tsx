@@ -4,23 +4,13 @@ import { Goal, ScreenId } from '../types';
 interface ProfileScreenProps {
   goal: Goal;
   onNavigate: (s: ScreenId) => void;
-  onResetData: () => void;
-  onBankingDemo: () => void;
   onDataConnections: () => void;
-  installState: 'available' | 'installed' | 'ios' | 'unavailable';
-  onInstall: () => void;
-  onClearOffline: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   goal,
   onNavigate,
-  onResetData,
-  onBankingDemo,
   onDataConnections,
-  installState,
-  onInstall,
-  onClearOffline,
 }) => {
   return (
     <div className="flex-1 flex flex-col pt-2 pb-safe px-4 overflow-y-auto no-scrollbar space-y-3.5">
@@ -69,96 +59,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
       </div>
 
-      <button onClick={onBankingDemo} className="w-full bg-white border border-[#E5E8EB] rounded-xl p-4 shadow-sm flex items-center justify-between text-[#0F6B6D] font-semibold text-sm"><span>授权、外部 Agent 与执行记录</span><span className="material-symbols-outlined">arrow_forward</span></button>
       <button onClick={onDataConnections} className="w-full bg-white border border-[#E5E8EB] rounded-xl p-4 shadow-sm flex items-center justify-between text-[#0F6B6D] font-semibold text-sm">
         <span className="flex items-center gap-2"><span className="material-symbols-outlined text-[19px]">account_balance</span>数据连接与自动守护</span>
         <span className="material-symbols-outlined">arrow_forward</span>
       </button>
 
-      <section className="rounded-xl border border-[#D8E4E4] bg-white p-4 shadow-sm">
-        <div className="flex items-start gap-3">
-          <span className="material-symbols-outlined rounded-xl bg-[#E6F2F2] p-2 text-[#0F6B6D]">install_mobile</span>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-[14px] font-bold text-[#1F2329]">安装 NOVA</h3>
-            <p className="mt-1 text-[11px] leading-relaxed text-[#5A616B]">
-              {installState === 'installed' ? '已作为应用安装，可从主屏幕直接打开。'
-                : installState === 'ios' ? '在 Safari 中点“分享”，再选“添加到主屏幕”。'
-                  : '添加到手机或电脑主屏幕。离线时只显示最近一次安全摘要。'}
-            </p>
-            {installState !== 'installed' && (
-              <button type="button" onClick={onInstall}
-                className="mt-2 rounded-lg bg-[#0F6B6D] px-3 py-2 text-[12px] font-semibold text-white">
-                {installState === 'ios' ? '查看安装方法' : installState === 'available' ? '安装到此设备' : '查看安装说明'}
-              </button>
-            )}
-            <button type="button" onClick={onClearOffline}
-              className="mt-2 block text-[11px] font-semibold text-[#5A616B] hover:text-[#1F2329]">
-              清除本机离线数据
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Quick Prototype Navigation & Simulation Tools */}
-      <div className="bg-[#F8FAFB] border border-[#E5E8EB] rounded-xl p-3.5 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[12px] font-bold text-[#1F2329] flex items-center gap-1">
-            <span className="material-symbols-outlined text-[15px] text-[#0F6B6D]">tune</span>
-            演示与屏幕快速直达
-          </span>
-          <span className="text-[10px] text-[#5A616B]">原型无缝切换</span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-[12px]">
-          <button
-            onClick={() => onNavigate('home')}
-            className="p-2.5 rounded-lg bg-white border border-[#E5E8EB] hover:border-[#0F6B6D] text-[#1F2329] font-medium text-left flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px] text-[#0F6B6D]">dashboard</span>
-            <span>屏幕 1：首页</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('create_goal')}
-            className="p-2.5 rounded-lg bg-white border border-[#E5E8EB] hover:border-[#0F6B6D] text-[#1F2329] font-medium text-left flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px] text-[#0F6B6D]">mic</span>
-            <span>屏幕 2：创建目标</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('feasibility')}
-            className="p-2.5 rounded-lg bg-white border border-[#E5E8EB] hover:border-[#0F6B6D] text-[#1F2329] font-medium text-left flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px] text-[#0F6B6D]">analytics</span>
-            <span>屏幕 4：目标可行性</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('impact')}
-            className="p-2.5 rounded-lg bg-white border border-[#E5E8EB] hover:border-[#0F6B6D] text-[#1F2329] font-medium text-left flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px] text-[#C74242]">psychology</span>
-            <span>屏幕 3：目标影响</span>
-          </button>
-          <button
-            onClick={() => onNavigate('workspace')}
-            className="col-span-2 p-2.5 rounded-lg bg-white border border-[#E5E8EB] hover:border-[#0F6B6D] text-[#1F2329] font-medium text-left flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px] text-[#0F6B6D]">smart_toy</span>
-            <span>NOVA 目标工作台</span>
-          </button>
-        </div>
-
-        <div className="pt-2 grid grid-cols-1 gap-2">
-          <button
-            onClick={onResetData}
-            className="py-2 px-3 rounded-lg bg-white border border-[#E5E8EB] text-[#5A616B] hover:text-[#1F2329] text-[12px] font-medium transition-colors cursor-pointer"
-          >
-            重置模拟目标、连接与流水
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

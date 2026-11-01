@@ -16,6 +16,7 @@ import { PlanChangeScreen } from './screens/PlanChangeScreen';
 import { GoalImpactScreen } from './screens/GoalImpactScreen';
 import { GoalsListScreen } from './screens/GoalsListScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
+import { DemoGovernanceActivityScreen } from './screens/DemoGovernanceActivityScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { BankingDemoScreen } from './screens/BankingDemoScreen';
 import { DataConnectionScreen } from './screens/DataConnectionScreen';
@@ -37,7 +38,8 @@ export default function App() {
   const [demoEnabled, setDemoEnabled] = useState(false);
   const demoControl = window.location.pathname === '/demo-control' && demoEnabled;
   useEffect(() => { void api<{demoControls:boolean}>('/api/capabilities').then(value => setDemoEnabled(value.demoControls)).catch(() => {}); }, []);
-  const [currentScreen, setCurrentScreen] = useState<ScreenId>('home');
+  const [currentScreen, setCurrentScreen] = useState<ScreenId>(window.location.pathname === '/demo-control' ? 'home' : 'data_connections');
+  const startupConnection = useRef(window.location.pathname !== '/demo-control');
   const [previousScreen, setPreviousScreen] = useState<ScreenId>('home');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [missionModel, setMissionModel] = useState<MoneyMissionReadModel | null>(null);
@@ -50,7 +52,10 @@ export default function App() {
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
   const [workspaceStarter, setWorkspaceStarter] = useState('');
+  const [workspaceThreadId,setWorkspaceThreadId]=useState<string|null>(null);
+  const [financialMemory,setFinancialMemory]=useState<import('../shared/chat-routing').ChatMemory|undefined>();
   const [financialStarter,setFinancialStarter]=useState('');
+  const [financialSection,setFinancialSection]=useState<string|undefined>();
   const [detailGoalId, setDetailGoalId] = useState<string | null>(null);
   const [financialTab,setFinancialTab]=useState<FinancialTab>('overview');
   const [pendingConnectionThreadId, setPendingConnectionThreadId] = useState<string | null>(null);
@@ -117,7 +122,7 @@ export default function App() {
   useEffect(() => {
     if (!snapshot || initiallyRouted.current) return;
     initiallyRouted.current = true;
-    setCurrentScreen(snapshot.goals.length ? 'home' : 'workspace');
+    setCurrentScreen(startupConnection.current ? 'data_connections' : snapshot.goals.length ? 'home' : 'workspace');
   }, [snapshot]);
   useEffect(() => {
     if (!snapshot || snapshot.goals.length === 0) return;
@@ -242,7 +247,10 @@ export default function App() {
     } else if (currentScreen === 'ai_safety') {
       setCurrentScreen('profile');
     } else if (currentScreen === 'data_connections') {
-      setCurrentScreen(previousScreen === 'profile' ? 'profile' : 'create_goal');
+      if (startupConnection.current) {
+        startupConnection.current = false;
+        setCurrentScreen('home');
+      } else setCurrentScreen(previousScreen === 'profile' ? 'profile' : previousScreen === 'workspace' ? 'workspace' : 'create_goal');
     } else if (currentScreen === 'impact') {
       setCurrentScreen('home');
     } else if (currentScreen === 'financial_services') {
@@ -294,7 +302,10 @@ export default function App() {
       const outcome = await api<{ snapshot: Snapshot; result: DataSyncResult }>('/api/data-connections/connect', 'POST', { sources });
       setSnapshot(outcome.snapshot);
       showToast(`已读取近 90 天模拟流水（${outcome.result.importedCount} 笔）`);
-      if (pendingConnectionThreadId) {
+      if (startupConnection.current) {
+        startupConnection.current = false;
+        navigateTo('home');
+      } else if (pendingConnectionThreadId) {
         const threadId = pendingConnectionThreadId;
         setPendingConnectionThreadId(null);
         try { await api('/api/agent/turn', 'POST', { threadId, message: '模拟数据已连接，请继续核算刚才的目标' }); }
@@ -412,7 +423,7 @@ export default function App() {
       case 'create_goal':
         return '创建目标';
       case 'money_mission':
-        return '账单与消费';
+        return '账单与订阅';
       case 'feasibility':
         return '目标可行性';
       case 'plan_change':
@@ -514,6 +525,7 @@ export default function App() {
           >
             NOVA 工作台
           </button>
+          <button onClick={() => navigateTo('banking_demo')} className="px-2.5 py-1 rounded-full shrink-0 bg-white border border-[#D0D5DD] text-[11px]">授权、外部 Agent 与执行记录</button>
         </div>
 
         <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -573,10 +585,11 @@ export default function App() {
           )}
 
           {currentScreen === 'money_mission' && <MoneyMissionScreen model={missionModel} loading={missionLoading}
+            initialSection={previousScreen==='workspace'?financialSection:undefined}
             onSnapshot={setSnapshot}
             error={missionError} compact={deviceFrame} onRefresh={() => void refreshMission()}
             onNavigate={() => { setWorkspaceStarter('请继续日本旅行目标的当前任务'); navigateTo('workspace'); }} />}
-          {currentScreen === 'financial_services' && <FinancialServicesScreen initialMessage={financialStarter} initialTab={financialTab} onBills={() => navigateTo('money_mission')}
+          {currentScreen === 'financial_services' && <FinancialServicesScreen initialMessage={financialStarter} initialTab={financialTab} initialSection={financialSection} initialDraft={financialMemory} onDraftChanged={draft=>{if(workspaceThreadId)void api<import('../shared/chat-routing').ChatMemory>('/api/agent/threads/'+workspaceThreadId+'/navigation-draft','POST',draft).then(setFinancialMemory).catch(error=>showToast(error.message));}} onBills={() => navigateTo('money_mission')}
             onChanged={() => { void api<Snapshot>('/api/session').then(setSnapshot).catch(error => showToast(error.message)); }} />}
 
           {currentScreen === 'create_goal' && !demoControl && <NewGoalScreen snapshot={snapshot} onSnapshot={setSnapshot} onDone={()=>navigateTo('home')} />}
@@ -658,6 +671,9 @@ export default function App() {
           )}
 
           {currentScreen === 'activity' && (
+            demoControl ? <DemoGovernanceActivityScreen snapshot={snapshot} mutate={mutate}
+              hasImpactPending={hasImpactPending} onNavigateToImpact={() => navigateTo('impact')}
+              onNavigateToBanking={() => navigateTo('banking_demo')} /> :
             <ActivityScreen twinVersion={snapshot.twinVersion}
               onChanged={() => { void api<Snapshot>('/api/session').then(setSnapshot).catch(error => showToast(error.message)); }} />
           )}
@@ -665,22 +681,17 @@ export default function App() {
           {currentScreen === 'banking_demo' && <BankingDemoScreen snapshot={snapshot} mutate={mutate}
             onNavigateActivity={() => navigateTo('activity')} />}
 
-          {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame}
-            starter={workspaceStarter} onSnapshot={setSnapshot} onNavigate={navigateTo}
-            onFinancialCategory={category=>{setFinancialStarter('');if(category==='bills'){navigateTo('money_mission');return;}setFinancialTab(category);navigateTo('financial_services');}}
-            onFinancialTask={message=>{setFinancialStarter(message);setFinancialTab('overview');navigateTo('financial_services');}} onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} />}
+          {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame} demoGoalRunner={demoControl}
+            starter={workspaceStarter} preferredThreadId={workspaceThreadId} onThreadChange={setWorkspaceThreadId} onSnapshot={setSnapshot} onNavigate={navigateTo}
+            onFinancialCategory={category=>{setFinancialMemory(undefined);setFinancialStarter('');setFinancialSection(undefined);if(category==='bills'){navigateTo('money_mission');return;}setFinancialTab(category);navigateTo('financial_services');}}
+            onFinancialTask={(message,destination,memory)=>{setFinancialMemory(memory);setFinancialStarter(message);setFinancialSection(destination.section);if(destination.category==='bills'){navigateTo('money_mission');return;}setFinancialTab(destination.category);navigateTo('financial_services');}} onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} />}
 
           {currentScreen === 'ai_safety' && <AISafetyScreen />}
           {currentScreen === 'profile' && goal && (
             <ProfileScreen
               goal={goal}
               onNavigate={navigateTo}
-              onResetData={handleResetData}
-              onBankingDemo={() => navigateTo(demoControl ? 'banking_demo' : 'financial_services')}
               onDataConnections={() => navigateTo('data_connections')}
-              installState={installState}
-              onInstall={() => void handleInstall()}
-              onClearOffline={() => void handleClearOffline()}
             />
           )}
         </Suspense></main>

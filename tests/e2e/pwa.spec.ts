@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import type { Page } from './fixtures';
 
 test.setTimeout(120_000);
 
 async function openDemo(page: Page): Promise<void> {
   await page.goto('/demo-control');
-  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
   // Do not abort Chrome's first worker-script fetch with the fixture reload.
   // Actual activation is still required before the offline assertions run.
   await expect.poll(() => page.evaluate(async () => {
@@ -35,7 +35,7 @@ async function hasSavedOfflineSnapshot(page: Page): Promise<boolean> {
   }));
 }
 
-test('manifest and install entry expose NOVA as a standalone app', async ({ page, request }) => {
+test('manifest and active service worker expose NOVA as a standalone app', async ({ page, request }) => {
   const manifest = await request.get('/manifest.webmanifest');
   expect(manifest.ok()).toBe(true);
   const body = await manifest.json();
@@ -44,8 +44,8 @@ test('manifest and install entry expose NOVA as a standalone app', async ({ page
   expect(body.icons).toEqual(expect.arrayContaining([expect.objectContaining({ sizes: '192x192' }), expect.objectContaining({ sizes: '512x512' })]));
 
   await openDemo(page);
-  await page.getByTitle('个人设置').click();
-  await expect(page.getByRole('heading', { name: '安装 NOVA' })).toBeVisible();
+
+  await expect.poll(() => page.evaluate(async () => Boolean((await navigator.serviceWorker.getRegistration())?.active))).toBe(true);
 });
 
 test('offline reload shows only the sanitized read-only summary', async ({ page, context }) => {

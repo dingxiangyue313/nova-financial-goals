@@ -490,3 +490,12 @@ test('fabricated candidate references are rejected and a finish requires actual 
   assert.equal(second.reasonCode, 'AGENT_RUN_NO_EVIDENCE');
   assert.match(getAgentMessages(empty.sessionId, empty.threadId).at(-1)!.content, /没有完成必要的只读调查/);
 });
+
+
+test('fallback recommendations never exceed the explicit monthly cap', async () => {
+ const {sessionId,threadId,run}=setup(45000,200000);
+ await runAgentTask(sessionId,threadId,run.runId,async()=>({failure:'DEEPSEEK_NOT_CONFIGURED'}));
+ const card=getAgentMessages(sessionId,threadId).at(-1)!.components.find(c=>c.type==='candidate_recommendations');
+ assert.ok(card?.type==='candidate_recommendations');
+ assert.ok(card.items.filter(item=>item.selectable).every(item=>item.monthlyContributionCents<=200000&&(item.firstMonthContributionCents??0)<=200000));
+});

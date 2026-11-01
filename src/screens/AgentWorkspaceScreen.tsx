@@ -7,15 +7,18 @@ import type { ScreenId } from '../types';
 import { AgentComponentRenderer } from '../components/AgentComponentRenderer';
 import { NovaMark } from '../components/NovaMark';
 import { financialCategories, type FinancialCategory } from '../lib/financial-categories';
+import type { FinancialDestination } from '../lib/financial-navigation';
+import { chatDestinations, ChatRouteResponseSchema } from '../../shared/chat-routing';
 
 const suggestions = ['帮我看看目标能否按时完成', '这笔支出会影响目标吗？', '帮我安排旅行预算'];
 const currentPreferences = (components: AgentComponent[], preferences: RiskPreferences) => components.map(component =>
   component.type === 'notification_preference_card' ? { ...component, preferences } : component);
 
-export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, onNavigate, onConnectData, onFinancialTask, onFinancialCategory }: {
-  snapshot: Snapshot; compact: boolean; starter?: string; onSnapshot: (snapshot: Snapshot) => void;
+export function AgentWorkspaceScreen({ snapshot, compact, starter, preferredThreadId, onThreadChange, onSnapshot, onNavigate, onConnectData, onFinancialTask, onFinancialCategory, demoGoalRunner = false }: {
+  demoGoalRunner?: boolean;
+  preferredThreadId?:string|null;onThreadChange?:(id:string)=>void; snapshot: Snapshot; compact: boolean; starter?: string; onSnapshot: (snapshot: Snapshot) => void;
   onNavigate: (screen: ScreenId) => void; onConnectData: (threadId: string) => void;
-  onFinancialTask?:(message:string)=>void;
+  onFinancialTask?:(message:string,destination:FinancialDestination,memory?:import('../../shared/chat-routing').ChatMemory)=>void;
   onFinancialCategory: (category: FinancialCategory) => void;
 }) {
   const [receiptRunId, setReceiptRunId] = useState<string | null>(null);
@@ -24,9 +27,18 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [draft, setDraft] = useState(starter || '');
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const composing = useRef(false);
+  const compositionEndedAt = useRef(0);
+  const replaceDraft = (value: string) => {
+    setDraft(value);
+    if (inputRef.current) inputRef.current.value = value;
+  };
   const [busy, setBusy] = useState(false);
+  const [initializing,setInitializing]=useState(true);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(compact);
+  const [shortcutsOpen, setShortcutsOpen] = useState(true);
   const [canvasComponents, setCanvasComponents] = useState<AgentComponent[]>([]);
   const [run, setRun] = useState<AgentRun | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
@@ -49,7 +61,7 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
     const hydrated = result.messages.map(message => ({ ...message,
       components: currentPreferences(message.components, snapshot.riskPreferences).map(component =>
         component.type === 'monitoring_opt_in' ? { ...component, enabled: result.monitor.enabled } : component) }));
-    setMessages(hydrated); setActiveThreadId(threadId);
+    setMessages(hydrated); setActiveThreadId(threadId); onThreadChange?.(threadId);
     setCanvasComponents(hydrated.slice().reverse().find(message => message.role === 'assistant'
       && message.components.length > 0)?.components || []);
     setThreads(current => current.map(thread => thread.id === threadId ? { ...thread, unread: false } : thread));
@@ -60,8 +72,8 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
     setRun(value.run);
     if (refreshOnFinish && value.run?.status !== 'running') await loadMessages(threadId);
   }
-  useEffect(() => { void api('/api/risk/summaries/ensure', 'POST').then(() => refreshThreads()).then(() => setError(null))
-    .catch(value => setError(value.message)); }, []);
+  useEffect(() => { void api('/api/risk/summaries/ensure', 'POST').then(() => refreshThreads(preferredThreadId)).then(() => setError(null))
+    .catch(value => setError(value.message)).finally(()=>setInitializing(false)); }, []);
   useEffect(() => {
     const timer = window.setInterval(() => { void api<{ threads: AgentThread[] }>(
       '/api/agent/threads?includeArchived=true').then(value => setThreads(value.threads)).catch(() => undefined); }, 15_000);
@@ -76,25 +88,42 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, busy]);
 
   async function send(message: string) {
-    if (!message.trim() || busy) return;
-    if(onFinancialTask&&/给.+转\s*\d|我要申购|我要赎回|挂失.*卡|调额|管理订阅|取消订阅|查看账单|获取.*报价/.test(message)){onFinancialTask(message.trim());return;}
-    setBusy(true); setError(null); setDraft('');
+    if (!message.trim() || busy || initializing || composing.current) return;
+    setBusy(true); setError(null); replaceDraft('');
     try {
       const writableThreadId = activeThread && activeThread.status === 'active' && !activeThread.readOnly ? activeThread.id : null;
-      const turn = await api<AgentTurnWithRun>('/api/agent/turn', 'POST', { threadId: writableThreadId, message: message.trim() });
+      if (demoGoalRunner) {
+        const turn = await api<AgentTurnWithRun>('/api/agent/turn', 'POST', { message: message.trim(), threadId: writableThreadId });
+        setRun(turn.run);
+        setCanvasComponents(turn.canvasComponents.length ? turn.canvasComponents : turn.components);
+        await refreshThreads(turn.thread.id);
+        return;
+      }
+      const response=await api<import('../../shared/chat-routing').ChatConversationResponse>('/api/agent/chat','POST',{message:message.trim(),threadId:writableThreadId});
+      const routed=ChatRouteResponseSchema.parse(response);onThreadChange?.(response.threadId);setActiveThreadId(response.threadId);
+      if(routed.decision.mode==='navigate'&&routed.decision.destination&&onFinancialTask){
+        onFinancialTask(message.trim(),chatDestinations[routed.decision.destination],response.memory);return;
+      }
+      if(routed.decision.mode==='clarify'){
+        replaceDraft(message);setError(routed.decision.question??'请确认你想办理的事项。');return;
+      }
+      const turn=response.turn;if(!turn)throw new Error('未收到有效回复，请重试。');
       setRun(turn.run);
       setCanvasComponents(turn.canvasComponents.length ? turn.canvasComponents : turn.components);
       await refreshThreads(turn.thread.id);
     } catch (value) {
-      if (value instanceof Error && value.message === 'THREAD_ARCHIVED') {
-        const turn = await api<AgentTurnWithRun>('/api/agent/turn', 'POST', { threadId: null, message: message.trim() });
-        setRun(turn.run);
-        await refreshThreads(turn.thread.id);
-      } else { setDraft(message); setError(value instanceof Error ? value.message : '发送失败'); }
+      replaceDraft(message);
+      setError(value instanceof Error && value.message === 'THREAD_ARCHIVED'
+        ? '此会话已归档，请新建会话后继续，输入内容已保留。'
+        : value instanceof Error ? value.message : '发送失败');
     }
     finally { setBusy(false); }
   }
-  async function submit(event: FormEvent) { event.preventDefault(); await send(draft); }
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (composing.current || Date.now() - compositionEndedAt.current < 100) return;
+    await send(inputRef.current?.value ?? draft);
+  }
   async function action(actionId: string, selection: string[] = []) {
     if (busy) return;
     setBusy(true); setError(null);
@@ -231,8 +260,12 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
     </div>
     <footer className="border-t border-[#E5E8EB] bg-white p-3">
       <section aria-label="金融任务快捷入口" className="mb-3">
-        <h2 className="mb-2 text-[12px] font-semibold text-[#1F2329]">你想办理什么？</h2>
-        <div className="flex flex-wrap gap-2">
+        <h2><button type="button" aria-expanded={shortcutsOpen} aria-controls="nova-financial-shortcuts"
+          aria-label={shortcutsOpen ? '收起功能入口' : '展开功能入口'} onClick={() => setShortcutsOpen(open => !open)}
+          className="flex min-h-11 w-full items-center justify-between gap-2 text-left text-[12px] font-semibold text-[#1F2329] rounded-lg focus-visible:outline-2 focus-visible:outline-[#0F6B6D]">
+          <span>你想办理什么？</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`h-4 w-4 text-[#0F6B6D] transition-transform motion-reduce:transition-none ${shortcutsOpen ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button></h2>
+        <div id="nova-financial-shortcuts" hidden={!shortcutsOpen} className={shortcutsOpen ? 'flex flex-wrap gap-2' : 'hidden'}>
           {financialCategories.map(category => <button key={category.id} type="button"
             onClick={() => onFinancialCategory(category.id)}
             className="min-h-11 rounded-2xl border border-[#D0D5DD] bg-white px-3 py-2.5 text-[12px] font-semibold text-[#1F2329] transition-colors hover:border-[#0F6B6D] hover:bg-[#E6F2F2] hover:text-[#0F6B6D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F6B6D]">
@@ -242,7 +275,10 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
       </section>
       {!messages.length && <div className="mb-2 flex gap-2 overflow-x-auto no-scrollbar">{suggestions.map(item => <button key={item} onClick={() => void send(item)} className="shrink-0 rounded-xl border border-[#D8E7E7] bg-[#F2FAFA] px-3 py-2 text-left text-[11px] text-[#0F6B6D]">{item}</button>)}</div>}
       {error && <div className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-700">{error}</div>}
-      <form onSubmit={submit} className="flex items-end gap-2"><textarea value={draft} onChange={event => setDraft(event.target.value)} aria-label="告诉 NOVA 你的需求" placeholder={activeThread?.readOnly || activeThread?.status === 'archived' ? '历史会话仅供查看；发送会新建会话' : '说说你的目标，或想办理的事情…'} rows={1} className="min-h-11 flex-1 resize-none rounded-xl border border-[#D0D5DD] bg-[#F8FAFB] px-3 py-3 text-[12px] outline-none focus:border-[#0F6B6D]"/><button type="submit" aria-label="发送" disabled={busy || !draft.trim()} className="grid h-11 w-11 place-items-center rounded-xl bg-[#0F6B6D] text-white disabled:opacity-40"><span className="material-symbols-outlined text-[18px]">arrow_upward</span></button></form>
+      <form onSubmit={submit} className="flex items-end gap-2"><textarea ref={inputRef} defaultValue={starter || ''} onChange={event => setDraft(event.target.value)}
+        onCompositionStart={() => { composing.current = true; }}
+        onCompositionEnd={event => { composing.current = false; compositionEndedAt.current = Date.now(); setDraft(event.currentTarget.value); }}
+        onKeyDown={event => { if (event.key === 'Enter' && (composing.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.stopPropagation(); }} aria-label="告诉 NOVA 你的需求" placeholder={activeThread?.readOnly || activeThread?.status === 'archived' ? '历史会话仅供查看；发送会新建会话' : '说说你的目标，或想办理的事情…'} rows={1} className="min-h-11 flex-1 resize-none rounded-xl border border-[#D0D5DD] bg-[#F8FAFB] px-3 py-3 text-[12px] outline-none focus:border-[#0F6B6D]"/><button type="submit" aria-label="发送" disabled={busy || initializing || !draft.trim()} className="grid h-11 w-11 place-items-center rounded-xl bg-[#0F6B6D] text-white disabled:opacity-40"><span className="material-symbols-outlined text-[18px]">arrow_upward</span></button></form>
     </footer>
   </section>;
 

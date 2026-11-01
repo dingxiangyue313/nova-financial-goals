@@ -1,4 +1,5 @@
 import { verifyAuditChain } from './governance.ts';
+import { ChatMemorySchema } from '../shared/chat-routing.ts';
 import {tickGoalNotices} from './goal-notices.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -22,6 +23,16 @@ import { inspectEvidence } from './bill-analysis.ts';
 const dbPath = resolve(process.env.NOVA_DB_PATH || './data/nova.sqlite');
 mkdirSync(dirname(dbPath), { recursive: true });
 const db = new DatabaseSync(dbPath);
+db.exec('CREATE TABLE IF NOT EXISTS chat_navigation_memory (session_id TEXT NOT NULL, thread_id TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(session_id,thread_id))');
+export function getChatMemory(sessionId:string,threadId:string){
+  getAgentThread(sessionId,threadId);
+  const row=db.prepare('SELECT payload FROM chat_navigation_memory WHERE session_id=? AND thread_id=?').get(sessionId,threadId) as {payload:string}|undefined;
+  return row?ChatMemorySchema.parse(JSON.parse(row.payload)):ChatMemorySchema.parse({destination:null});
+}
+export function saveChatMemory(sessionId:string,threadId:string,value:unknown){
+  getAgentThread(sessionId,threadId);const memory=ChatMemorySchema.parse(value);
+  db.prepare('INSERT INTO chat_navigation_memory VALUES (?,?,?) ON CONFLICT(session_id,thread_id) DO UPDATE SET payload=excluded.payload').run(sessionId,threadId,JSON.stringify(memory));return memory;
+}
 db.exec('PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
 db.exec(`CREATE TABLE IF NOT EXISTS demo_sessions (
   id TEXT PRIMARY KEY, state_json TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL

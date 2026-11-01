@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('home trend survives source connection and opens bills without mission steps',async({page},testInfo)=>{
  await page.goto('/');await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();
@@ -8,14 +8,14 @@ test('home trend survives source connection and opens bills without mission step
  await page.getByRole('button',{name:'查看账单与消费'}).click();
  await expect(page.getByRole('navigation',{name:'Money Mission 进度'})).toHaveCount(0);
  await expect(page.getByText('一步步准备旅行金')).toHaveCount(0);
- await expect(page.getByRole('heading',{name:'钱主要花在哪里'})).toBeVisible();
+ await page.getByRole('button',{name:'支出分析',exact:true}).click();await expect(page.getByRole('heading',{name:'钱主要花在哪里'})).toBeVisible();
  await expect(page.getByText('相比历史基线变化 ¥0')).toHaveCount(0);
- await expect(page.getByText('2026-07-05 · ¥58 · 银行卡',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'订阅管理',exact:true}).click();await expect(page.getByText('2026-07-05 · ¥58 · 银行卡',{exact:true})).toBeVisible();
  await expect(page.getByText('2026-10-05 · ¥68 · 银行卡',{exact:true})).toBeVisible();
  await page.screenshot({path:`artifacts/bill-breakdown-${testInfo.project.name}.png`,fullPage:true});
- await page.getByRole('heading',{name:'可能是订阅：CloudBox Plus'}).scrollIntoViewIfNeeded();
+ await page.getByRole('button',{name:'订阅管理',exact:true}).click();await page.getByRole('heading',{name:'可能是订阅：CloudBox Plus'}).scrollIntoViewIfNeeded();
  await page.screenshot({path:`artifacts/subscription-card-${testInfo.project.name}.png`,fullPage:true});
- await page.getByRole('button',{name:'查看住房逐笔账单'}).click();
+ await page.getByRole('button',{name:'支出分析',exact:true}).click();await page.getByRole('button',{name:'查看住房逐笔账单'}).click();
  await expect(page.getByRole('heading',{name:'逐笔交易证据 · 住房'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
@@ -30,7 +30,7 @@ test('new goal contains plan comparison and preserves existing account money',as
  await page.getByRole('button',{name:'下一步：比较目标方案'}).click();
  await expect(page.getByRole('heading',{name:'选择适合你的存钱节奏'})).toBeVisible();
  await page.getByRole('button',{name:'选择并核对平衡方案'}).click();
- await page.getByRole('dialog').getByRole('button',{name:'确认并执行模拟操作'}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'确认操作'}).click();
  await expect(page.getByRole('dialog')).toBeHidden();
  await page.getByRole('button',{name:'完成，返回首页'}).click();
  await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();

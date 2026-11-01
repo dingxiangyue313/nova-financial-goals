@@ -5,7 +5,7 @@ import {money} from '../../lib/format';
 export function CardApplications({view,busy,limit,onLimit,onPrepare,onQuery,onCredit}:{view:FinancialServicesView;busy:boolean;limit:string;onLimit:(s:string)=>void;onPrepare:(a:ServiceAction)=>void;onQuery:(id:string)=>void;onCredit:(missing:boolean)=>void}){
  const [missing,setMissing]=useState(false),[employment,setEmployment]=useState<'synthetic_salaried'|'synthetic_freelance'>('synthetic_salaried'),[ack,setAck]=useState(false);
  const names:Record<string,string>={under_review:'审核中',unknown:'结果待核对',approved:'已通过',rejected:'未通过',withdrawn:'已撤回',needs_information:'待补充资料'};
- return <section className="mission-card"><h2 className="font-bold">模拟卡片申请</h2><p>使用合成身份，费用¥0。信用额度不增加活期或目标余额。</p>
+ return <section className="mission-card"><h2 className="font-bold">申请新卡</h2><p>使用合成身份，费用¥0。信用额度不增加活期或目标余额。</p>
  <button className="mission-secondary" disabled={busy} onClick={()=>onPrepare({kind:'apply_card',product:'travel_debit',requestedLimitCents:500000,employmentEvidence:'available'})}>申请旅行借记卡</button>
  <label className="block py-2"><input type="checkbox" checked={missing} onChange={e=>setMissing(e.target.checked)}/> 信用卡申请暂缺就业说明（合成资料）</label>
  <button className="mission-secondary" disabled={busy} onClick={()=>onCredit(missing)}>申请日常信用卡</button>
@@ -18,3 +18,4 @@ export function CardApplications({view,busy,limit,onLimit,onPrepare,onQuery,onCr
  {a.status==='unknown'&&<p>原申请结果待核对，查询后再决定下一步。</p>}</article>)}
  </section>;
 }
+

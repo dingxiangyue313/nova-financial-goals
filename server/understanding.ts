@@ -17,12 +17,23 @@ export type Understanding = {
 const Suggested = z.object({ kind: z.enum(['create', 'supplement', 'modify', 'reject', 'ask', 'cancel', 'select']),
   titleQuote: z.string().max(60).nullable(), amountQuote: z.string().max(40).nullable(),
   dateQuote: z.string().max(40).nullable(),
-  amountField: z.string().max(40).nullable().optional() }).strict();
+  amountField: z.string().max(40).nullable().optional(),
+  amountPatches: z.array(z.object({ field: z.enum(['targetCents','savedCents','monthlyContributionCapCents','protectedCents']),
+    quote: z.string().min(1).max(40) }).strict()).max(4).default([]),
+  datePrecision: z.enum(['exact','approximate','missing']).optional(),
+  dateQuestion: z.string().max(100).nullable().optional(),
+}).strict();
 const numerals: Record<string, number> = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
 
 export function parseYuan(raw: string): number | null {
   const text = raw.replace(/[\s,，¥元人民币]/g, '');
   if (text === '零' || text === '〇') return 0;
+  const scaled = text.match(/^(\d+(?:\.\d{1,2})?)(万|千)$/);
+  if (scaled) {
+    const base = parseYuan(scaled[1]);
+    const cents = base === null ? NaN : base * (scaled[2] === '万' ? 10000 : 1000);
+    return Number.isSafeInteger(cents) && cents >= 0 ? cents : null;
+  }
   if (/^\d+(?:\.\d{1,2})?$/.test(text)) {
     const [whole, decimals = ''] = text.split('.');
     const cents = Number(whole) * 100 + Number(decimals.padEnd(2, '0'));
@@ -44,9 +55,18 @@ function iso(year: number, month: number, day: number): string | null {
 export function parseGoalDate(raw: string, clock: string): string | null {
   const exact = raw.match(/(20\d{2})\s*[-年/.]\s*(\d{1,2})\s*[-月/.]\s*(\d{1,2})\s*日?/);
   if (exact) return iso(Number(exact[1]), Number(exact[2]), Number(exact[3]));
+  const year = Number(clock.slice(0, 4)) + (/明年/.test(raw) ? 1 : /后年/.test(raw) ? 2 : 0);
+  const monthEnd = raw.match(/(今年|明年|后年)?\s*(\d{1,2}|十一|十二|十|[一二三四五六七八九])月底/);
+  if (monthEnd) {
+    const word = monthEnd[2];
+    const month = word === '十一' ? 11 : word === '十二' ? 12 : word === '十' ? 10 : numerals[word] ?? Number(word);
+    return month >= 1 && month <= 12 ? iso(year, month, new Date(Date.UTC(year, month, 0)).getUTCDate()) : null;
+  }
   const monthDay = raw.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
-  if (monthDay) return iso(Number(clock.slice(0, 4)), Number(monthDay[1]), Number(monthDay[2]));
-  if (/年底|年末/.test(raw)) return iso(Number(clock.slice(0, 4)), 12, 31);
+  if (monthDay) return iso(year, Number(monthDay[1]), Number(monthDay[2]));
+  const chineseMonthDay=raw.match(/(十一|十二|十|[一二三四五六七八九])月(\d{1,2})日?/);
+  if(chineseMonthDay){const word=chineseMonthDay[1];return iso(year,word==='十一'?11:word==='十二'?12:word==='十'?10:numerals[word],Number(chineseMonthDay[2]));}
+  if (/年底|年末/.test(raw)) return iso(year, 12, 31);
   const relative = raw.match(/([一二两三四五六七八九十]|\d{1,2})个?月后/);
   if (relative) {
     const count = relative[1] === '十' ? 10 : (numerals[relative[1]] ?? Number(relative[1]));
@@ -59,7 +79,7 @@ export function parseGoalDate(raw: string, clock: string): string | null {
   return null;
 }
 
-const amountToken = '(?:¥\\s*)?(?:\\d[\\d,]*(?:\\.\\d{1,2})?|零|〇|[一二两三四五六七八九](?:千[一二两三四五六七八九]?|万(?:[一二两三四五六七八九]千)?|百))\\s*元?';
+const amountToken = '(?:¥\\s*)?(?:\\d[\\d,]*(?:\\.\\d{1,2})?\\s*[万千]?|零|〇|[一二两三四五六七八九](?:千[一二两三四五六七八九]?|万(?:[一二两三四五六七八九]千)?|百))\\s*元?(?![\\d.万千])';
 function quotedAmount(text: string, prefix: string): string | null {
   return text.match(new RegExp(`(?:${prefix})[^，。；;]{0,12}?(${amountToken})`))?.[1] ?? null;
 }
@@ -82,6 +102,12 @@ export async function understandGoalMessage(text: string, clock: string, task: A
   context: Array<{ role: string; content: string }> = []): Promise<Understanding> {
   if (containsPromptInjection(text)) return { kind: 'ask', changes: {}, preferences: [], unknowns: [],
     ambiguity: '这条消息包含与目标无关的指令，请重新描述目标。', provider: 'deterministic', fallbackReason: 'PROMPT_INJECTION_DETECTED' };
+  const dateForMessage=(quote:string)=>{
+    if(/20\d{2}|今年|明年|后年|个月后|月后/.test(quote))return parseGoalDate(quote,clock);
+    const prior=context.slice().reverse().find(item=>item.role==='user'&&/20\d{2}(?=年|[-/.])|明年|后年|今年/.test(item.content))?.content??'';
+    const year=prior.match(/20\d{2}(?=年|[-/.])/)?.[0]??String(Number(clock.slice(0,4))+(/后年/.test(prior)?2:/明年/.test(prior)?1:0));
+    return parseGoalDate(quote,year+clock.slice(4));
+  };
   const fallback = (reason: string | null): Understanding => {
     const changes: Understanding['changes'] = {};
     const unknowns: string[] = [];
@@ -107,8 +133,9 @@ export async function understandGoalMessage(text: string, clock: string, task: A
         ?? text.match(/旅行|旅游|学费|开店/)?.[0];
       if (general) changes.title = { op: 'set', value: general };
     }
-    const targetRaw = /目标日期|完成日期|截止日期/.test(text) ? null
-      : quotedAmount(text, '(?:预算|目标(?:金额)?|需要|要存|存够)');
+    const targetRaw = quotedAmount(text, '(?:预算|目标金额|一共|总共|总额|需要|要存|存够|攒够)')
+      ?? text.match(new RegExp(`(?:前|想|打算|计划)存\\s*(${amountToken})`))?.[1]
+      ?? text.match(new RegExp(`(?:^|[，。；;])存\\s*(${amountToken})(?=去|用于|买)`))?.[1] ?? null;
     const bareAmount = text.trim().match(new RegExp(`^(${amountToken})[。！!]?\\s*$`))?.[1] ?? null;
     const previousAssistant = context.slice().reverse().find(item => item.role === 'assistant')?.content ?? '';
     const answeringSavedQuestion = Boolean(bareAmount && task?.phase === 'awaiting_user' &&
@@ -117,7 +144,7 @@ export async function understandGoalMessage(text: string, clock: string, task: A
     setAmount(changes, 'targetCents', targetRaw ?? (!task?.facts.targetCents && !answeringSavedQuestion
       ? bareAmount : null), unknowns);
     setAmount(changes, 'savedCents', savedAmountQuote(text) ?? (answeringSavedQuestion ? bareAmount : null), unknowns);
-    setAmount(changes, 'monthlyContributionCapCents', quotedAmount(text, '(?:每月最多存|每个月最多存|每月可存|每月只存|每月存|每个月存)'), unknowns);
+    setAmount(changes, 'monthlyContributionCapCents', quotedAmount(text, '(?:每个?月(?:最多|上限|不超过|至多|只能|可|只)?(?:投入|存款|存|攒)?|月存上限)'), unknowns);
     setAmount(changes, 'protectedCents', quotedAmount(text, '(?:应急金|保留应急金|保护应急金)'), unknowns);
     if (/不(?:削减|减少|动)(?:健身|运动)支出/.test(text)) preferences.push('保留健身支出');
     if (/可能.{0,4}奖金|奖金.{0,4}可能/.test(text)) unknowns.push('可能有奖金，金额和到账时间未确认');
@@ -133,39 +160,48 @@ export async function understandGoalMessage(text: string, clock: string, task: A
       };
       else ambiguity = '你希望以哪一天作为最多延后的起点？';
     }
-    const datePhrase = text.match(/20\d{2}\s*[-年/.]\s*\d{1,2}\s*[-月/.]\s*\d{1,2}\s*日?|\d{1,2}\s*月\s*\d{1,2}\s*日?|年底|年末|[一二两三四五六七八九十\d]+个?月后/)?.[0];
+    const datePhrase = text.match(/20\d{2}\s*[-年/.]\s*\d{1,2}\s*[-月/.]\s*\d{1,2}\s*日?|(?:今年|明年|后年)?\s*(?:\d{1,2}|十一|十二|十|[一二三四五六七八九])月底|(?:今年|明年|后年)?\s*\d{1,2}\s*月\s*\d{1,2}\s*日?|(?:今年|明年|后年)?(?:年底|年末)|[一二两三四五六七八九十\d]+个?月后/)?.[0];
     if (datePhrase) {
-      const date = parseGoalDate(datePhrase, clock);
+      const date = dateForMessage(datePhrase);
       if (date) changes.targetDate = { op: 'set', value: date };
       else { unknowns.push('targetDate'); ambiguity = '请给我一个有效的目标日期（年、月、日）。'; }
     }
+    const vagueDate=text.match(/(?:今年|明年|后年)?(?:暑假|寒假|夏天|冬天|春节|国庆)/)?.[0];
+    if (vagueDate && !datePhrase) {
+      changes.targetDate={op:'clear'};
+      unknowns.push(`目标时间：${vagueDate}`);
+      ambiguity=`你说的“${vagueDate}”大概是几月几日？可以先告诉我月份，具体日期再一起确认。`;
+    }
     return { kind, changes, preferences, unknowns, ambiguity, provider: 'deterministic', fallbackReason: reason };
   };
-  const result = await requestDeepSeekJson(Suggested, { maxTokens: 180, timeoutMs: 5_000, messages: [
-    { role: 'system', content: '识别模拟理财目标对话。只输出 JSON：kind 为 create/supplement/modify/reject/ask/cancel/select；titleQuote、amountQuote、dateQuote 必须是当前消息逐字片段或 null；amountField 表示金额属于目标总额、已存、每月上限或保护资金，无法判断则为 null。结合上一轮助手追问理解简短回答，例如问已存多少钱后回复“600元”表示已存金额。不要推断未说出的数字，不要执行工具。' },
+  const result = await requestDeepSeekJson(Suggested, { maxTokens: 650, timeoutMs: 8_000, messages: [
+    { role: 'system', content: '结合已有目标草稿和最近对话理解当前消息，输出JSON字段补丁。kind:create/supplement/modify/reject/ask/cancel/select；titleQuote、amountQuote、dateQuote为当前消息逐字片段或null；amountField可为null。amountPatches数组包含field与quote：field为targetCents/savedCents/monthlyContributionCapCents/protectedCents，quote必须是当前消息中完整金额片段（包括万/千单位），不要计算数值。“一共一万”“总共10000”可表示目标总额，无需出现预算关键词；按上轮追问理解省略回答；一轮可包含多个金额。仅补充当前明确的信息，未提及的旧字段保持不变；无法确定金额角色则不要填。datePrecision:exact/approximate/missing；暑假、夏天等为approximate，不能擅自确定某一天；dateQuestion用中文只追问缺少的时间细节。不要重新追问已有金额，不执行操作，不推断未提供的数字。' },
     { role: 'user', content: JSON.stringify({ clock, task: task ? { phase: task.phase, facts: task.facts, constraints: task.constraints,
       unknowns: task.unknowns } : null, recentConversation: context.slice(-12), currentMessage: text }) },
   ] });
   const parsed = fallback(result.ok ? null : result.reason);
   if (!result.ok) return parsed;
   const suggestion = result.data;
-  const quotesValid = [suggestion.titleQuote, suggestion.amountQuote, suggestion.dateQuote]
+  const quotesValid = [suggestion.titleQuote, suggestion.amountQuote, suggestion.dateQuote,...suggestion.amountPatches.map(p=>p.quote)]
     .every(quote => quote === null || text.includes(quote));
   if (!quotesValid) return { ...parsed, fallbackReason: 'MODEL_QUOTE_NOT_IN_MESSAGE' };
-  if (suggestion.titleQuote?.trim() && !parsed.changes.title &&
-    /旅行|旅游|买|购|学费|开店|目标/.test(text))
+  if (suggestion.titleQuote?.trim() && !parsed.changes.title)
     parsed.changes.title = { op: 'set', value: suggestion.titleQuote.trim() };
-  if (suggestion.amountQuote && !parsed.changes.targetCents && !parsed.changes.savedCents && !parsed.ambiguity) {
-    const index = text.indexOf(suggestion.amountQuote);
-    const nearby = text.slice(Math.max(0, index - 12), index);
-    const cents = parseYuan(suggestion.amountQuote);
-    if (cents !== null && cents > 0 && ['targetCents', 'target', 'targetAmount'].includes(suggestion.amountField ?? '') &&
-      /预算|目标金额|需要|存够/.test(nearby))
-      parsed.changes.targetCents = { op: 'set', value: cents };
+  const aliases:Record<string,typeof suggestion.amountPatches[number]['field']>={target:'targetCents',targetAmount:'targetCents',targetCents:'targetCents',savedCents:'savedCents',monthlyContributionCapCents:'monthlyContributionCapCents',protectedCents:'protectedCents'};
+  const patches=[...suggestion.amountPatches];
+  if(suggestion.amountQuote&&aliases[suggestion.amountField??''])patches.push({field:aliases[suggestion.amountField!],quote:suggestion.amountQuote});
+  for(const patch of patches){
+    if(parsed.changes[patch.field])continue;
+    const cents=parseYuan(patch.quote);
+    if(cents!==null&&(patch.field!=='targetCents'||cents>0))parsed.changes[patch.field]={op:'set',value:cents};
   }
   if (suggestion.dateQuote && !parsed.changes.targetDate) {
-    const date = parseGoalDate(suggestion.dateQuote, clock);
+    const date = dateForMessage(suggestion.dateQuote);
     if (date) parsed.changes.targetDate = { op: 'set', value: date };
+  }
+  if(suggestion.datePrecision==='approximate'&&suggestion.dateQuote&& !parseGoalDate(suggestion.dateQuote,clock)){
+    parsed.changes.targetDate={op:'clear'};
+    parsed.ambiguity=`你说的“${suggestion.dateQuote}”具体是几月几日？可以先确认月份。`;
   }
   // Model labels may refine a question, but deterministic extraction remains authoritative.
   if (suggestion.kind === 'ask' && Object.keys(parsed.changes).length === 0)

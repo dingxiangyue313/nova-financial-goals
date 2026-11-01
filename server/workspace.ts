@@ -74,11 +74,13 @@ function mergedGoalDraft(sessionId: string, threadId: string, parsed: Understand
   return saveGoalDraft(sessionId, next);
 }
 
-function clarificationForDraft(draft: GoalDraft): AgentComponent {
+function clarificationForDraft(draft: GoalDraft, ambiguity: string | null = null): AgentComponent {
   const labels = { title: '这个计划是为了什么', targetCents: '一共需要多少钱', targetDate: '希望什么时候完成' } as const;
   const missing = draft.missingRequiredFields.map(field => labels[field]);
+  const known=[draft.title?`目标是${draft.title}`:null,draft.targetCents!==null?`总额${yuan(draft.targetCents)}`:null,
+    draft.savedCents!==null?`已存${yuan(draft.savedCents)}`:null,draft.targetDate?`目标日期${draft.targetDate}`:null].filter(Boolean);
   return { id: componentId(), type: 'clarification', title: '还需要一点信息',
-    body: `请告诉我${missing.join('、')}。信息完整后我再生成试算，不会先套用演示数据。`,
+    body: `${known.length?`已记下：${known.join('，')}。`:''}${ambiguity??`请告诉我${missing[0]??'还需要补充的条件'}。`}`,
     suggestions: draft.missingRequiredFields.includes('targetCents')
       ? ['预算 ¥8,000', '需要 ¥12,000'] : draft.missingRequiredFields.includes('targetDate')
         ? ['12 月 15 日前', '今年年底前'] : ['去日本旅行', '买一台相机'] };
@@ -256,7 +258,7 @@ export function prepareCandidateConfirmation(sessionId: string, threadId: string
 }
 
 export async function createAgentTurn(sessionId: string, threadId: string | null, message: string,
-  state: DemoState): Promise<AgentTurn> {
+  state: DemoState, routed?: {intent:AgentIntent;explanation:string|null;provider:'deepseek'|'deterministic';fallbackReason:string|null}): Promise<AgentTurn> {
   const trimmed = message.trim();
   if (!trimmed || trimmed.length > 500) throw new Error('INVALID_AGENT_MESSAGE');
   const deterministicIntent = detectIntent(trimmed);
@@ -267,9 +269,9 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
   const context = getAgentMessages(sessionId, thread.id, 20).map(item => ({ role: item.role, content: item.content }));
   const previousDraft = getGoalDraft(sessionId, thread.id);
   const priorTask = getAgentTaskForThread(sessionId, thread.id);
-  const understood = await interpretAgentRequest(trimmed, deterministicIntent, { context,
+  const understood = routed ?? await interpretAgentRequest(trimmed, deterministicIntent, { context,
     twin: { version: state.twinVersion, goalStatus: state.goal.status, hasImpact: Boolean(state.pendingImpact), hasMandate: Boolean(state.mandate?.active) } });
-  const intent = understood.intent !== 'rejected_prompt_injection' && priorTask &&
+  const intent = routed ? routed.intent : understood.intent !== 'rejected_prompt_injection' && priorTask &&
     priorTask.phase !== 'completed' && priorTask.phase !== 'failed' &&
     !['mandate_management', 'external_agent_request'].includes(understood.intent) &&
     !(understood.intent === 'goal_impact' && /影响|意外支出|额外支出|突然支出|花了|消费了|保养|延期/.test(trimmed))
@@ -343,10 +345,8 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
       preferences, unknowns, phase: needsClarification ? 'awaiting_user' : 'understanding',
       waitingReason: needsClarification ? 'missing_information' : null });
     if (parsed.ambiguity || draft.missingRequiredFields.length) {
-      components = [clarificationForDraft(draft)];
-      if (parsed.ambiguity) components = [{ id: componentId(), type: 'clarification', title: '需要确认',
-        body: parsed.ambiguity, suggestions: [] }];
-      reply = '我先确认这一处信息，再继续计算。';
+      components = [clarificationForDraft(draft,parsed.ambiguity)];
+      reply = components[0].type==='clarification'?components[0].body:'我已更新目标信息。';
     } else {
       const savedCents = draft.savedCents ?? 0;
       const protectedCents = draft.protectedCents ?? state.finance.emergencyCents;
@@ -416,7 +416,7 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
       body: '请只描述目标、目标影响或授权范围。模型没有收到这条内容。', code: 'PROMPT_INJECTION_DETECTED' }];
     reply = '这条内容包含与财务任务无关的指令，我没有执行或转发。';
   } else {
-    components = [{ id: componentId(), type: 'clarification', title: '我可以怎样帮你？',
+    components = routed?.explanation ? [{id:componentId(),type:'explanation',title:'NOVA',body:routed.explanation,tone:'neutral'}] : [{ id: componentId(), type: 'clarification', title: '我可以怎样帮你？',
       body: '请描述目标、目标风险，或希望授予外部 Agent 的范围。',
       suggestions: ['我想年底去日本旅行，预算 ¥8,000', '这笔 ¥900 支出会影响目标吗？', '允许旅行 Agent 在 ¥500 内订票'] }];
     reply = understood.explanation || '我还不能确定你要完成哪类财务任务。';

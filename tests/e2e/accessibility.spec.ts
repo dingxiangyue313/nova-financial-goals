@@ -1,6 +1,6 @@
 type Result = { id: string; impact?: string | null; nodes: unknown[] };
 import AxeBuilder from '@axe-core/playwright';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 
 async function expectNoSeriousViolations(page: Page, screen: string) {
   const result = await new AxeBuilder({ page })
@@ -15,14 +15,14 @@ test('首页、工作台、可行性、影响和授权页无严重无障碍问�
   await page.route(/https:\/\/(fonts\.(googleapis|gstatic)\.com|images\.unsplash\.com|lh3\.googleusercontent\.com)\/.*/, route => route.abort());
   await page.goto('/demo-control', { waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ content: '*, *::before, *::after { animation: none !important; transition: none !important; }' });
-  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
   await page.request.post('/api/demo/load-japan');
   await page.reload();
   await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();
   await expectNoSeriousViolations(page, '首页');
 
   await page.getByTitle('新建目标 / NOVA 智能对话').click();
-  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
   await expectNoSeriousViolations(page, 'NOVA 工作台');
 
   await page.getByRole('button', { name: '4. 目标可行性' }).click();

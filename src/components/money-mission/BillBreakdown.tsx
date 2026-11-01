@@ -7,6 +7,6 @@ export function BillBreakdown({brief,onCategory,onEvidence}:{brief:BillBrief;onC
    <span className="flex justify-between gap-2 mb-2"><span>{labels[c.category]??c.category}</span><span>{money(c.amountCents)} ›</span></span>
    <span className="block h-2 rounded-full bg-[#ECF1F1] overflow-hidden"><span className="block h-full rounded-full bg-[#378E90]" style={{width:`${Math.min(100,Math.max(1,100*c.amountCents/Math.max(1,brief.totalExpenseCents)))}%`}}/></span>
  </button>)}
- {!brief.categories.length&&<p>这段时间还没有可核对的消费记录，可在下方导入模拟账单。</p>}
+ {!brief.categories.length&&<p>这段时间还没有消费记录，可前往“数据管理”导入账单。</p>}
  <button className="mission-link" onClick={onEvidence}>查看逐笔证据与排除项</button></section>;
 }
