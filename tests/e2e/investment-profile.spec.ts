@@ -1,7 +1,7 @@
 import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('complete questionnaire supports cash-only then comparable suitable products with separate purchase confirmation',async({page})=>{
- await page.goto('/');await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();await page.getByRole('button',{name:'理财',exact:true}).click();
+ await page.goto('/');await page.getByRole('button',{name:'NOVA',exact:true}).click();await page.getByRole('button',{name:'理财',exact:true}).click();
  const before=await (await page.request.get('/api/services')).json();
  await expect(page.getByRole('button',{name:'核对完整风险资料'})).toBeDisabled();
  await page.getByLabel('这笔资金的用途').selectOption('education');await page.getByLabel('最早用钱日期',{exact:true}).fill('2027-06-30');

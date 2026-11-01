@@ -1,7 +1,7 @@
 import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('unknown payments expose a local case pack and resolve only the original operation',async({page,request})=>{
- await page.goto('/');await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();
+ await page.goto('/');await page.getByRole('button',{name:'NOVA',exact:true}).click();
  const before=await (await page.request.get('/api/services')).json();
  expect((await page.request.post('/api/demo/services/fault',{data:{fault:'timeout_after'}})).ok()).toBe(true);
  await page.getByRole('button',{name:'转账与AA',exact:true}).click();

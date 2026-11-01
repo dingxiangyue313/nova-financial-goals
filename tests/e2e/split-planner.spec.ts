@@ -1,7 +1,7 @@
 import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('custom AA with another payer records liability, then confirms only my exact share',async({page})=>{
- await page.goto('/');await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();
+ await page.goto('/');await page.getByRole('button',{name:'NOVA',exact:true}).click();
  await page.getByRole('button',{name:'转账与AA',exact:true}).click();
  const before=await (await page.request.get('/api/services')).json();
  await page.getByLabel('总额（元）',{exact:true}).fill('400');
@@ -22,6 +22,6 @@ test('custom AA with another payer records liability, then confirms only my exac
  const after=await (await page.request.get('/api/services')).json();
  expect(after.accounts.find((a:{id:string})=>a.id==='checking').balanceCents).toBe(before.accounts.find((a:{id:string})=>a.id==='checking').balanceCents-11000);
  expect(after.splits[0].shares.find((s:{recipientId:string})=>s.recipientId==='self').collectedCents).toBe(11000);
- await page.reload();await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();await page.getByRole('button',{name:'转账与AA',exact:true}).click();
+ await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();await page.getByRole('button',{name:'转账与AA',exact:true}).click();
  await expect(page.getByRole('region',{name:'AA ¥400'})).toContainText('已结算¥110');
 });

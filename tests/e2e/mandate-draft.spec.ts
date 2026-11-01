@@ -1,7 +1,7 @@
 import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('natural-language mandate fills editable fields and never creates authority without confirmation',async({page})=>{
- await page.goto('/');await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();await page.getByRole('button',{name:'旅行请求',exact:true}).click();
+ await page.goto('/');await page.getByRole('button',{name:'NOVA',exact:true}).click();await page.getByRole('button',{name:'旅行请求',exact:true}).click();
  const before=await (await page.request.get('/api/services')).json();
  await page.getByText('用一句话填写授权草稿',{exact:true}).click();
  await page.getByLabel('授权描述').fill('只允许樱旅航空和京都旅宿，单笔不超过2600元，累计4800元，有效至2026-11-20');
