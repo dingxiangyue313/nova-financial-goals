@@ -4,6 +4,9 @@ import { test as base, expect } from '@playwright/test';
 // The dedicated input/navigation suites exercise that entry explicitly.
 export const test = base.extend({
   page: async ({ page }, use) => {
+    // Establish the cookie before browser bootstrap and API scenario setup can
+    // race to create two different simulated sessions.
+    await page.request.get('/api/session');
     await page.route(/https:\/\/(fonts\.(googleapis|gstatic)\.com|images\.unsplash\.com|lh3\.googleusercontent\.com)\/.*/, route => route.abort());
     // Keep business scenarios on their explicitly created goals. Sample-gallery
     // seeding is independent of the banking operations exercised by these suites.

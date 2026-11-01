@@ -24,5 +24,5 @@ test('custom AA with another payer records liability, then confirms only my exac
  expect(after.accounts.find((a:{id:string})=>a.id==='checking').balanceCents).toBe(before.accounts.find((a:{id:string})=>a.id==='checking').balanceCents-11000);
  expect(after.splits[0].shares.find((s:{recipientId:string})=>s.recipientId==='self').collectedCents).toBe(11000);
  await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();await openCategory(page,'转账与AA');await page.getByRole('button',{name:'AA收付款',exact:true}).click();
- await expect(page.getByRole('region',{name:'AA ¥400'})).toContainText('已结算¥110');
+ await page.getByRole('button',{name:'我的收付款',exact:true}).click();await expect(page.getByRole('region',{name:'AA ¥400'})).toContainText('已结算¥110');
 });

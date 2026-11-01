@@ -6,7 +6,7 @@ test('two goals share one dated budget, edit exact constraints and confirm a bou
  await page.goto('/');await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();
  const snapshot=await (await page.request.get('/api/session')).json();
  expect((await page.request.post('/api/product/goals',{data:{title:'培训目标',targetCents:3000000,targetDate:'2027-06-30',protectedCents:2000000,expectedTwinVersion:snapshot.twinVersion}})).ok()).toBe(true);
- await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();await openCategory(page,'目标资金');await page.getByRole('button',{name:'计划调整',exact:true}).click();
+ expect((await page.request.post('/api/goals/'+snapshot.goal.id+'/set-primary')).ok()).toBe(true);await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();await openCategory(page,'目标资金');await page.getByRole('button',{name:'计划调整',exact:true}).click();
  const before=await (await page.request.get('/api/services')).json();
  const confirm=async()=>{const dialog=page.getByRole('dialog');await expect(dialog).toContainText('不移动资金');await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(dialog).toBeHidden();};
  await page.getByRole('button',{name:'编辑「日本旅行」资金计划'}).click();
