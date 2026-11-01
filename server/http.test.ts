@@ -166,6 +166,90 @@ async function freePort(): Promise<number> {
   return port;
 }
 
+test('GoalGuard HTTP repair uses preview/apply/status and rejects the legacy A/B write path', { timeout: 120_000 }, async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'nova-risk-repair-http-'));
+  const port = await freePort();
+  const base = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], { cwd: process.cwd(), stdio: 'ignore',
+    env: { ...process.env, PORT: String(port), NOVA_DB_PATH: join(directory, 'demo.sqlite'), DEEPSEEK_API_KEY: '',
+      NODE_ENV: 'production', NOVA_DEMO_CONTROLS: 'true', NOVA_SESSION_SECRET: externalSecret } });
+  try {
+    let ready = false;
+    for (let i = 0; i < 180; i++) {
+      try { if ((await fetch(`${base}/api/health`)).ok) { ready = true; break; } }
+      catch { await new Promise(resolve => setTimeout(resolve, 250)); }
+    }
+    assert.equal(ready, true, 'risk repair server must start');
+    let cookie = '';
+    const call = async (path: string, method = 'GET', body?: unknown) => {
+      const response = await fetch(`${base}${path}`, { method,
+        headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(cookie ? { Cookie: cookie } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body) });
+      const setCookie = response.headers.get('set-cookie');
+      if (setCookie) cookie = setCookie.split(';')[0];
+      return { code: response.status, data: await response.json() };
+    };
+    await call('/api/demo/load-japan', 'POST');
+    await call('/api/goals/activate', 'POST', { planId: 'balanced' });
+    const trend = await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'risk-repair-trend' });
+    const risk = trend.data as Snapshot;
+    const impactId = risk.pendingImpact!.id;
+    const legacy = await call('/api/impact/decision', 'POST', { decision: 'A' });
+    assert.equal(legacy.code, 400);
+    assert.equal((legacy.data as { error: string }).error, 'RISK_REPAIR_PREVIEW_REQUIRED');
+    const [optionA, optionB] = await Promise.all([
+      call('/api/impact/plan-preview', 'POST', { impactId, expectedTwinVersion: risk.twinVersion,
+        strategy: 'keep_target_date' }),
+      call('/api/impact/plan-preview', 'POST', { impactId, expectedTwinVersion: risk.twinVersion,
+        strategy: 'keep_monthly_contribution' }),
+    ]);
+    assert.equal(optionA.code, 200);
+    assert.equal(optionB.code, 200);
+    assert.equal(optionA.data.baseTwinVersion, optionB.data.baseTwinVersion);
+    assert.equal(optionA.data.candidate.effectiveTargetDate, risk.goal.targetDate);
+    assert.equal(optionB.data.candidate.monthlyCents, risk.goal.monthlyContributionCents);
+    const request = { impactId, previewId: optionA.data.previewId, expectedTwinVersion: risk.twinVersion,
+      strategy: 'keep_target_date', candidateId: optionA.data.candidate.id,
+      acceptTargetDateChange: false, idempotencyKey: 'repair-http-1' };
+    const applied = await call('/api/impact/plan-apply', 'POST', request);
+    assert.equal(applied.code, 200);
+    assert.equal(applied.data.snapshot.pendingImpact, null);
+    assert.equal(applied.data.snapshot.riskSignals[0].status, 'resolved');
+    assert.equal(applied.data.replayed, false);
+    const replay = await call('/api/impact/plan-apply', 'POST', request);
+    assert.equal(replay.code, 200);
+    assert.equal(replay.data.replayed, true);
+    const status = await call('/api/impact/plan-status', 'POST', { impactId, idempotencyKey: 'repair-http-1' });
+    assert.equal(status.code, 200);
+    assert.equal(status.data.applied, true);
+    assert.equal(status.data.receipt.resultingTwinVersion, applied.data.snapshot.twinVersion);
+
+    cookie = '';
+    await call('/api/demo/load-japan', 'POST');
+    await call('/api/goals/activate', 'POST', { planId: 'balanced' });
+    const manualRisk = (await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'manual-risk' })).data as Snapshot;
+    const draft = { targetCents: manualRisk.goal.targetCents, targetDate: manualRisk.goal.targetDate,
+      savedCents: manualRisk.goal.savedCents, protectedCents: manualRisk.goal.protectedCents,
+      monthlyContributionCents: 200000, flexibilityWeeks: manualRisk.goal.flexibilityWeeks };
+    const manualPreview = await call('/api/goals/current/plan-preview', 'POST', {
+      expectedTwinVersion: manualRisk.twinVersion, draft,
+    });
+    const candidate = manualPreview.data.novaPlans.find((item: { selectable: boolean }) => item.selectable)
+      ?? manualPreview.data.customPlan;
+    const changed = await call('/api/goals/current/plan-change', 'POST', {
+      expectedTwinVersion: manualRisk.twinVersion, draft,
+      selection: { candidateId: candidate.id, acceptTargetDateChange: true },
+    });
+    assert.equal(changed.code, 200);
+    assert.equal(changed.data.snapshot.riskSignals[0].status, 'stale');
+    assert.equal(changed.data.snapshot.pendingImpact, null);
+  } finally {
+    child.kill('SIGTERM');
+    await new Promise(resolve => child.once('exit', resolve));
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('clean HTTP demo completes goal, impact, tool and session isolation flows', { timeout: 180_000 }, async () => {
   const directory = mkdtempSync(join(tmpdir(), 'nova-http-'));
   const port = await freePort();
@@ -267,7 +351,9 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     const riskThreads = await call('/api/agent/threads?includeArchived=true');
     assert.equal((riskThreads.data as { threads: Array<{ kind: string; unread: boolean }> }).threads
       .some(thread => thread.kind === 'risk' && thread.unread), true);
-    assert.equal((await call('/api/impact/decision', 'POST', { decision: 'B' })).code, 200);
+    const legacyB = await call('/api/impact/decision', 'POST', { decision: 'B' });
+    assert.equal(legacyB.code, 400);
+    assert.equal((legacyB.data as { error: string }).error, 'RISK_REPAIR_PREVIEW_REQUIRED');
     assert.equal((await call('/api/mandates', 'POST', { confirmed: true })).code, 200);
     const subject = cookie.slice('nova_demo_sid='.length).split('.')[0];
     const envelope = { agentId: 'travel-agent-demo', subject, timestamp: Date.now(), nonce: 'signed-nonce-001',
