@@ -524,6 +524,7 @@ export default function App() {
           >
             NOVA 工作台
           </button>
+          <button onClick={() => navigateTo('banking_demo')} className="px-2.5 py-1 rounded-full shrink-0 bg-white border border-[#D0D5DD] text-[11px]">授权、外部 Agent 与执行记录</button>
         </div>
 
         <div className="flex items-center gap-2 shrink-0 ml-2">

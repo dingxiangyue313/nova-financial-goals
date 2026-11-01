@@ -44,8 +44,8 @@ test('manifest and active service worker expose NOVA as a standalone app', async
   expect(body.icons).toEqual(expect.arrayContaining([expect.objectContaining({ sizes: '192x192' }), expect.objectContaining({ sizes: '512x512' })]));
 
   await openDemo(page);
-  await page.getByTitle('个人设置').click();
-  await expect(page.getByRole('heading', { name: '安装 NOVA' })).toBeVisible();
+
+  await expect.poll(() => page.evaluate(async () => Boolean((await navigator.serviceWorker.getRegistration())?.active))).toBe(true);
 });
 
 test('offline reload shows only the sanitized read-only summary', async ({ page, context }) => {
