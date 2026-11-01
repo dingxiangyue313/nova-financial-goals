@@ -7,9 +7,11 @@ const shift=(date:string,days:number)=>new Date(Date.parse(date+'T00:00:00Z')+da
 const sum=(values:number[])=>{const total=values.reduce((n,v)=>n+v,0);if(!Number.isSafeInteger(total))throw new Error('PORTFOLIO_INVALID_CENTS');return total;};
 export function goalContract(state:DemoState,goal:Goal):GoalContract {
  const stored=state.financialServices.goalContracts.find(c=>c.goalId===goal.id);
- return stored?{...stored,title:goal.title,targetCents:goal.targetCents,targetDate:goal.targetDate,monthlyContributionCents:goal.monthlyContributionCents,protectedCents:goal.protectedCents}:{
+ const defaults:Record<string,number>={'sample-goal-health':2,'sample-goal-learning':2,'sample-goal-computer':3,'sample-goal-moving':4,'sample-goal-hobby':5};
+ const priority=goal.id===state.primaryGoalId?1:Math.max(2,stored?.priority??defaults[goal.id]??3);
+ return stored?{...stored,priority,title:goal.title,targetCents:goal.targetCents,targetDate:goal.targetDate,monthlyContributionCents:goal.monthlyContributionCents,protectedCents:goal.protectedCents}:{
   goalId:goal.id,title:goal.title,targetCents:goal.targetCents,targetDate:goal.targetDate,monthlyContributionCents:goal.monthlyContributionCents,
-  protectedCents:goal.protectedCents,priority:3,maxMonthlyIncreaseCents:0,maxExtensionDays:goal.flexibilityWeeks*7,allowPayments:true,
+  protectedCents:goal.protectedCents,priority,maxMonthlyIncreaseCents:0,maxExtensionDays:goal.flexibilityWeeks*7,allowPayments:true,
   revision:0,updatedAt:state.clock+'T12:00:00.000Z',requiredChecks:['funds','card','mandate','orders'],
   protectedAccountIds:state.accounts.filter(a=>a.protected).map(a=>a.id),
  };
@@ -19,6 +21,7 @@ export function changedGoalContract(state:DemoState,raw:unknown){
  if(!goal)throw new Error('SERVICE_GOAL_NOT_FOUND');
  if(terms.targetDate<=state.clock)throw new Error('GOAL_DATE_MUST_BE_FUTURE');
  const previous=goalContract(state,goal);
+ if(goal.id===state.primaryGoalId?terms.priority!==1:terms.priority===1)throw new Error('SERVICE_GOAL_PRIORITY_FIXED');
  const schedules=state.transferSchedules.filter(s=>s.goalId===goal.id).map(s=>s.id);
  if(state.transferExecutions.some(e=>schedules.includes(e.scheduleId)&&['unknown','executing'].includes(e.status)))throw new Error('GOAL_OPERATION_STATUS_REQUIRED');
  return {...terms,revision:previous.revision+1,updatedAt:state.clock+'T12:00:00.000Z',requiredChecks:previous.requiredChecks,protectedAccountIds:previous.protectedAccountIds};

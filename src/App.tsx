@@ -36,7 +36,8 @@ export default function App() {
   const [demoEnabled, setDemoEnabled] = useState(false);
   const demoControl = window.location.pathname === '/demo-control' && demoEnabled;
   useEffect(() => { void api<{demoControls:boolean}>('/api/capabilities').then(value => setDemoEnabled(value.demoControls)).catch(() => {}); }, []);
-  const [currentScreen, setCurrentScreen] = useState<ScreenId>('home');
+  const [currentScreen, setCurrentScreen] = useState<ScreenId>(window.location.pathname === '/demo-control' ? 'home' : 'data_connections');
+  const startupConnection = useRef(window.location.pathname !== '/demo-control');
   const [previousScreen, setPreviousScreen] = useState<ScreenId>('home');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [missionModel, setMissionModel] = useState<MoneyMissionReadModel | null>(null);
@@ -116,7 +117,7 @@ export default function App() {
   useEffect(() => {
     if (!snapshot || initiallyRouted.current) return;
     initiallyRouted.current = true;
-    setCurrentScreen(snapshot.goals.length ? 'home' : 'workspace');
+    setCurrentScreen(startupConnection.current ? 'data_connections' : snapshot.goals.length ? 'home' : 'workspace');
   }, [snapshot]);
   useEffect(() => {
     if (!snapshot || snapshot.goals.length === 0) return;
@@ -239,7 +240,10 @@ export default function App() {
     } else if (currentScreen === 'ai_safety') {
       setCurrentScreen('profile');
     } else if (currentScreen === 'data_connections') {
-      setCurrentScreen(previousScreen === 'profile' ? 'profile' : 'create_goal');
+      if (startupConnection.current) {
+        startupConnection.current = false;
+        setCurrentScreen('home');
+      } else setCurrentScreen(previousScreen === 'profile' ? 'profile' : previousScreen === 'workspace' ? 'workspace' : 'create_goal');
     } else if (currentScreen === 'impact') {
       setCurrentScreen('home');
     } else if (currentScreen === 'financial_services') {
@@ -291,7 +295,10 @@ export default function App() {
       const outcome = await api<{ snapshot: Snapshot; result: DataSyncResult }>('/api/data-connections/connect', 'POST', { sources });
       setSnapshot(outcome.snapshot);
       showToast(`已读取近 90 天模拟流水（${outcome.result.importedCount} 笔）`);
-      if (pendingConnectionThreadId) {
+      if (startupConnection.current) {
+        startupConnection.current = false;
+        navigateTo('home');
+      } else if (pendingConnectionThreadId) {
         const threadId = pendingConnectionThreadId;
         setPendingConnectionThreadId(null);
         try { await api('/api/agent/turn', 'POST', { threadId, message: '模拟数据已连接，请继续核算刚才的目标' }); }
@@ -409,7 +416,7 @@ export default function App() {
       case 'create_goal':
         return '创建目标';
       case 'money_mission':
-        return '账单与消费';
+        return '账单与订阅';
       case 'feasibility':
         return '目标可行性';
       case 'data_connections':
@@ -659,7 +666,6 @@ export default function App() {
               goal={goal}
               onNavigate={navigateTo}
               onResetData={handleResetData}
-              onBankingDemo={() => navigateTo(demoControl ? 'banking_demo' : 'financial_services')}
               onDataConnections={() => navigateTo('data_connections')}
               installState={installState}
               onInstall={() => void handleInstall()}

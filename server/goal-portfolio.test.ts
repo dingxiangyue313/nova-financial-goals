@@ -88,3 +88,18 @@ test('protection required by a secondary goal is enforced by both financial and 
  assert.equal((runBankingTool(state,'risk_check',{sourceAccountId:'checking',amountCents:20000}).result as {allowed:boolean}).allowed,false);
  assert.equal(buildGoalPortfolio(state).reservedCents,110000);
 });
+
+
+test('primary goal has exclusive first priority, including after primary changes',()=>{
+ const state=initializeServices(createJapanMoneyMissionFixture());
+ const second={...state.goal,id:'sample-goal-health',title:'家人体检'};
+ state.goals.push(second);
+ assert.equal(goalContract(state,state.goal).priority,1);
+ assert.equal(goalContract(state,second).priority,2);
+ assert.throws(()=>changedGoalContract(state,{...terms(state),priority:3}),/GOAL_PRIORITY_FIXED/);
+ assert.throws(()=>changedGoalContract(state,{...terms(state,second.id),priority:1}),/GOAL_PRIORITY_FIXED/);
+ state.financialServices.goalContracts.push({...goalContract(state,state.goal),priority:1});
+ state.primaryGoalId=second.id;
+ assert.equal(goalContract(state,second).priority,1);
+ assert.equal(goalContract(state,state.goal).priority,2);
+});

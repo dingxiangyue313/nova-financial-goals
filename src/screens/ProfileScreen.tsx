@@ -5,7 +5,6 @@ interface ProfileScreenProps {
   goal: Goal;
   onNavigate: (s: ScreenId) => void;
   onResetData: () => void;
-  onBankingDemo: () => void;
   onDataConnections: () => void;
   installState: 'available' | 'installed' | 'ios' | 'unavailable';
   onInstall: () => void;
@@ -16,7 +15,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   goal,
   onNavigate,
   onResetData,
-  onBankingDemo,
   onDataConnections,
   installState,
   onInstall,
@@ -69,7 +67,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
       </div>
 
-      <button onClick={onBankingDemo} className="w-full bg-white border border-[#E5E8EB] rounded-xl p-4 shadow-sm flex items-center justify-between text-[#0F6B6D] font-semibold text-sm"><span>授权、外部 Agent 与执行记录</span><span className="material-symbols-outlined">arrow_forward</span></button>
       <button onClick={onDataConnections} className="w-full bg-white border border-[#E5E8EB] rounded-xl p-4 shadow-sm flex items-center justify-between text-[#0F6B6D] font-semibold text-sm">
         <span className="flex items-center gap-2"><span className="material-symbols-outlined text-[19px]">account_balance</span>数据连接与自动守护</span>
         <span className="material-symbols-outlined">arrow_forward</span>
