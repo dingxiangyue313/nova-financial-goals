@@ -21,7 +21,7 @@ test('two goals share one dated budget, edit exact constraints and confirm a bou
  await card.getByRole('button',{name:'核对这个调整'}).click();const dialog=page.getByRole('dialog');
  await expect(dialog).toContainText('培训目标');await expect(dialog).toContainText('没有转账');
  await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(dialog).toBeHidden();
- await expect(page.getByText('按当前模拟假设，各目标的投入可以同时满足。',{exact:true})).toBeVisible();
+ await expect(page.getByText('按当前资金计划，各目标的投入可以同时满足。',{exact:true})).toBeVisible();
  const after=await (await page.request.get('/api/services')).json();expect(after.accounts).toEqual(before.accounts);expect(after.mandates).toEqual(before.mandates);
  const session=await (await page.request.get('/api/session')).json();expect(session.goals.find((g:{title:string})=>g.title==='日本旅行').monthlyContributionCents).toBe(100000);
  expect(session.goals.find((g:{title:string})=>g.title==='培训目标').monthlyContributionCents).toBeLessThan(600000);
@@ -29,5 +29,5 @@ test('two goals share one dated budget, edit exact constraints and confirm a bou
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(axe.violations.filter(v=>['critical','serious'].includes(v.impact??''))).toEqual([]);
  await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();await openCategory(page,'目标资金');await page.getByRole('button',{name:'计划调整',exact:true}).click();
- await expect(page.getByText('按当前模拟假设，各目标的投入可以同时满足。',{exact:true})).toBeVisible();
+ await expect(page.getByText('按当前资金计划，各目标的投入可以同时满足。',{exact:true})).toBeVisible();
 });
