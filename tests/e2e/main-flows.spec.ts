@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 
 async function openApp(page: Page) {
   await page.route('**/api/ui/cards', async route => {
@@ -7,7 +7,7 @@ async function openApp(page: Page) {
   });
   await page.goto('/demo-control');
   await expect(page.getByTestId('nova-welcome')).toBeHidden();
-  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
   await page.request.post('/api/demo/load-japan');
   await page.reload();
   await expect(page.getByRole('heading', { name: '早上好，Alex' })).toBeVisible();

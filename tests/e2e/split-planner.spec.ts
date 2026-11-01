@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('custom AA with another payer records liability, then confirms only my exact share',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();

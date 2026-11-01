@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';test.use({serviceWorkers:'block'});
+import {test,expect} from './fixtures';test.use({serviceWorkers:'block'});
 test('12 AA scenarios remain in demo control; consumer sees distinct labels and repeat collection preserves cash',async({page})=>{
  await page.goto('/demo-control');await page.getByRole('button',{name:'载入12组AA样例（重置模拟会话）'}).click();await page.getByRole('button',{name:'转账与AA',exact:true}).click();const before=await (await page.request.get('/api/services')).json();expect(before.splits).toHaveLength(12);await expect(page.getByText('合成样例 · 四人均分余分',{exact:true})).toBeVisible();await expect(page.getByText('合成样例 · 逾期未收齐',{exact:true})).toBeVisible();
  const repeat=page.getByRole('region',{name:'AA ¥400'}).filter({hasText:'合成样例 · 重复到账查询'});await repeat.getByRole('button',{name:'查询模拟收款'}).click();const after=await (await page.request.get('/api/services')).json();expect(after.accounts).toEqual(before.accounts);expect(after.journals).toEqual(before.journals);

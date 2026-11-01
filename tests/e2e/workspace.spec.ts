@@ -1,8 +1,8 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 
 async function openApp(page: Page) {
   await page.goto('/demo-control');
-  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
   await page.request.post('/api/demo/load-japan');
   await page.request.post('/api/data-connections/connect',
     { data: { sources: ['bank', 'wechat_pay', 'alipay'] } });
@@ -12,7 +12,7 @@ async function openApp(page: Page) {
 
 async function openWorkspace(page: Page) {
   await page.getByTitle('新建目标 / NOVA 智能对话').click();
-  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
 }
 
 test('独立演示后台保留品牌欢迎页和空白目标工作台', async ({ page }) => {
@@ -21,14 +21,14 @@ test('独立演示后台保留品牌欢迎页和空白目标工作台', async ({
   await expect(welcome).toBeVisible();
   await expect(welcome.getByText('不记账，也有数')).toBeVisible();
   await expect(welcome).toBeHidden();
-  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
   await expect(page.getByText('你想完成什么财务目标？')).toBeVisible();
   await expect(page.getByText('日本旅行', { exact: true })).not.toBeVisible();
 });
 
 test('首次目标先提示连接模拟数据，连接后回到同一任务核算方案', async ({ page }) => {
   await page.goto('/demo-control');
-  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
   await page.getByPlaceholder('描述目标、风险或授权范围…')
     .fill('我想年底去日本旅行，预算 ¥8,000，已存 0 元');
   await page.getByRole('button', { name: '发送' }).click();
@@ -37,7 +37,7 @@ test('首次目标先提示连接模拟数据，连接后回到同一任务核�
   await page.getByRole('button', { name: '选择模拟数据来源' }).first().click();
   await expect(page.getByRole('heading', { name: '连接模拟数据' })).toBeVisible();
   await page.getByRole('button', { name: '连接并开始智能守护' }).click();
-  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
   await expect(page.getByRole('button', { name: '选择此候选并核对确认' }).first()).toBeVisible();
 });
 
@@ -74,7 +74,7 @@ test('对话故事二：显著支出自动创建未读风险会话', async ({ pa
   await activateGoalFromWorkspace(page);
   await page.getByTitle('查看模拟时间与自动同步').click();
   await page.getByRole('button', { name: /推进到 9月23日/ }).click();
-  await expect(page.getByRole('heading', { name: 'NOVA 目标工作台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
   const risk = page.getByRole('button', { name: /外卖与打车持续上升影响目标/ });
   // The demo transition opens the newly-created risk conversation, so viewing it clears the unread marker.
   await expect(risk).toHaveAttribute('data-unread', 'false');

@@ -1,5 +1,5 @@
 type Result = { id: string; impact?: string | null; nodes: unknown[] };
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
 
 test.beforeEach(({ page }) => { page.on('pageerror', error => { throw error; }); });

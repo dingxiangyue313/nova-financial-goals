@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('spending investigation records feedback without hiding evidence and survives refresh',async({page,playwright})=>{
  await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByText('核对支出变化',{exact:true}).click();

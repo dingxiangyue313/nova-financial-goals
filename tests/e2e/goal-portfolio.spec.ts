@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
 test.use({serviceWorkers:'block'});
 test('two goals share one dated budget, edit exact constraints and confirm a bounded repair without moving cash',async({page},testInfo)=>{

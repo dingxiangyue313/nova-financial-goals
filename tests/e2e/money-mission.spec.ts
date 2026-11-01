@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('home trend survives source connection and opens bills without mission steps',async({page},testInfo)=>{
  await page.goto('/');await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 test.use({serviceWorkers:'block'});
 test('subscription cancellation stays verified after reload without changing account cash',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();

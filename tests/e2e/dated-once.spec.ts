@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('chosen goal can schedule a specific one-time date with no immediate debit and cancel safely',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'新建目标'}).click();await page.getByLabel('目标名称',{exact:true}).fill('旅行准备金');await page.getByLabel('需要准备多少钱（元）').fill('8000');await page.getByLabel('什么时候用钱').fill('2027-06-30');await page.getByRole('button',{name:'下一步：比较目标方案'}).click();await page.getByRole('button',{name:'选择并核对平衡方案'}).click();await page.getByRole('dialog').getByRole('button',{name:'确认并执行模拟操作'}).click();await expect(page.getByRole('dialog')).toBeHidden();await page.getByRole('button',{name:'完成，返回首页'}).click();

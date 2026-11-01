@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';test.use({serviceWorkers:'block'});
+import {test,expect} from './fixtures';test.use({serviceWorkers:'block'});
 test('signed inbox requires review and new cheaper nonrefundable terms must be accepted again without automatic payment',async({page})=>{
  await page.goto('/demo-control');await page.getByRole('button',{name:'载入旅行付款样例（重置模拟会话）'}).click();await page.getByRole('button',{name:'旅行请求',exact:true}).click();await page.getByRole('button',{name:'获取签名机票与住宿报价'}).click();
  const request=page.getByRole('article',{name:'签名旅行请求'}).first();await expect(request).toContainText('第1版');await request.getByRole('button',{name:'核对并接受此请求'}).click();const confirm=async()=>{await page.getByRole('dialog').getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(page.getByRole('dialog')).toBeHidden();};await expect(page.getByRole('dialog')).toContainText('可申请退款');await confirm();const before=await (await page.request.get('/api/services')).json();

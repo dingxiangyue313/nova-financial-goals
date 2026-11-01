@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('a changed financial version visibly retires a previously selected report',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByText('切换账单月份或年度',{exact:true}).click();

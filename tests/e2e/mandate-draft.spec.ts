@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('natural-language mandate fills editable fields and never creates authority without confirmation',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();await page.getByRole('button',{name:'旅行请求',exact:true}).click();

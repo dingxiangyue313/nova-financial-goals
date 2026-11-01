@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('twelve subscriptions keep annual terms, explicit decisions and original-operation recovery',async({page})=>{
  await page.goto('/');await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();

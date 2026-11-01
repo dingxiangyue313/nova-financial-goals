@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('homonym recipient is blocked until exact synthetic identity review, which never moves money',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'金融任务：转账、AA、理财、卡片与旅行预订'}).click();await page.getByRole('button',{name:'转账与AA',exact:true}).click();

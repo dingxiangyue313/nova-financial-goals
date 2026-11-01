@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('subscription reminder can snooze and persist read state without a cancellation or cash change',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();const before=await (await page.request.get('/api/session')).json();

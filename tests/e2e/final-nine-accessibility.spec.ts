@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '@playwright/test';import AxeBuilder from '@axe-core/playwright';test.use({serviceWorkers:'block'});
+import {test,expect,type Page} from './fixtures';import AxeBuilder from '@axe-core/playwright';test.use({serviceWorkers:'block'});
 const scan=async(page:Page)=>{const result=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(result.violations.filter(v=>['serious','critical'].includes(v.impact??''))).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();};
 const act=async(page:Page,input:unknown)=>{const p=await (await page.request.post('/api/services/prepare',{data:input})).json();expect(p.confirmation?.actionId).toBeTruthy();const r=await page.request.post('/api/services/confirm',{data:{actionId:p.confirmation.actionId,decision:'confirm'}});expect(r.ok(),await r.text()).toBeTruthy();return r.json();};
 test('I-A04 only failed hotel is requoted and paid, preserves successful flight, recovery and evidence states are accessible',async({page})=>{

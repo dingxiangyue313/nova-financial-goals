@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
 
 test('active plan opens a deeper revision page, supports cancellation and explicit delayed-date confirmation', async ({ page }, testInfo) => {
