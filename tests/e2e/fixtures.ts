@@ -18,7 +18,7 @@ export const test = base.extend({
       await expect(page.getByRole('heading', { name: '连接模拟数据', exact: true })).toBeVisible();
       await page.getByRole('button', { name: '返回', exact: true }).click();
     };
-    page.goto = async (...args) => { const response = await goto(...args); await finishEntry(); return response; };
+    page.goto = async (url, options) => { const response = await goto(url, { waitUntil: 'domcontentloaded', ...options }); await finishEntry(); return response; };
     page.reload = async (...args) => { const response = await reload(...args); await finishEntry(); return response; };
     await use(page);
   },

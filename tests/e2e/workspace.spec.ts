@@ -29,7 +29,7 @@ test('独立演示后台保留品牌欢迎页和空白目标工作台', async ({
 test('首次目标先提示连接模拟数据，连接后回到同一任务核算方案', async ({ page }) => {
   await page.goto('/demo-control');
   await expect(page.getByRole('heading', { name: 'NOVA 财务助手', exact: true }).last()).toBeVisible();
-  await page.getByPlaceholder('描述目标、风险或授权范围…')
+  await page.getByRole('textbox',{name:'告诉 NOVA 你的需求'})
     .fill('我想年底去日本旅行，预算 ¥8,000，已存 0 元');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByRole('heading', { name: '连接模拟数据后再核算' }).first()).toBeVisible();
@@ -43,7 +43,7 @@ test('首次目标先提示连接模拟数据，连接后回到同一任务核�
 
 async function activateGoalFromWorkspace(page: Page) {
   await openWorkspace(page);
-  const composer = page.getByPlaceholder('描述目标、风险或授权范围…');
+  const composer = page.getByRole('textbox',{name:'告诉 NOVA 你的需求'});
   await composer.fill('我想在 12 月 15 日前存够 ¥8,000 去日本旅行，现在已经存了 ¥3,500，每月最多存 ¥1,500，¥20,000 应急金不能动。');
   await page.getByRole('button', { name: '发送' }).click();
   const choose = page.getByRole('button', { name: '选择此候选并核对确认' }).first();
@@ -92,7 +92,7 @@ test('主动询问支出时展示只读对比，不新增模拟流水', async ({
   await openWorkspace(page);
   const before = await page.request.get('/api/session');
   const twinVersionBefore = (await before.json()).twinVersion;
-  await page.getByPlaceholder('描述目标、风险或授权范围…').fill('这笔¥900支出会影响目标吗？');
+  await page.getByRole('textbox',{name:'告诉 NOVA 你的需求'}).fill('这笔¥900支出会影响目标吗？');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByRole('heading', { name: '这笔支出对目标的影响' }).first()).toBeVisible();
   await expect(page.getByText(/支出前.*支出后/).first()).toBeVisible();
@@ -105,7 +105,7 @@ test('对话故事三：创建限定授权并运行受治理的外部 Agent 请�
   await openApp(page);
   await activateGoalFromWorkspace(page);
   await openWorkspace(page);
-  const composer = page.getByPlaceholder('描述目标、风险或授权范围…');
+  const composer = page.getByRole('textbox',{name:'告诉 NOVA 你的需求'});
   await composer.fill('允许旅行 Agent 在 ¥500 内订票');
   await page.getByRole('button', { name: '发送' }).click();
   await page.getByRole('button', { name: '确认创建授权' }).click();
@@ -145,7 +145,7 @@ test('首页与空工作台使用同一透明 NOVA 标志', async ({ page }) => 
 test('目标画布由 NOVA 核算多个候选并逐项解释', async ({ page }) => {
   await openApp(page);
   await openWorkspace(page);
-  await page.getByPlaceholder('描述目标、风险或授权范围…')
+  await page.getByRole('textbox',{name:'告诉 NOVA 你的需求'})
     .fill('我想年底去日本旅行，预算 ¥4,000，已存 0 元');
   await page.getByRole('button', { name: '发送' }).click();
   const card = page.locator('article').filter({ hasText: '已核验的参考方案' }).first();
@@ -169,7 +169,7 @@ test('自适应桌面工作台使用 32/68 Governed Canvas', async ({ page }, te
   }
   await expect(canvas).toBeVisible();
   await expect(canvas.getByRole('heading', { name: '当前任务画布' })).toBeVisible();
-  await page.getByPlaceholder('描述目标、风险或授权范围…').fill('我想年底去日本旅行，预算 ¥8,000');
+  await page.getByRole('textbox',{name:'告诉 NOVA 你的需求'}).fill('我想年底去日本旅行，预算 ¥8,000');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(canvas.getByText('请确认已存金额')).toBeVisible();
 });
@@ -177,7 +177,7 @@ test('自适应桌面工作台使用 32/68 Governed Canvas', async ({ page }, te
 test('只读调查在刷新后保留真实步骤，并适配工作台宽度', async ({ page }) => {
   await openApp(page);
   await openWorkspace(page);
-  await page.getByPlaceholder('描述目标、风险或授权范围…')
+  await page.getByRole('textbox',{name:'告诉 NOVA 你的需求'})
     .fill('我想年底去日本旅行，预算 ¥8,000，已经存了 ¥0，每月最多存 ¥2,000');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByText('规则试算已完成')).toBeVisible();
@@ -195,7 +195,7 @@ test('只读调查在刷新后保留真实步骤，并适配工作台宽度', as
 test('未确认已存金额时先追问，补充后再开始只读调查', async ({ page }) => {
   await openApp(page);
   await openWorkspace(page);
-  const composer = page.getByPlaceholder('描述目标、风险或授权范围…');
+  const composer = page.getByRole('textbox',{name:'告诉 NOVA 你的需求'});
   await composer.fill('我想年底去日本旅行，预算 ¥8,000');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(page.getByText('请确认已存金额')).toBeVisible();
@@ -209,7 +209,7 @@ test('未确认已存金额时先追问，补充后再开始只读调查', async
 test('已验证候选单独确认后才能启用目标监测与奖金跟进', async ({ page }) => {
   await openApp(page);
   await openWorkspace(page);
-  await page.getByPlaceholder('描述目标、风险或授权范围…')
+  await page.getByRole('textbox',{name:'告诉 NOVA 你的需求'})
     .fill('我想年底去日本旅行，预算 ¥8,000，已经存了 ¥0，每月最多存 ¥2,000');
   await page.getByRole('button', { name: '发送' }).click();
   const choose = page.getByRole('button', { name: '选择此候选并核对确认' }).first();
