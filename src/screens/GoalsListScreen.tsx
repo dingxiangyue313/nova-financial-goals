@@ -9,7 +9,6 @@ interface GoalsListScreenProps {
   onNavigateToCreate: () => void;
   onNavigateToImpact: () => void;
 }
-
 const yuan = (cents: number) => `¥${(cents / 100).toLocaleString('zh-CN')}`;
 
 export function GoalsListScreen({ goals, primaryGoalId, emergencyCents, hasImpactPending,
@@ -29,4 +28,3 @@ export function GoalsListScreen({ goals, primaryGoalId, emergencyCents, hasImpac
     })}
   </div>;
 }
-

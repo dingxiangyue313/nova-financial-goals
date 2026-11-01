@@ -108,4 +108,3 @@ export function ProductMissionPanel({ stage, onSnapshot, onChanged,allowSchedule
     {confirmation && <div className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4"><div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="product-confirm-title" className="mission-card w-full max-w-[350px] max-h-[80vh] overflow-auto shadow-xl"><h2 id="product-confirm-title" className="text-lg font-bold">{confirmation.title}</h2><p>{confirmation.body}</p><p>确认信息5分钟有效，数据变化后请重新核对。</p>{error && <p role="alert">{error}</p>}<button className="mission-primary" disabled={busy} onClick={() => void confirm('confirm')}>确认操作</button><button className="mission-secondary" disabled={busy} onClick={() => void confirm('cancel')}>暂不操作</button></div></div>}
   </div>;
 }
-
