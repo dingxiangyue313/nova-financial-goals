@@ -199,8 +199,10 @@ export default function App() {
   const goal = snapshot?.primaryGoal ? displayGoal(snapshot) : null;
   const activeImpact = snapshot?.pendingImpact?.goalId == null || snapshot.pendingImpact.goalId === snapshot.primaryGoalId
     ? snapshot?.pendingImpact ?? null : null;
+  const activeImpactSignal = activeImpact ? snapshot?.riskSignals.find(signal => signal.impactId === activeImpact.id
+    && (signal.status === 'active' || signal.status === 'later')) : undefined;
   const scenario = snapshot && activeImpact ? displayImpact({ ...snapshot, pendingImpact: activeImpact }) : null;
-  const hasImpactPending = Boolean(activeImpact);
+  const hasImpactPending = activeImpactSignal?.status === 'active';
 
   const mutate = async (url: string, method: string, body?: unknown) => {
     try {
@@ -228,7 +230,7 @@ export default function App() {
 
   const handleBack = () => {
     if (currentScreen === 'plan_change') {
-      setCurrentScreen('feasibility');
+      setCurrentScreen(previousScreen === 'impact' ? 'impact' : 'feasibility');
     } else if (currentScreen === 'goal_detail') {
       setCurrentScreen(previousScreen === 'goals_list' ? 'goals_list' : 'home');
     } else if (currentScreen === 'feasibility') {
@@ -364,17 +366,12 @@ export default function App() {
       showToast('智能守护设置已更新');
     } catch (error) { showToast(error instanceof Error ? error.message : '设置更新失败'); throw error; }
   };
-  const handleApplyOption = async (option: 'A' | 'B') => {
-    await mutate('/api/impact/decision', 'POST', { decision: option });
-    showToast(`已应用方案 ${option}`);
-    navigateTo('home');
-  };
   const handleLater = async () => {
-    await mutate('/api/impact/decision', 'POST', { decision: 'later' });
+    await mutate('/api/impact/decision', 'POST', { decision: 'later', impactId: activeImpact?.id });
     showToast('已标记稍后处理'); navigateTo('home');
   };
   const handleDismiss = async () => {
-    await mutate('/api/impact/decision', 'POST', { decision: 'dismiss' });
+    await mutate('/api/impact/decision', 'POST', { decision: 'dismiss', impactId: activeImpact?.id });
     showToast('已忽略本次提示'); navigateTo('home');
   };
   const handleResetData = async () => {
@@ -609,7 +606,7 @@ export default function App() {
             <PlanChangeScreen
               snapshot={snapshot}
               onRefresh={setSnapshot}
-              onCancel={() => setCurrentScreen('feasibility')}
+              onCancel={() => setCurrentScreen(previousScreen === 'impact' ? 'impact' : 'feasibility')}
               onApplied={(next, review) => {
                 setSnapshot(next);
                 setCurrentScreen('feasibility');
@@ -632,12 +629,18 @@ export default function App() {
 
           {currentScreen === 'impact' && goal && scenario && (
             <GoalImpactScreen
+              snapshot={snapshot}
               goal={goal}
               scenario={scenario}
-              onApplyOption={handleApplyOption}
+              onRefresh={setSnapshot}
+              onResolved={(next, destination) => {
+                setSnapshot(next);
+                setCurrentScreen(destination);
+                showToast('计划已调整；NOVA 将继续守护');
+              }}
+              onManualAdjust={() => navigateTo('plan_change')}
               onLater={handleLater}
               onDismiss={handleDismiss}
-              onBack={handleBack}
             />
           )}
 

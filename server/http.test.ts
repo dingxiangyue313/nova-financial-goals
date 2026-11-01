@@ -348,6 +348,11 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     const large = await call('/api/demo/expense', 'POST', { amountCents: 90000, title: '汽车保养' });
     assert.ok((large.data as Snapshot).pendingImpact);
     assert.equal((large.data as Snapshot).finance.emergencyCents, 2000000);
+    const oneOff = large.data as Snapshot;
+    const oneOffPreview = await call('/api/impact/plan-preview', 'POST', {
+      impactId: oneOff.pendingImpact!.id, expectedTwinVersion: oneOff.twinVersion, strategy: 'keep_target_date',
+    });
+    assert.equal(oneOffPreview.code, 200);
     const riskThreads = await call('/api/agent/threads?includeArchived=true');
     assert.equal((riskThreads.data as { threads: Array<{ kind: string; unread: boolean }> }).threads
       .some(thread => thread.kind === 'risk' && thread.unread), true);

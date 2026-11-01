@@ -28,7 +28,7 @@ import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.
 import { containsPromptInjection, signExternalRequest, verifyExternalRequest } from './security.ts';
 import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary,
   executeWorkspaceAction, prepareCandidateConfirmation, prepareSubscriptionConfirmation, prepareTransferScheduleConfirmation } from './workspace.ts';
-import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk } from './risk.ts';
+import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, RISK_RULE_VERSION } from './risk.ts';
 import { installApiRateLimits, installRequestHardening, setStaticCacheHeaders } from './http-hardening.ts';
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
 import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, failDataSource, recoverDataSource, revokeDataSource } from './data-connections.ts';
@@ -660,8 +660,19 @@ app.post('/api/demo/expense', route((req, res) => {
     const result = injectExpense(old, body.amountCents, body.title);
     const decision = evaluateOneOffExpenseRisk(old, body.amountCents);
     const acceptedImpact = decision.outcome === 'immediate_signal' ? result.impact : null;
+    const transactionId = randomUUID();
+    const signal = acceptedImpact ? {
+      id: randomUUID(), goalId: old.goal.id, patternId: `one-off:${transactionId}`,
+      impactId: acceptedImpact.id, createdAt: old.clock,
+      title: `${body.title}影响${old.goal.title}`, decision: 'immediate_signal' as const,
+      evidence: [{ transactionId, date: old.clock, amountCents: body.amountCents }],
+      confidence: 'high' as const, ruleVersion: RISK_RULE_VERSION,
+      twinVersion: old.twinVersion + 1, impact: decision.goalImpact!, status: 'active' as const,
+      suppressionKey: `one-off:${old.goal.id}:${transactionId}`,
+    } : null;
     const withTransaction = { ...result.state, pendingImpact: acceptedImpact,
-      transactions: [{ id: randomUUID(), accountId: 'checking',
+      riskSignals: signal ? [...result.state.riskSignals, signal] : result.state.riskSignals,
+      transactions: [{ id: transactionId, accountId: 'checking',
       date: old.clock, title: body.title, category: 'expense', amountCents: -body.amountCents }, ...result.state.transactions] };
     return audit(withTransaction, 'simulate_expense', decision.outcome, body.title);
   });
