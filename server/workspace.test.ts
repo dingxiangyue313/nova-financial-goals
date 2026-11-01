@@ -13,6 +13,7 @@ import { verifyAuditChain } from './governance.ts';
 import {
   agentArtifactCounts,
   createAgentThread,
+  createAgentAction,
   deleteAgentThread,
   getAgentMessages,
   getAgentTaskForThread,
@@ -24,7 +25,7 @@ import {
   saveAgentMessage,
   setAgentThreadStatus,
 } from './store.ts';
-import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary, executeWorkspaceAction } from './workspace.ts';
+import { createAgentTurn, createScenarioPreview, decorateAgentMessageActions, ensureImpactThread, ensureWeeklyRiskSummary, executeWorkspaceAction } from './workspace.ts';
 import { prepareTransferScheduleConfirmation } from './workspace.ts';
 import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
 import { buildMoneyMissionPlans } from './money-mission-plans.ts';
@@ -549,6 +550,22 @@ test('risk conversations expose one read-only repair entry and legacy confirmati
     assert.throws(() => executeWorkspaceAction(sessionId, legacy.action.actionId, 'confirm', state),
       /RISK_REPAIR_PREVIEW_REQUIRED/);
   }
+});
+
+test('legacy risk confirmation cards are returned as unavailable history', () => {
+  const sessionId = randomUUID();
+  const state = applySpendingTrendDemo(activatePlan(createFixture(), 'balanced')).state;
+  const thread = createAgentThread(sessionId, { title: '旧风险方案' });
+  const action = createAgentAction(sessionId, thread.id, 'resolve_impact', state.twinVersion, { decision: 'A' });
+  const message = saveAgentMessage(sessionId, thread.id, { role: 'assistant', content: '旧版方案', components: [{
+    id: randomUUID(), type: 'confirmation', title: '确认旧方案 A', body: '旧版直接写入入口', tone: 'warning',
+    action: { actionId: action.id, label: '确认方案 A', destructive: false },
+  }] });
+
+  const decorated = decorateAgentMessageActions(sessionId, [message]);
+  const confirmation = decorated[0].components[0];
+  assert.equal(confirmation.type, 'confirmation');
+  if (confirmation.type === 'confirmation') assert.match(confirmation.unavailableReason ?? '', /旧方案已停用/);
 });
 
 test('prompt injection produces a safe non-actionable turn', async () => {

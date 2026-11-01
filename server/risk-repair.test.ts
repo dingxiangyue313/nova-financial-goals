@@ -8,6 +8,7 @@ import {
   type RiskRepairApplyRequest,
 } from '../shared/contracts.ts';
 import { activatePlan } from './domain.ts';
+import { runBankingTool } from './banking.ts';
 import { createFixture } from './fixtures.ts';
 import { applySpendingTrendDemo } from './risk.ts';
 import {
@@ -157,4 +158,16 @@ test('later keeps a retrievable risk quiet while dismiss clears the current remi
   assert.equal(dismissed.riskSignals[0].status, 'dismissed');
   assert.equal(dismissed.pendingImpact, null);
   assert.equal(dismissed.twinVersion, later.twinVersion + 1);
+});
+
+test('ordinary goal writes make active and postponed risk judgments stale in the same state change', () => {
+  for (const status of ['active', 'later'] as const) {
+    const state = activeRiskFixture();
+    state.riskSignals = state.riskSignals.map(signal => ({ ...signal, status }));
+    const updated = runBankingTool(state, 'update_goal', { targetCents: state.goal.targetCents + 10000 }).state;
+
+    assert.equal(updated.riskSignals[0].status, 'stale');
+    assert.equal(updated.pendingImpact, null);
+    assert.equal(updated.goal.status, 'draft');
+  }
 });

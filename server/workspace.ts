@@ -2,7 +2,7 @@ import { assertAiWriteAllowed } from './ai-safety-control.ts';
 import { z } from 'zod';
 import { applyConfirmedAccountSnapshot } from './account-snapshots.ts';
 import { AgentTurnSchema, GoalAssumptionsSchema, type AgentComponent, type AgentIntent,
-  type AgentTurn, type DemoState, type GoalAssumptions, type GoalDraft, type TransferScheduleInput } from '../shared/contracts.ts';
+  type AgentMessage, type AgentTurn, type DemoState, type GoalAssumptions, type GoalDraft, type TransferScheduleInput } from '../shared/contracts.ts';
 import { interpretAgentRequest } from './agent.ts';
 import { understandGoalMessage, type Understanding } from './understanding.ts';
 import { buildWeeklyRiskSummary, notificationDelivery } from './risk.ts';
@@ -26,6 +26,21 @@ import {
 
 const yuan = (value: number) => `¥${(value / 100).toLocaleString('zh-CN')}`;
 const componentId = () => crypto.randomUUID();
+
+export function decorateAgentMessageActions(sessionId: string, messages: AgentMessage[]): AgentMessage[] {
+  return messages.map(message => ({ ...message, components: message.components.map(component => {
+    if (component.type !== 'confirmation') return component;
+    try {
+      const action = getAgentAction(sessionId, component.action.actionId);
+      if (action.actionType === 'resolve_impact') return { ...component,
+        unavailableReason: '旧方案已停用，请使用“查看调整方案”重新核验。' };
+      if (action.status !== 'pending') return { ...component, unavailableReason: '这项操作已经处理，历史内容仅供查看。' };
+    } catch {
+      return { ...component, unavailableReason: '这项历史操作已不可执行。' };
+    }
+    return component;
+  }) }));
+}
 
 function detectIntent(message: string): AgentIntent {
   if (/(执行|Execute|Ask|Block|人工复核|外部.*请求|Agent 请求)/i.test(message)) return 'external_agent_request';

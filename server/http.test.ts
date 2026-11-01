@@ -243,6 +243,17 @@ test('GoalGuard HTTP repair uses preview/apply/status and rejects the legacy A/B
     assert.equal(changed.code, 200);
     assert.equal(changed.data.snapshot.riskSignals[0].status, 'stale');
     assert.equal(changed.data.snapshot.pendingImpact, null);
+
+    cookie = '';
+    await call('/api/demo/load-japan', 'POST');
+    await call('/api/goals/activate', 'POST', { planId: 'balanced' });
+    const directRisk = (await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'direct-goal-risk' })).data as Snapshot;
+    const directChange = await call('/api/goals/current', 'PATCH', {
+      expectedTwinVersion: directRisk.twinVersion, targetCents: directRisk.goal.targetCents + 10000,
+    });
+    assert.equal(directChange.code, 200);
+    assert.equal(directChange.data.riskSignals[0].status, 'stale');
+    assert.equal(directChange.data.pendingImpact, null);
   } finally {
     child.kill('SIGTERM');
     await new Promise(resolve => child.once('exit', resolve));

@@ -9,6 +9,7 @@ import { cancelTransferSchedule, getTransferScheduleStatus, pauseTransferSchedul
   transferScheduleApprovalParameters, TransferScheduleLifecycleSchema } from './transfer-schedules.ts';
 import { assessGoal } from './domain.ts';
 import { activatePlan } from './domain.ts';
+import { invalidateGoalRisks } from './risk-lifecycle.ts';
 import { approveOperation, evaluateExternalRequest, reconcileOperation } from './tools.ts';
 import {
   appendAuditEvent,
@@ -217,6 +218,8 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
         finance: { ...state.finance, emergencyCents: input.protectedCents }, pendingImpact: null, mandate: null,
         accounts: state.accounts.map(item => item.id === 'emergency' ? { ...item, balanceCents: input.protectedCents }
           : item.id === 'goal-wallet' ? { ...item, balanceCents: savedCents } : item) };
+      next = invalidateGoalRisks(next, state.goal.id);
+      if (created.id !== state.goal.id) next = invalidateGoalRisks(next, created.id);
       next = appendAuditEvent(next, 'create_goal', 'draft', input.title);
       return { state: next, result: { goal: next.goal, twinVersion: next.twinVersion } };
     }
@@ -230,6 +233,7 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
         finance: input.protectedCents === undefined ? state.finance : { ...state.finance, emergencyCents: input.protectedCents },
         accounts: input.protectedCents === undefined ? state.accounts : state.accounts.map(item => item.id === 'emergency' ? { ...item, balanceCents: input.protectedCents } : item),
         pendingImpact: null, mandate: null };
+      next = invalidateGoalRisks(next, updated.id);
       next = appendAuditEvent(next, 'update_goal', 'draft', '目标参数已修改，方案需要重新选择');
       return { state: next, result: { goal: next.goal, twinVersion: next.twinVersion } };
     }
@@ -239,6 +243,7 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       const updated = { ...state.goal, contributionMode: undefined, selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents, status: 'draft' as const };
       let next: DemoState = { ...state, twinVersion: state.twinVersion + 1,
         goal: updated, goals: state.goals.map(goal => goal.id === updated.id ? updated : goal) };
+      next = invalidateGoalRisks(next, updated.id);
       next = appendAuditEvent(next, 'select_goal_plan', 'selected', plan.id);
       return { state: next, result: { goal: next.goal, twinVersion: next.twinVersion } };
     }
@@ -264,6 +269,8 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
       next = { ...next, twinVersion: next.twinVersion + 1, goal,
         goals: previous ? next.goals.map(item => item.id === goal.id ? goal : item) : [...next.goals, goal],
         primaryGoalId: goal.id, pendingImpact: null };
+      next = invalidateGoalRisks(next, state.goal.id);
+      if (goal.id !== state.goal.id) next = invalidateGoalRisks(next, goal.id);
       next = appendPipeline(next, `goal-${goal.id}`, '已验证候选目标已激活');
       return { state: next, result: { goal, twinVersion: next.twinVersion } };
     }

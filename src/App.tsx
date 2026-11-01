@@ -631,7 +631,6 @@ export default function App() {
             <GoalImpactScreen
               snapshot={snapshot}
               goal={goal}
-              scenario={scenario}
               onRefresh={setSnapshot}
               onResolved={(next, destination) => {
                 setSnapshot(next);

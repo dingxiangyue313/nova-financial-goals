@@ -16,6 +16,7 @@ import {
 } from '../shared/contracts.ts';
 import { appendAuditEvent, stableHash } from './governance.ts';
 import { applyGoalPlanChange, previewGoalPlanChange } from './scenario.ts';
+export { invalidateGoalRisks } from './risk-lifecycle.ts';
 
 type CurrentRisk = { impact: Impact; signal: GoalImpactSignal };
 
@@ -170,18 +171,6 @@ export function applyRiskRepair(state: DemoState, input: RiskRepairApplyRequest)
   'risk_repair_applied', 'succeeded', `风险 ${request.impactId} 已通过统一方案修改流程处理；转入安排保持不变。`);
   return { state: resolved, preview, receipt, scheduleReviewRequired: applied.scheduleReviewRequired,
     replayed: false };
-}
-
-export function invalidateGoalRisks(state: DemoState, goalId: string): DemoState {
-  let changed = false;
-  const riskSignals = state.riskSignals.map(signal => {
-    if (signal.goalId !== goalId || (signal.status !== 'active' && signal.status !== 'later')) return signal;
-    changed = true;
-    return { ...signal, status: 'stale' as const };
-  });
-  if (!changed) return state;
-  return { ...state, riskSignals,
-    pendingImpact: state.pendingImpact?.goalId === goalId ? null : state.pendingImpact };
 }
 
 function updateRiskDisposition(state: DemoState, impactId: string, status: 'later' | 'dismissed'): DemoState {

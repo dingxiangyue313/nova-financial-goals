@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { RiskRepairPreviewSchema, SnapshotSchema, type RiskRepairPreview,
   type RiskRepairStrategy, type Snapshot } from '../../shared/contracts';
-import { api, readableDate } from '../api';
+import { api } from '../api';
 import { money, PlanCandidateCard, PlanDifferenceTable, TargetDateConfirmation } from '../components/PlanConfirmation';
-import type { Goal, ImpactScenario } from '../types';
+import type { Goal } from '../types';
 
 interface GoalImpactScreenProps {
-  snapshot: Snapshot; goal: Goal; scenario: ImpactScenario;
+  snapshot: Snapshot; goal: Goal;
   onRefresh: (snapshot: Snapshot) => void;
   onResolved: (snapshot: Snapshot, destination: 'home' | 'money_mission') => void;
   onManualAdjust: () => void; onLater: () => void; onDismiss: () => void;
@@ -24,7 +24,7 @@ function errorText(reason: unknown) {
   return reason instanceof Error ? reason.message : '暂时无法核验调整方案';
 }
 
-export function GoalImpactScreen({ snapshot, goal, scenario, onRefresh, onResolved, onManualAdjust,
+export function GoalImpactScreen({ snapshot, goal, onRefresh, onResolved, onManualAdjust,
   onLater, onDismiss }: GoalImpactScreenProps) {
   const impactId = snapshot.pendingImpact!.id;
   const [previews, setPreviews] = useState<Record<RiskRepairStrategy, RiskRepairPreview> | null>(null);
@@ -33,12 +33,21 @@ export function GoalImpactScreen({ snapshot, goal, scenario, onRefresh, onResolv
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
   const [success, setSuccess] = useState<{ snapshot: Snapshot; review: boolean } | null>(null);
   const idempotencyKey = useRef(crypto.randomUUID());
 
+  async function recoverLatest() {
+    const live = SnapshotSchema.parse(await api<Snapshot>('/api/session'));
+    setPreviews(null); setSelected(null); setAccepted(false);
+    idempotencyKey.current = crypto.randomUUID();
+    onRefresh(live);
+    setRefreshKey(value => value + 1);
+  }
+
   useEffect(() => {
     let active = true;
-    setLoading(true); setError(''); setSelected(null); setAccepted(false);
+    setLoading(true); setError(''); setPreviews(null); setSelected(null); setAccepted(false);
     Promise.all((['keep_target_date', 'keep_monthly_contribution'] as const).map(async strategy => {
       const result = await api('/api/impact/plan-preview', 'POST', {
         impactId, expectedTwinVersion: snapshot.twinVersion, strategy,
@@ -48,19 +57,22 @@ export function GoalImpactScreen({ snapshot, goal, scenario, onRefresh, onResolv
       if (!active) return;
       if (keepTargetDate.baseTwinVersion !== keepMonthlyContribution.baseTwinVersion)
         throw new Error('TWIN_VERSION_CHANGED');
+      setError('');
       setPreviews({ keep_target_date: keepTargetDate,
         keep_monthly_contribution: keepMonthlyContribution });
     }).catch(async reason => {
       if (!active) return;
       setError(errorText(reason));
       if (reason instanceof Error && /TWIN_VERSION_CHANGED/.test(reason.message)) {
-        try { onRefresh(await api<Snapshot>('/api/session')); } catch { /* keep the actionable error */ }
+        try { await recoverLatest(); } catch { setError('数据已更新，暂时无法重新加载；请稍后重试。'); }
       }
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [impactId, snapshot.twinVersion, onRefresh]);
+  }, [impactId, snapshot.twinVersion, onRefresh, refreshKey]);
 
   const chosen = selected && previews ? previews[selected] : null;
+  const verified = previews?.keep_monthly_contribution ?? previews?.keep_target_date ?? null;
+  const evidenceTotal = verified?.evidence.transactions.reduce((sum, item) => sum + item.amountCents, 0) ?? 0;
 
   async function checkStatus() {
     const status = await api<{ applied: boolean; receipt: { scheduleReviewRequired: boolean } | null }>(
@@ -85,6 +97,9 @@ export function GoalImpactScreen({ snapshot, goal, scenario, onRefresh, onResolv
     } catch (reason) {
       try { if (await checkStatus()) return; } catch { /* show original failure */ }
       setError(errorText(reason));
+      if (reason instanceof Error && /TWIN_VERSION_CHANGED|PREVIEW_STALE/.test(reason.message)) {
+        try { await recoverLatest(); } catch { setError('数据已更新，暂时无法重新加载；请稍后重试。'); }
+      }
     } finally { setBusy(false); }
   }
 
@@ -105,20 +120,22 @@ export function GoalImpactScreen({ snapshot, goal, scenario, onRefresh, onResolv
 
   return <div className="flex-1 overflow-y-auto px-4 py-2">
     <div className="space-y-3 pb-5">
-      <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
+      {verified && <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-[19px] font-bold">{goal.title}可能延期 {scenario.impactDays} 天</h2>
+          <h2 className="text-[19px] font-bold">{goal.title}可能延期 {verified.candidate.delayDays} 天</h2>
           <span className="shrink-0 rounded-full bg-[#E6F2F2] px-2 py-1 text-[11px] font-semibold text-[#0F6B6D]">NOVA 洞察</span>
         </div>
-        <p className="text-sm leading-relaxed text-[#5A616B]">本月新增 ¥{scenario.expenseAmount.toLocaleString()} {scenario.expenseTitle}，影响了原有储蓄节奏。</p>
-        <p className="rounded-lg bg-[#EBF7F2] p-2.5 text-xs font-semibold text-[#276B4E]">¥{scenario.emergencyFundAmount.toLocaleString()} 应急金未受影响 · 安全隔离</p>
-      </section>
-      <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
+        <p className="text-sm leading-relaxed text-[#5A616B]">{verified.evidence.title}；{verified.evidence.transactions.length} 笔核验流水累计 {money(evidenceTotal)}，影响了原有储蓄节奏。</p>
+        <p className={`rounded-lg p-2.5 text-xs font-semibold ${verified.protection.satisfied ? 'bg-[#EBF7F2] text-[#276B4E]' : 'bg-rose-50 text-rose-700'}`}>
+          保护资金 {money(verified.protection.requiredCents)} · 可用 {money(verified.protection.availableCents)} · {verified.protection.satisfied ? '安全隔离' : '当前不足'}
+        </p>
+      </section>}
+      {verified && <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
         <h3 className="text-sm font-bold">为什么会受影响</h3>
-        <p className="text-xs text-[#5A616B]">{scenario.expenseDate} 记录到「{scenario.expenseTitle} ¥{scenario.expenseAmount.toLocaleString()}」</p>
-        <p className="text-xs text-[#5A616B]">原计划 {readableDate(goal.targetDate)}，当前风险估算可能延期 {scenario.impactDays} 天。</p>
-        <p className="text-[11px] text-[#5A616B]">证据与金额均来自当前模拟数据，最终方案由服务端重新核算。</p>
-      </section>
+        <p className="text-xs text-[#5A616B]">数据截至 {verified.evidence.dataAsOf} · 风险识别于 {verified.evidence.detectedAt} · 置信度 {verified.evidence.confidence}</p>
+        <p className="text-xs text-[#5A616B]">原计划 {verified.comparison.before.targetDate}，保持当前月投入后预计 {verified.comparison.after.projectedDate ?? '仍需补充数据'} 完成，延期 {verified.candidate.delayDays} 天。</p>
+        <p className="text-[11px] text-[#5A616B]">证据、金额与日期均来自同一服务端预览；选择方案后仍需最终确认。</p>
+      </section>}
       <section aria-label="调整方案" className="space-y-2.5">
         <h3 className="text-sm font-bold">比较两个不动保护资金的方案</h3>
         {loading && <p role="status" className="rounded-xl bg-white p-4 text-sm">正在核验方案…</p>}

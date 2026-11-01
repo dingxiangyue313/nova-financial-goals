@@ -27,7 +27,7 @@ import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
 import { containsPromptInjection, signExternalRequest, verifyExternalRequest } from './security.ts';
 import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary,
-  executeWorkspaceAction, prepareCandidateConfirmation, prepareSubscriptionConfirmation, prepareTransferScheduleConfirmation } from './workspace.ts';
+  decorateAgentMessageActions, executeWorkspaceAction, prepareCandidateConfirmation, prepareSubscriptionConfirmation, prepareTransferScheduleConfirmation } from './workspace.ts';
 import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, RISK_RULE_VERSION } from './risk.ts';
 import { installApiRateLimits, installRequestHardening, setStaticCacheHeaders } from './http-hardening.ts';
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
@@ -418,7 +418,7 @@ app.delete('/api/agent/threads/:id', route((req, res) => {
   deleteAgentThread(sessionId(req, res), req.params.id); res.json({ deleted: true });
 }));
 app.get('/api/agent/threads/:id/messages', route((req, res) => {
-  const id = sessionId(req, res); const messages = getAgentMessages(id, req.params.id);
+  const id = sessionId(req, res); const messages = decorateAgentMessageActions(id, getAgentMessages(id, req.params.id));
   markAgentThreadRead(id, req.params.id); res.json({ messages,
     monitor: MonitorStatusSchema.parse(monitorStatus(id, req.params.id)) });
 }));
@@ -597,7 +597,8 @@ app.post('/api/goals/:id/set-primary', route((req, res) => {
   const state = mutateState(sessionId(req, res), old => {
     const goal = old.goals.find(item => item.id === id);
     if (!goal) throw new Error('GOAL_NOT_FOUND');
-    return audit({ ...old, primaryGoalId: id, goal, twinVersion: old.twinVersion + 1 },
+    const current = invalidateGoalRisks(old, old.goal.id);
+    return audit({ ...current, primaryGoalId: id, goal, twinVersion: current.twinVersion + 1 },
       'primary_goal_changed', 'changed', `主目标已切换为 ${goal.title}`);
   });
   return respond(res, state);
