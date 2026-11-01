@@ -145,7 +145,7 @@ export const GoalImpactSignalSchema = z.object({
     sourceKind: DataSourceKindSchema.optional() })),
   confidence: z.enum(['low', 'medium', 'high']), ruleVersion: z.string(),
   twinVersion: z.number().int().positive(), impact: GoalRiskImpactSchema,
-  status: z.enum(['active', 'later', 'dismissed', 'resolved']),
+  status: z.enum(['active', 'later', 'dismissed', 'resolved', 'stale']),
   suppressionKey: z.string(),
 });
 export type GoalImpactSignal = z.infer<typeof GoalImpactSignalSchema>;
@@ -624,32 +624,6 @@ const MoneyMissionArtifactCollections = {
 const { importIssues: _importIssues, normalizedStatementRows: _normalizedRows,
   ...MoneyMissionPublicArtifactCollections } = MoneyMissionArtifactCollections;
 
-export const DemoStateSchema = z.object({
-  financialServices: FinancialServicesSchema.default(() => FinancialServicesSchema.parse({})),
-  legacyProductArtifacts:z.record(z.string(),z.unknown()).default({}),
-  ...MoneyMissionArtifactCollections,
-  subscriptionMerchants: z.array(SubscriptionMerchantSchema).default([]),
-  clock: IsoDateSchema, goal: GoalSchema, finance: FinanceSchema,
-  goals: z.array(GoalSchema).default([]), primaryGoalId: z.string().nullable().default(null),
-  pendingImpact: ImpactSchema.nullable(), mandate: MandateSchema.nullable(),
-  audit: z.array(AuditSchema), operations: z.array(OperationSchema),
-  twinVersion: z.number().int().positive().default(1),
-  accounts: z.array(AccountSchema).default([]), transactions: z.array(TransactionSchema).default([]),
-  bills: z.array(BillSchema).default([]), subscriptions: z.array(SubscriptionSchema).default([]),
-  approvals: z.array(ApprovalSchema).default([]), receipts: z.array(ReceiptSchema).default([]),
-  consumedNonces: z.array(z.string()).default([]), toolRecords: z.array(ToolRecordSchema).default([]),
-  riskPreferences: RiskPreferencesSchema.default({
-    amountThresholdCents: 50000, goalImpactRatioThresholdBps: 500,
-    weeklySummaryEnabled: true, quietHours: null, pausedUntil: null, goalOverrides: {},
-  }),
-  spendingPatterns: z.array(SpendingPatternSchema).default([]),
-  riskSignals: z.array(GoalImpactSignalSchema).default([]),
-  weeklyRiskSummaries: z.array(WeeklyRiskSummarySchema).default([]),
-  dataConnections: z.array(DataConnectionSchema).default([]),
-  dataSyncBatches: z.array(DataSyncBatchSchema).default([]),
-});
-export type DemoState = z.infer<typeof DemoStateSchema>;
-
 export const PlanSchema = z.object({
   id: z.string(), label: z.string(), monthlyCents: MoneySchema,
   projectedDate: IsoDateSchema.nullable(), safeToSpendCents: z.number().int(),
@@ -703,6 +677,80 @@ export const GoalPlanChangeRequestSchema = z.object({
   selection: z.object({ candidateId: z.string().min(1), acceptTargetDateChange: z.boolean() }).strict(),
 }).strict();
 export type GoalPlanChangeRequest = z.infer<typeof GoalPlanChangeRequestSchema>;
+
+export const RiskRepairStrategySchema = z.enum(['keep_target_date', 'keep_monthly_contribution']);
+export type RiskRepairStrategy = z.infer<typeof RiskRepairStrategySchema>;
+
+export const RiskRepairPreviewRequestSchema = z.object({
+  impactId: z.string().min(1), expectedTwinVersion: z.number().int().positive(),
+  strategy: RiskRepairStrategySchema,
+}).strict();
+export type RiskRepairPreviewRequest = z.infer<typeof RiskRepairPreviewRequestSchema>;
+
+const RiskRepairPlanStateSchema = z.object({
+  targetCents: MoneySchema.positive(), savedCents: MoneySchema,
+  monthlyContributionCents: MoneySchema.positive(), targetDate: IsoDateSchema,
+  projectedDate: IsoDateSchema.nullable(),
+}).strict();
+
+export const RiskRepairPreviewSchema = z.object({
+  previewId: z.string().min(1), impactId: z.string().min(1), goalId: z.string().min(1),
+  signalId: z.string().min(1), baseTwinVersion: z.number().int().positive(),
+  strategy: RiskRepairStrategySchema, draft: GoalPlanChangeDraftSchema,
+  candidate: GoalPlanChangeCandidateSchema,
+  comparison: z.object({ before: RiskRepairPlanStateSchema, after: RiskRepairPlanStateSchema }).strict(),
+  evidence: z.object({ title: z.string(), detectedAt: IsoDateSchema, dataAsOf: IsoDateSchema,
+    confidence: z.enum(['low', 'medium', 'high']), transactions: GoalImpactSignalSchema.shape.evidence }).strict(),
+  protection: z.object({ requiredCents: MoneySchema, availableCents: MoneySchema,
+    satisfied: z.boolean(), blockingReasons: z.array(z.string()) }).strict(),
+  transferSchedules: z.array(z.object({ id: z.string(), amountCents: MoneySchema,
+    status: TransferScheduleSchema.shape.status }).strict()),
+  scheduleReviewRequired: z.boolean(),
+}).strict();
+export type RiskRepairPreview = z.infer<typeof RiskRepairPreviewSchema>;
+
+export const RiskRepairApplyRequestSchema = z.object({
+  impactId: z.string().min(1), previewId: z.string().min(1),
+  expectedTwinVersion: z.number().int().positive(), strategy: RiskRepairStrategySchema,
+  candidateId: z.string().min(1), acceptTargetDateChange: z.boolean(),
+  idempotencyKey: z.string().min(1).max(160),
+}).strict();
+export type RiskRepairApplyRequest = z.infer<typeof RiskRepairApplyRequestSchema>;
+
+export const RiskRepairReceiptSchema = z.object({
+  idempotencyKey: z.string().min(1), requestHash: z.string().min(1),
+  impactId: z.string().min(1), previewId: z.string().min(1), goalId: z.string().min(1),
+  appliedAt: z.string(), resultingTwinVersion: z.number().int().positive(),
+  scheduleReviewRequired: z.boolean(), preview: RiskRepairPreviewSchema,
+}).strict();
+export type RiskRepairReceipt = z.infer<typeof RiskRepairReceiptSchema>;
+
+export const DemoStateSchema = z.object({
+  financialServices: FinancialServicesSchema.default(() => FinancialServicesSchema.parse({})),
+  legacyProductArtifacts:z.record(z.string(),z.unknown()).default({}),
+  ...MoneyMissionArtifactCollections,
+  subscriptionMerchants: z.array(SubscriptionMerchantSchema).default([]),
+  clock: IsoDateSchema, goal: GoalSchema, finance: FinanceSchema,
+  goals: z.array(GoalSchema).default([]), primaryGoalId: z.string().nullable().default(null),
+  pendingImpact: ImpactSchema.nullable(), mandate: MandateSchema.nullable(),
+  audit: z.array(AuditSchema), operations: z.array(OperationSchema),
+  twinVersion: z.number().int().positive().default(1),
+  accounts: z.array(AccountSchema).default([]), transactions: z.array(TransactionSchema).default([]),
+  bills: z.array(BillSchema).default([]), subscriptions: z.array(SubscriptionSchema).default([]),
+  approvals: z.array(ApprovalSchema).default([]), receipts: z.array(ReceiptSchema).default([]),
+  consumedNonces: z.array(z.string()).default([]), toolRecords: z.array(ToolRecordSchema).default([]),
+  riskPreferences: RiskPreferencesSchema.default({
+    amountThresholdCents: 50000, goalImpactRatioThresholdBps: 500,
+    weeklySummaryEnabled: true, quietHours: null, pausedUntil: null, goalOverrides: {},
+  }),
+  spendingPatterns: z.array(SpendingPatternSchema).default([]),
+  riskSignals: z.array(GoalImpactSignalSchema).default([]),
+  weeklyRiskSummaries: z.array(WeeklyRiskSummarySchema).default([]),
+  dataConnections: z.array(DataConnectionSchema).default([]),
+  dataSyncBatches: z.array(DataSyncBatchSchema).default([]),
+  riskRepairReceipts: z.array(RiskRepairReceiptSchema).default([]),
+});
+export type DemoState = z.infer<typeof DemoStateSchema>;
 
 export const GoalAssumptionsSchema = z.object({
   targetCents: MoneySchema.positive(),
