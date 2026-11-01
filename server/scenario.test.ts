@@ -9,6 +9,7 @@ import {
 import { createFixture } from './fixtures.ts';
 import { applyGoalPlanChange, previewGoalPlanChange, previewGoalScenario } from './scenario.ts';
 import { createJapanMoneyMissionFixture } from './money-mission-fixture.ts';
+import { assessGoal } from './domain.ts';
 
 test('goal scenario preview is deterministic, immutable, and limited to three plans', () => {
   const state = createFixture();
@@ -81,6 +82,44 @@ test('plan-change preview exposes but blocks a user amount above available month
 
   assert.equal(preview.customPlan.selectable, false);
   assert.ok(preview.customPlan.blockingReasons.includes('MONTHLY_CAPACITY_EXCEEDED'));
+});
+
+test('dated plan changes calculate an arbitrary monthly amount through its actual salary dates', () => {
+  const state = createJapanMoneyMissionFixture();
+  const preview = previewGoalPlanChange(state, { targetCents: 800000, savedCents: 200000,
+    targetDate: '2027-06-30', monthlyContributionCents: 180000, protectedCents: 2000000, flexibilityWeeks: 0 });
+  assert.equal(preview.customPlan.selectable, true);
+  assert.equal(preview.customPlan.projectedDate, '2027-02-26');
+  const late = previewGoalPlanChange(state, { ...preview.draft, targetDate: '2027-01-31' });
+  assert.equal(late.customPlan.selectable, true);
+  assert.equal(late.customPlan.effectiveTargetDate, '2027-02-26');
+});
+
+test('all candidate choices block insufficient protection rather than allowing a NOVA bypass', () => {
+  const preview = previewGoalPlanChange(activePlanFixture(), { ...planDraft(), protectedCents: 3000000 });
+  assert.ok([...preview.novaPlans, preview.customPlan].every(plan => !plan.selectable));
+});
+
+test('dated NOVA and arbitrary custom selections retain their exact contribution meaning after apply', () => {
+  const state = createJapanMoneyMissionFixture();
+  const draft = { ...planDraft(180000), savedCents: 200000, targetDate: '2027-06-30' };
+  const preview = previewGoalPlanChange(state, draft);
+  for (const candidate of [...preview.novaPlans, preview.customPlan].filter(item => item.selectable)) {
+    const result = applyGoalPlanChange(state, { draft, expectedTwinVersion: state.twinVersion,
+      selection: { candidateId: candidate.id, acceptTargetDateChange: true } });
+    assert.equal(assessGoal(result.state).projectedDate, candidate.projectedDate);
+  }
+});
+
+test('a fully funded draft can be previewed and becomes achieved without moving funds', () => {
+  const state = activePlanFixture();
+  const draft = { ...planDraft(), savedCents: 800000 };
+  const preview = previewGoalPlanChange(state, draft);
+  assert.equal(preview.customPlan.projectedDate, state.clock);
+  const changed = applyGoalPlanChange(state, { draft, expectedTwinVersion: 1,
+    selection: { candidateId: 'custom', acceptTargetDateChange: false } });
+  assert.equal(changed.state.goal.status, 'achieved');
+  assert.deepEqual(changed.state.accounts, state.accounts);
 });
 
 test('plan-change preview merges a user amount that duplicates a NOVA plan', () => {

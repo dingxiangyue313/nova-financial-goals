@@ -77,7 +77,7 @@ test('offline acceptance: investigate, revise, confirm, monitor, repair and conf
   assert.ok(repair && repair.type === 'candidate_recommendations');
   assert.equal(getState(sessionId).goal.targetDate, '2026-12-31');
   const repairAction = prepareCandidateConfirmation(sessionId, threadId,
-    repair.items[0].resultId, getState(sessionId));
+    repair.items[0].resultId!, getState(sessionId));
   mutateState(sessionId, old => executeWorkspaceAction(sessionId, repairAction.action.id, 'confirm', old).state);
   assert.equal(getState(sessionId).goal.targetDate, repair.items[0].targetDate);
   assert.equal(getState(sessionId).finance.emergencyCents, beforeRisk.finance.emergencyCents);

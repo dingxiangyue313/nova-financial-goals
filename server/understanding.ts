@@ -117,7 +117,7 @@ export async function understandGoalMessage(text: string, clock: string, task: A
     setAmount(changes, 'targetCents', targetRaw ?? (!task?.facts.targetCents && !answeringSavedQuestion
       ? bareAmount : null), unknowns);
     setAmount(changes, 'savedCents', savedAmountQuote(text) ?? (answeringSavedQuestion ? bareAmount : null), unknowns);
-    setAmount(changes, 'monthlyContributionCapCents', quotedAmount(text, '(?:每月最多存|每个月最多存|每月可存|每月存)'), unknowns);
+    setAmount(changes, 'monthlyContributionCapCents', quotedAmount(text, '(?:每月最多存|每个月最多存|每月可存|每月只存|每月存|每个月存)'), unknowns);
     setAmount(changes, 'protectedCents', quotedAmount(text, '(?:应急金|保留应急金|保护应急金)'), unknowns);
     if (/不(?:削减|减少|动)(?:健身|运动)支出/.test(text)) preferences.push('保留健身支出');
     if (/可能.{0,4}奖金|奖金.{0,4}可能/.test(text)) unknowns.push('可能有奖金，金额和到账时间未确认');

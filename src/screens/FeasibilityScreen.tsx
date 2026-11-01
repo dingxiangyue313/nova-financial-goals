@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Goal } from '../types';
-import type { Assessment, RiskPreferences } from '../../shared/contracts';
+import type { Assessment, RiskPreferences, Snapshot } from '../../shared/contracts';
+import { PlanChangePanel } from '../components/PlanChangePanel';
 
 interface FeasibilityScreenProps {
+  snapshot: Snapshot;
+  onRefresh: (snapshot: Snapshot) => void;
+  onPlanChanged: (snapshot: Snapshot, review: boolean) => void;
   goal: Goal;
   assessment: Assessment;
   selectedPlanId: string | null;
@@ -13,6 +17,7 @@ interface FeasibilityScreenProps {
 }
 
 export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
+  snapshot, onPlanChanged, onRefresh,
   goal,
   assessment,
   selectedPlanId,
@@ -23,6 +28,10 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [savingPreferences, setSavingPreferences] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const stageButton = useRef<HTMLButtonElement>(null);
+  const active = snapshot.goal.status !== 'draft' && Boolean(selectedPlanId);
+  const closeEditor = () => { setEditing(false); requestAnimationFrame(() => stageButton.current?.focus()); };
   const options = assessment.plans.map(p => ({
     id: p.id, type: p.label, amountText: `¥${(p.monthlyCents / 100).toLocaleString()}`,
     periodText: '/ 月', forecastText: p.explanation,
@@ -104,7 +113,7 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
               <div className="flex-1 rounded-lg p-2.5 shadow-sm bg-[#F8FAFB] border border-[#E5E8EB]">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-[#276B4E]">阶段 02</span>
-                  <span className="text-[11px] font-semibold text-[#276B4E]">可行方案</span>
+                  <span className="text-[11px] font-semibold text-[#276B4E]">{active ? '已核验方案' : '可行方案'}</span>
                 </div>
                 <p className="text-[12px] mt-0.5 leading-relaxed text-[#1F2329]">
                   每月必要投入{' '}
@@ -124,18 +133,39 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
               <div className="flex-1 rounded-lg p-2.5 shadow-sm bg-[#F8FAFB] border border-[#E5E8EB]">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-[#5A616B]">阶段 03</span>
-                  <span className="text-[11px] font-semibold text-[#5A616B]">确认计划</span>
+                  <span className="text-[11px] font-semibold text-[#5A616B]">{active ? '计划已确认' : '确认计划'}</span>
                 </div>
                 <p className="text-[12px] mt-0.5 leading-relaxed text-[#1F2329]">
-                  选择适合你的节奏，再决定是否启用
+                  {active ? `当前每月投入 ¥${(snapshot.goal.monthlyContributionCents / 100).toLocaleString()}，可随时调整` : '选择适合你的节奏，再决定是否启用'}
                 </p>
               </div>
             </div>
+            {active && <div className="relative flex items-start gap-2.5 z-10">
+              <div aria-hidden="true" className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm bg-[#F0F2F5] text-[#5A616B]">
+                <span className="material-symbols-outlined text-[17px]">edit</span>
+              </div>
+              <button ref={stageButton} type="button" aria-expanded={editing} aria-controls="plan-change-panel"
+                onClick={() => editing ? closeEditor() : setEditing(true)}
+                className="flex-1 min-h-11 rounded-lg p-2.5 shadow-sm bg-[#F8FAFB] border border-[#E5E8EB] text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F6B6D]">
+                <span className="flex items-center justify-between">
+                  <span className="text-[11px] text-[#5A616B]">阶段 04</span>
+                  <span className="text-[11px] font-semibold text-[#5A616B]">修改方案</span>
+                </span>
+                <span className="block text-[12px] mt-0.5 leading-relaxed text-[#1F2329]">调整目标参数或存钱节奏</span>
+              </button>
+            </div>}
           </div>
         </div>
+        {active && <section aria-label="当前方案" className="rounded-xl border border-[#D8E7E7] bg-white p-3.5 text-sm space-y-1">
+          <h3 className="font-bold">当前方案{selectedPlanId === 'custom' ? ' · 你的方案' : ''}</h3>
+          <p>每月投入 ¥{(snapshot.goal.monthlyContributionCents / 100).toLocaleString()}</p>
+          <p>目标日期 {snapshot.goal.targetDate}</p><p>预计完成 {assessment.projectedDate ?? '待核对数据'}</p>
+          <details><summary className="min-h-11 cursor-pointer">计算依据</summary>{assessment.assumptions.map(text => <p key={text} className="text-xs text-[#5A616B]">{text}</p>)}</details>
+        </section>}
+        {active && editing && <PlanChangePanel snapshot={snapshot} onRefresh={onRefresh} onCancel={closeEditor} onApplied={(next, review) => { onPlanChanged(next, review); closeEditor(); }} />}
 
-        {/* Interactive Decision Options: 3 Choices */}
-        <div className="w-full flex flex-col space-y-2">
+        {/* First-time selection only */}
+        {!active && <div className="w-full flex flex-col space-y-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-[12px] text-[#1F2329] font-bold">
               选择适合你的节奏
@@ -204,6 +234,7 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
           })}
         </div>
 
+        }
         <section className="w-full rounded-xl border border-[#D8E7E7] bg-white p-3.5 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div className="flex gap-2.5">
@@ -229,7 +260,7 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
         </section>
 
         {/* Action Area: Primary CTA & Safety Reassurance */}
-        <div className="w-full flex flex-col space-y-2.5 pt-1">
+        {!active && <div className="w-full flex flex-col space-y-2.5 pt-1">
           <button
             disabled={selectedId === null}
             onClick={() => selectedId && onConfirmPlan(selectedId)}
@@ -257,7 +288,7 @@ export const FeasibilityScreen: React.FC<FeasibilityScreenProps> = ({
               {selectedPlanId ? '当前方案已激活。' : '选择方案只会设置提醒与推进节奏，不会自动扣款。'}
             </span>
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );

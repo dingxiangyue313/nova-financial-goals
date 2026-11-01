@@ -348,6 +348,53 @@ test('fallback offers distinct verified monthly options when capacity allows', a
   assert.ok(card.items.every(item => item.status === 'on_track' && item.explanation.length > 80));
 });
 
+test('fallback adds the exact user monthly amount as a selectable user plan', async () => {
+  const { sessionId, threadId, run } = setup(45_000, 180000, '我想每月只存1800元');
+  const { updateAgentTask } = await import('./store.ts');
+  const task = getAgentTaskForThread(sessionId, threadId)!;
+  updateAgentTask(sessionId, task.taskId, task.taskRevision, { preferences: [{
+    key: 'preferred_monthly_cents', value: '180000', source: task.fieldSources.monthlyContributionCents,
+  }] });
+  const finished = await runAgentTask(sessionId, threadId, run.runId,
+    async () => ({ failure: 'DEEPSEEK_NOT_CONFIGURED' }));
+  const card = getAgentMessages(sessionId, threadId).at(-1)!.components
+    .find(item => item.type === 'candidate_recommendations');
+
+  assert.ok(card && card.type === 'candidate_recommendations');
+  assert.ok(card.items.length <= 4);
+  const userPlan = card.items.find(item => item.source === 'user' || item.source === 'both');
+  assert.ok(userPlan);
+  assert.equal(userPlan.label, '你的方案');
+  assert.equal(userPlan.monthlyContributionCents, 180000);
+  assert.equal(userPlan.originalTargetDate, '2026-12-31');
+  assert.equal(userPlan.targetDate, '2027-01-14');
+  assert.equal(userPlan.projectedDate, '2027-01-14');
+  assert.equal(userPlan.delayDays, 14);
+  assert.equal(userPlan.selectable, true);
+  assert.ok(userPlan.resultId);
+  assert.ok(finished.recommendedResultIds.includes(userPlan.resultId));
+});
+
+test('a new user-authored plan retains the primary goal cash reservation', async () => {
+  const { sessionId, threadId } = setup();
+  const { mutateState, updateAgentTask } = await import('./store.ts');
+  const { createJapanMoneyMissionFixture } = await import('./money-mission-fixture.ts');
+  const { previewPreferredMonthlyPlan } = await import('./agent-read-tools.ts');
+  mutateState(sessionId, old => {
+    const fixture = createJapanMoneyMissionFixture();
+    const goal = { ...fixture.goal, monthlyContributionCents: 400000, status: 'active' as const };
+    return { ...fixture, goal, goals: [goal], twinVersion: old.twinVersion + 1 };
+  });
+  const task = getAgentTaskForThread(sessionId, threadId)!;
+  updateAgentTask(sessionId, task.taskId, task.taskRevision, {
+    facts: { ...task.facts, targetCents: 800000, savedCents: 200000, originalTargetDate: '2027-06-30' },
+    preferences: [{ key: 'preferred_monthly_cents', value: '100000', source: task.fieldSources.monthlyContributionCents }],
+  });
+  const plan = previewPreferredMonthlyPlan(sessionId, threadId)!;
+  assert.equal(plan.selectable, false);
+  assert.ok(plan.blockingReasons.includes('GOAL_PRIORITY_CONFLICT'));
+});
+
 test('scripted agent searches options and recommends only returned result IDs', async () => {
   const { sessionId, threadId, run } = setup(45_000, 400000);
   const { mutateState } = await import('./store.ts');

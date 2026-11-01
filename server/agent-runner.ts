@@ -11,8 +11,7 @@ import { AgentDecisionSchema, AgentRunSchema, type AgentDecision, type AgentRun,
   type AgentTask, type AgentToolResult } from '../shared/contracts.ts';
 import { requestDeepSeekJson, type DeepSeekFailure } from './deepseek-client.ts';
 import { explainAgentCandidates, explanationInputFromResults, type AgentExplanation } from './agent-explanation.ts';
-import { runAgentReadTool } from './agent-read-tools.ts';
-import { assessCandidateScenario } from './domain.ts';
+import { previewPreferredMonthlyPlan, runAgentReadTool, runPreferredMonthlyCandidate } from './agent-read-tools.ts';
 import { createAgentRun, getAgentMessages, getAgentRun, getAgentTaskForThread, getAgentToolResult,
   getLatestAgentRunForThread, getState, claimAgentRun, cancelAgentRun,
   markAgentThreadUnread, saveAgentMessage, saveAgentTurnRecord,
@@ -247,7 +246,7 @@ function checked(sessionId: string, threadId: string, runId: string,
 
 function verifiedCandidates(sessionId: string, threadId: string, task: AgentTask,
   ids: string[], twinVersion: number): AgentToolResult[] | null {
-  if (new Set(ids).size !== ids.length || ids.length > 3) return null;
+  if (new Set(ids).size !== ids.length || ids.length > 4) return null;
   const results: AgentToolResult[] = [];
   for (const id of ids) {
     if (!task.candidateRefs.includes(id)) return null;
@@ -334,13 +333,28 @@ function resultComponents(run: AgentRun, sessionId: string, threadId: string, re
   fallbackReason: string | null, narrative: AgentExplanation | null,
   stress: Record<string, unknown> | null) {
   const components: Array<Record<string, unknown>> = [];
-  const sorted = [...results].filter(item => item.tool === 'candidate_preview')
+  const preferred = previewPreferredMonthlyPlan(sessionId, threadId);
+  const preferredKey = preferred ? `${preferred.monthlyCents}:${preferred.projectedDate ?? 'unknown'}` : null;
+  const seen = new Set<string>();
+  const candidates = [...results].filter(item => item.tool === 'candidate_preview')
+    .sort((a, b) => a.tool === 'candidate_preview' && b.tool === 'candidate_preview'
+      ? Number(b.output.input.targetDate === preferred?.effectiveTargetDate) -
+          Number(a.output.input.targetDate === preferred?.effectiveTargetDate) : 0)
+    .filter(item => {
+      if (item.tool !== 'candidate_preview') return false;
+      const key = `${item.output.input.monthlyContributionCents}:${item.output.assessment?.projectedDate ?? 'unknown'}`;
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+  const sorted = [...candidates]
     .sort((a, b) => a.tool === 'candidate_preview' && b.tool === 'candidate_preview'
       ? a.output.input.monthlyContributionCents - b.output.input.monthlyContributionCents : 0);
-  const items = results.flatMap(result => {
+  const items: Extract<import('../shared/contracts.ts').AgentComponent, {type:'candidate_recommendations'}>['items'] = sorted.flatMap(result => {
     if (result.tool !== 'candidate_preview' || !result.output.assessment) return [];
     const { input, assessment } = result.output;
     const monthly = input.monthlyContributionCents;
+    const key = `${monthly}:${assessment.projectedDate ?? 'unknown'}`;
+    const isUserPlan = preferredKey === key && input.targetDate === preferred?.effectiveTargetDate;
     const calculatedExplanation = `按当前模拟收入扣除固定账单和必要支出后，每月最多可用于目标 ${yuan(assessment.availableMonthlyCents)}。` +
       `这个方案每月投入 ${yuan(monthly)}，首月可动用额度 ${yuan(assessment.firstMonthCapacityCents)}，` +
       `${assessment.bufferCents >= 0 ? `投入后约留 ${yuan(assessment.bufferCents)} 缓冲` : '首月额度低于计划投入，后续月份需补足'}。` +
@@ -351,37 +365,36 @@ function resultComponents(run: AgentRun, sessionId: string, threadId: string, re
       `日常节奏：${explained.everydayLife}`, `优势：${explained.advantage}`,
       `需要接受：${explained.tradeoff}`].join('\n') : calculatedExplanation;
     const rank = sorted.findIndex(item => item.toolResultId === result.toolResultId);
-    const label = input.firstMonthContributionCents !== undefined ? '均衡方案'
+    const label = isUserPlan ? '你的方案' : input.firstMonthContributionCents !== undefined ? '均衡方案'
       : sorted.length === 1 ? '加速方案' : rank === 0 ? '保守方案'
         : rank === sorted.length - 1 ? '加速方案' : '均衡方案';
-    return [{ resultId: result.toolResultId, label, targetCents: input.targetCents,
+    return [{ resultId: result.toolResultId,
+      source: isUserPlan ? preferred?.source ?? 'user' : 'nova', selectable: true, blockingReasons: [],
+      originalTargetDate: isUserPlan ? getAgentTaskForThread(sessionId, threadId)!.facts.originalTargetDate! : input.targetDate,
+      delayDays: isUserPlan ? preferred?.delayDays ?? 0 : assessment.delayDays,
+      label, targetCents: input.targetCents,
       targetDate: input.targetDate, monthlyContributionCents: input.monthlyContributionCents,
       ...(input.firstMonthContributionCents !== undefined
         ? { firstMonthContributionCents: input.firstMonthContributionCents } : {}),
       protectedCents: input.protectedCents, projectedDate: assessment.projectedDate,
-      bufferCents: assessment.bufferCents, status: assessment.status,
+      bufferCents: assessment.bufferCents, status: assessment.status as 'on_track' | 'at_risk',
       tradeoff, explanation, assumptions: result.assumptions, gaps: result.gaps }];
   });
-  let conditionalPlan: { monthlyContributionCents: number; projectedDate: string; targetDate: string } | undefined;
-  const sample = results.find(item => item.tool === 'candidate_preview');
-  if (sample?.tool === 'candidate_preview') {
-    const state = getState(sessionId);
-    const task = getAgentTaskForThread(sessionId, threadId);
-    const low = Math.floor(sample.output.input.monthlyContributionCents * .75 / 10000) * 10000;
-    if (task?.facts.savedCents !== null && task?.facts.savedCents !== undefined && low >= 10000 &&
-      sample.output.input.monthlyContributionCents - low >= 30000) {
-      const input = { ...sample.output.input, monthlyContributionCents: low,
-        firstMonthContributionCents: undefined };
-      const assessment = assessCandidateScenario(state, input, task.facts.savedCents, [], '9999-12-31');
-      if (assessment.projectedDate && assessment.projectedDate > input.targetDate && assessment.bufferCents >= 0)
-        conditionalPlan = { monthlyContributionCents: low, projectedDate: assessment.projectedDate,
-          targetDate: input.targetDate };
-    }
+  if (preferred && !items.some(item => item.source === 'user' || item.source === 'both')) {
+    const task = getAgentTaskForThread(sessionId, threadId)!;
+    items.push({ resultId: null, source: preferred.source, selectable: false,
+      blockingReasons: preferred.blockingReasons, originalTargetDate: task.facts.originalTargetDate!,
+      delayDays: preferred.delayDays, label: '你的方案', targetCents: task.facts.targetCents!,
+      targetDate: preferred.effectiveTargetDate, monthlyContributionCents: preferred.monthlyCents,
+      protectedCents: Math.max(task.constraints.protectedCents ?? 0, getState(sessionId).finance.emergencyCents),
+      projectedDate: preferred.projectedDate, bufferCents: preferred.safeToSpendCents,
+      status: preferred.status === 'infeasible' ? 'at_risk' : preferred.status,
+      tradeoff: 'balanced', explanation: preferred.explanation, assumptions: [], gaps: preferred.blockingReasons });
   }
   if (items.length) components.push({ id: randomUUID(), type: 'candidate_recommendations',
     title: fallback ? '已核验的参考方案' : '有依据的候选方案',
     body: '选一个适合自己的存钱节奏；日期由 NOVA 根据当前模拟数据计算。',
-    taskThreadId: threadId, ...(conditionalPlan ? { conditionalPlan } : {}), items });
+    taskThreadId: threadId, items: items.slice(0, 4) });
   else if (getAgentTaskForThread(sessionId, threadId)?.facts.targetCents) components.push({
     id: randomUUID(), type: 'clarification', title: '需要调整目标条件',
     body: '当前条件下还没有可核验的存钱方案。请补充可用于目标的月存款，或调整目标金额和日期后重新试算。', suggestions: [] });
@@ -394,6 +407,17 @@ function finishRun(sessionId: string, threadId: string, runId: string,
   reasonCode: string | null, reply: string, results: AgentToolResult[] = [],
   tradeoff: 'earlier' | 'lower_monthly' | 'higher_buffer' | 'balanced' = 'balanced',
   question: string | null = null, narrative: AgentExplanation | null = null): AgentRun {
+  checked(sessionId, threadId, runId, expectedTaskRevision, expectedTwinVersion);
+  const investigatedResults = results;
+  if (!question && ['completed', 'fallback'].includes(status)) {
+    const preferred = runPreferredMonthlyCandidate(sessionId, threadId);
+    if (preferred.result) {
+      results = [...results.filter(result => result.tool !== 'candidate_preview' ||
+        result.output.input.monthlyContributionCents !== preferred.plan?.monthlyCents ||
+        result.output.assessment?.projectedDate !== preferred.plan?.projectedDate).slice(0, 3), preferred.result];
+      expectedTaskRevision = getAgentTaskForThread(sessionId, threadId)!.taskRevision;
+    }
+  }
   const { run, task } = checked(sessionId, threadId, runId, expectedTaskRevision, expectedTwinVersion);
   const endKind = status === 'awaiting_user' ? 'waiting' : status === 'failed' || status === 'timed_out' ? 'stopped' : 'finished';
   const final = updateAgentRun(sessionId, threadId, runId, run.revision, { status,
@@ -409,8 +433,8 @@ function finishRun(sessionId: string, threadId: string, runId: string,
       at: new Date().toISOString(), toolResultId: results[0]?.toolResultId ?? null } });
   const latestUserMessage = getAgentMessages(sessionId, threadId, 20).filter(item => item.role === 'user').at(-1)?.content ?? '';
   const showStress = /如果|假如|万一|压力测试|漏存|收入下降|支出增加|额外支出/.test(latestUserMessage);
-  const stress = showStress && results.length ? stressComponent(sessionId, threadId, task,
-    results.map(item => item.toolResultId), expectedTwinVersion) : null;
+  const stress = showStress && investigatedResults.length ? stressComponent(sessionId, threadId, task,
+    investigatedResults.map(item => item.toolResultId), expectedTwinVersion) : null;
   const components = question ? [{ id: randomUUID(), type: 'clarification', title: '需要一点信息',
     body: question, suggestions: [] }] : resultComponents(final, sessionId, threadId, results, tradeoff,
       status === 'fallback', reasonCode, narrative, stress);

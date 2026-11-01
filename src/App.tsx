@@ -573,6 +573,9 @@ export default function App() {
 
           {currentScreen === 'feasibility' && goal && (
             <FeasibilityScreen
+              snapshot={snapshot}
+              onRefresh={setSnapshot}
+              onPlanChanged={(next, review) => { setSnapshot(next); showToast(review ? '方案已更新；请单独核对已有转入安排' : '方案已更新'); }}
               goal={goal}
               assessment={snapshot.assessment}
               selectedPlanId={snapshot.goal.selectedPlanId}

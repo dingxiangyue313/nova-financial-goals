@@ -19,7 +19,8 @@ import { runAgentReadTool } from './agent-read-tools.ts';
 import { composeUiCards, interpretGoal } from './agent.ts';
 import { quickConfirmOperation, retryOperation, verifyOperation } from './tools.ts';
 import { registerMcp } from './mcp.ts';
-import { DataSourceKindSchema, GoalAssumptionsSchema, IsoDateSchema, RiskPreferencesPatchSchema, RiskPreferencesSchema,
+import { DataSourceKindSchema, GoalAssumptionsSchema, GoalPlanChangeDraftSchema, GoalPlanChangeRequestSchema,
+  IsoDateSchema, RiskPreferencesPatchSchema, RiskPreferencesSchema,
   type DataSyncResult, type DemoState } from '../shared/contracts.ts';
 import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './banking.ts';
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
@@ -48,6 +49,8 @@ import { moneyMissionReadModel } from './money-mission.ts';
 import { registerProductMission, productMission } from './product-mission.ts';
 import { registerFinancialServices } from './financial-services-routes.ts';
 import { tickFinancialServices,tickSubscriptionReminderQueue,tickGoalNoticeQueue } from './store.ts';
+import { applyGoalPlanChange, previewGoalPlanChange } from './scenario.ts';
+import { hasDatedCashflowEvidence } from './money-mission-plans.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -99,6 +102,7 @@ function respond(res: express.Response, state: DemoState) { return res.json(snap
 function failure(res: express.Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
   if (message === 'AI_SAFE_MODE_WRITE_BLOCKED') return res.status(409).json({ error: message });
+  if (message === 'TARGET_DATE_CHANGE_CONFIRMATION_REQUIRED') return res.status(400).json({ error: message });
   const bad = error instanceof z.ZodError || /^(SERVICE_|PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_|DATA_|STATEMENT_|IMPORT_|BILL_|EVIDENCE_|SUBSCRIPTION_|SCHEDULE_|FORECAST_)/.test(message);
   return res.status(bad ? 400 : 500).json({ error: bad ? message : '服务暂时不可用，请稍后重试。' });
 }
@@ -610,12 +614,32 @@ app.patch('/api/goals/current', route((req, res) => {
   const state = mutateState(sessionId(req, res), old => { assertExpectedTwin(old, req.body?.expectedTwinVersion); return runBankingTool(old, 'update_goal', changes).state; });
   return respond(res, state);
 }));
+app.post('/api/goals/current/plan-preview', route((req, res) => {
+  const body = z.object({ expectedTwinVersion: z.number().int().positive(),
+    draft: GoalPlanChangeDraftSchema }).strict().parse(req.body);
+  const state = getState(sessionId(req, res));
+  assertExpectedTwin(state, body.expectedTwinVersion);
+  res.json(previewGoalPlanChange(state, body.draft));
+}));
+app.post('/api/goals/current/plan-change', route((req, res) => {
+  const body = GoalPlanChangeRequestSchema.parse(req.body);
+  const id = sessionId(req, res);
+  let scheduleReviewRequired = false;
+  const state = mutateState(id, current => {
+    assertAiWriteAllowed();
+    const changed = applyGoalPlanChange(current, body);
+    scheduleReviewRequired = changed.scheduleReviewRequired;
+    return changed.state;
+  });
+  res.json({ snapshot: snapshot(state), scheduleReviewRequired });
+}));
 app.post('/api/goals/activate', route((req, res) => {
   const planId = z.string().nullable().parse(req.body?.planId ?? null);
   if (!planId) throw new Error('PLAN_NOT_SELECTED');
   const state = mutateState(sessionId(req, res), old => {
     assertExpectedTwin(old, req.body?.expectedTwinVersion);
-    const selected = runBankingTool(old, 'select_goal_plan', { planId });
+    const selected = hasDatedCashflowEvidence(old) ? { state: old }
+      : runBankingTool(old, 'select_goal_plan', { planId });
     const approval = runBankingTool(selected.state, 'create_approval_snapshot', {
       action: 'activate_goal', parameters: { planId }, expiresInSeconds: 300,
     });

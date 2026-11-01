@@ -245,7 +245,9 @@ export function prepareCandidateConfirmation(sessionId: string, threadId: string
       demoRunId: task.demoRunId, resultId, candidateHash, frozen });
   updateAgentTask(sessionId, task.taskId, task.taskRevision, {
     phase: 'awaiting_confirmation', waitingReason: 'approval', pendingActionId: action.id });
-  const body = `目标 ${frozen.title}：${yuan(frozen.targetCents)}，日期 ${frozen.targetDate}，${frozen.firstMonthContributionCents === undefined ? '' : `首月投入 ${yuan(frozen.firstMonthContributionCents)}，之后`}每月投入 ${yuan(frozen.monthlyContributionCents)}，保护资金 ${yuan(frozen.protectedCents)}。确认后激活目标计划；不会自动扣款或创建授权。`;
+  const dateChange = frozen.targetDate > frozen.originalDate
+    ? `本次同时将目标日期从 ${frozen.originalDate} 调整为 ${frozen.targetDate}（延后 ${Math.ceil((Date.parse(frozen.targetDate) - Date.parse(frozen.originalDate)) / 86400000)} 天）。` : '';
+  const body = `目标 ${frozen.title}：${yuan(frozen.targetCents)}，日期 ${frozen.targetDate}，${frozen.firstMonthContributionCents === undefined ? '' : `首月投入 ${yuan(frozen.firstMonthContributionCents)}，之后`}每月投入 ${yuan(frozen.monthlyContributionCents)}，保护资金 ${yuan(frozen.protectedCents)}。${dateChange}确认后激活目标计划；不会自动扣款或创建授权。`;
   const component: AgentComponent = { id: componentId(), type: 'confirmation', title: '核对并激活候选方案',
     body, tone: 'warning', action: { actionId: action.id, label: '确认激活', destructive: false } };
   const message = saveMessage ? saveAgentMessage(sessionId, threadId, { role: 'assistant',
@@ -322,6 +324,13 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
       parsed.changes.preserveEssentialSpending.op === 'clear' ? null : Boolean(parsed.changes.preserveEssentialSpending.value);
     const preferences = [...task.preferences.filter(item => !parsed.preferences.includes(item.value)),
       ...parsed.preferences.map(value => ({ key: 'spending_preference', value, source }))];
+    if (parsed.changes.monthlyContributionCapCents) {
+      const change = parsed.changes.monthlyContributionCapCents;
+      for (let index = preferences.length - 1; index >= 0; index--) {
+        if (preferences[index].key === 'preferred_monthly_cents') preferences.splice(index, 1);
+      }
+      if (change.op === 'set') preferences.push({ key: 'preferred_monthly_cents', value: String(change.value), source });
+    }
     const unknowns = [...new Set([...task.unknowns.filter(key => !['title', 'targetCents', 'targetDate'].includes(key)),
       ...draft.missingRequiredFields, ...parsed.unknowns])];
     const needsSavedAmount = !draft.missingRequiredFields.length && draft.savedCents === null;

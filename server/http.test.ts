@@ -209,7 +209,8 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
       targetDate: '2026-12-15', protectedCents: 2000000, quote: '去日本旅行', flexibilityWeeks: 2 });
     assert.equal(created.code, 200);
     assert.equal((created.data as Snapshot).goal.selectedPlanId, null);
-    assert.equal((await call('/api/goals/activate', 'POST', { planId: 'balanced' })).code, 200);
+    const activated = await call('/api/goals/activate', 'POST', { planId: 'balanced' });
+    assert.equal(activated.code, 200);
     const defaultPreferences = await call('/api/risk/preferences');
     assert.equal((defaultPreferences.data as { preferences: { amountThresholdCents: number } }).preferences.amountThresholdCents, 50000);
     const changedPreferences = await call('/api/risk/preferences', 'PATCH', { amountThresholdCents: 60000 });
@@ -362,6 +363,39 @@ test('clean HTTP demo completes goal, impact, tool and session isolation flows',
     assert.ok((messages.data as { messages: unknown[] }).messages.length >= 5);
     assert.equal((await call(`/api/agent/threads/${threadId}`, 'PATCH', { title: '冬季日本旅行' })).code, 200);
     assert.equal((await call(`/api/agent/threads/${threadId}`, 'DELETE')).code, 200);
+    await call('/api/demo/load-japan', 'POST');
+    const reactivated = await call('/api/goals/activate', 'POST', { planId: 'balanced' });
+    const activeSnapshot = reactivated.data as Snapshot;
+    const planDraft = { targetCents: 800000, targetDate: '2026-12-31', savedCents: 0,
+      protectedCents: 2000000, monthlyContributionCents: 180000, flexibilityWeeks: 0 };
+    const planPreview = await call('/api/goals/current/plan-preview', 'POST', {
+      expectedTwinVersion: activeSnapshot.twinVersion, draft: planDraft,
+    });
+    assert.equal(planPreview.code, 200);
+    const customPlan = (planPreview.data as { customPlan: { projectedDate: string; selectable: boolean;
+      requiresTargetDateChange: boolean } }).customPlan;
+    assert.deepEqual(customPlan, { ...customPlan, projectedDate: '2027-01-14', selectable: true,
+      requiresTargetDateChange: true });
+    const declinedDate = await call('/api/goals/current/plan-change', 'POST', {
+      expectedTwinVersion: activeSnapshot.twinVersion, draft: planDraft,
+      selection: { candidateId: 'custom', acceptTargetDateChange: false },
+    });
+    assert.equal(declinedDate.code, 400);
+    assert.equal((await call('/api/session')).data.goal.targetDate, activeSnapshot.goal.targetDate);
+    const changedPlan = await call('/api/goals/current/plan-change', 'POST', {
+      expectedTwinVersion: activeSnapshot.twinVersion, draft: planDraft,
+      selection: { candidateId: 'custom', acceptTargetDateChange: true },
+    });
+    assert.equal(changedPlan.code, 200);
+    const changedPayload = changedPlan.data as { snapshot: Snapshot; scheduleReviewRequired: boolean };
+    assert.equal(changedPayload.snapshot.goal.selectedPlanId, 'custom');
+    assert.equal(changedPayload.snapshot.goal.targetDate, '2027-01-14');
+    assert.equal(changedPayload.snapshot.goal.monthlyContributionCents, 180000);
+    assert.equal(changedPayload.scheduleReviewRequired, false);
+    assert.equal((await call('/api/goals/current/plan-change', 'POST', {
+      expectedTwinVersion: activeSnapshot.twinVersion, draft: planDraft,
+      selection: { candidateId: 'custom', acceptTargetDateChange: true },
+    })).code, 400);
   } finally {
     child.kill('SIGTERM');
     await new Promise(resolve => child.once('exit', resolve));

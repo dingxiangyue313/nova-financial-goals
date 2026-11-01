@@ -45,7 +45,7 @@ function datedCandidate(state: DemoState, input: CandidateInput, savedCents: num
     state.goal.savedCents < state.goal.targetCents && input.monthlyContributionCents === state.goal.monthlyContributionCents &&
     input.firstMonthContributionCents === state.goal.firstMonthContributionCents;
   const ambiguous = matches.some(plan => plan.limitations.includes('AMBIGUOUS_SCHEDULE')) ||
-    acceptedSelection && matches.length === 0;
+    acceptedSelection && matches.length === 0 && state.goal.contributionMode !== 'fixed_monthly';
   const edits: import('../shared/contracts.ts').CashflowEdit[] = [];
   const scenario = input.scenario;
   if (scenario.kind === 'current_month_expense') edits.push({ type: 'add', event: {
@@ -268,7 +268,7 @@ export function activatePlan(state: DemoState, planId: string | null): DemoState
   const dated = hasDatedCashflowEvidence(state) ? buildMoneyMissionPlans(state, buildDatedCashflowForecast(state,
     { accountId: 'checking', horizonEnd: goalForecastWindow(state, state.goal.targetDate).horizonEnd,
       scenario: 'baseline' })).find(option => option.id === plan.id) : null;
-  const goal = { ...state.goal, status: 'active' as const, selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents,
+  const goal = { ...state.goal, contributionMode: undefined, status: 'active' as const, selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents,
     ...(dated ? { firstMonthContributionCents: dated.firstMonthContributionCents } : {}) };
   return { ...state, goal, goals: state.goals.map(item => item.id === goal.id ? goal : item) };
 }

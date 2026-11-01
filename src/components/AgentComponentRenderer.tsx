@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { AgentComponent, GoalAssumptions, RiskPreferences } from '../../shared/contracts';
-import { api } from '../api';
 import { normalizeAgentComponent } from '../../shared/generative';
 import type { ScreenId } from '../types';
 import { ClaimBadge } from './money-mission/ClaimBadge';
@@ -9,6 +8,12 @@ const money = (cents: number) => `¥${(cents / 100).toLocaleString('zh-CN')}`;
 const sourceName = { bank: '银行卡', wechat_pay: '微信支付', alipay: '支付宝' } as const;
 const fieldSourceName: Record<string, string> = { user_provided: '用户提供', connected_data: '连接数据',
   system_calculated: '系统计算', default_assumption: '默认假设' };
+const planReason: Record<string, string> = {
+  MONTHLY_CAPACITY_EXCEEDED: '超过每月可投入金额', FIRST_MONTH_BUFFER_NEGATIVE: '首月可用金额不足',
+  PROTECTED_FUNDS_UNAVAILABLE: '会影响保护资金', INSUFFICIENT_DATA: '需要补充数据',
+  GOAL_PRIORITY_CONFLICT: '与其他目标的预算冲突', FORECAST_HORIZON_INCOMPLETE: '超出当前可核算日期范围',
+  GOAL_DEADLINE_PASSED: '目标日期已过', AMBIGUOUS_SCHEDULE: '需要核对存款安排',
+};
 const tone = {
   neutral: 'border-[#E5E8EB] bg-white', good: 'border-emerald-200 bg-emerald-50',
   warning: 'border-amber-200 bg-amber-50', danger: 'border-rose-200 bg-rose-50',
@@ -42,52 +47,6 @@ function ScenarioCompare({ component, onAction, busy }: {
     const disabled = plan.status === 'infeasible' || !component.actions.some(item => item.planId === plan.id);
     return <button type="button" key={plan.id} disabled={disabled || busy} onClick={() => setSelected(plan.id)} className={`w-full rounded-xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-55 ${selected === plan.id ? 'border-[#0F6B6D] bg-[#F2FAFA] ring-1 ring-[#0F6B6D]' : plan.recommended ? 'border-[#93C7C8] bg-[#F7FBFB]' : 'border-[#E5E8EB]'}`}><div className="flex justify-between text-[12px] font-semibold"><span>{plan.label}{plan.recommended ? ' · 推荐' : ''}</span><span>{money(plan.monthlyCents)}/月</span></div><p className="mt-1 text-[11px] text-[#5A616B]">{plan.explanation}</p></button>;
   })}</div>{component.actions.length > 0 && <button type="button" disabled={!action || busy} onClick={() => action && onAction(action.actionId)} className="mt-3 min-h-11 w-full rounded-xl bg-[#0F6B6D] px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-40">{busy ? '正在启用…' : selected ? '确认并启用该方案' : '先选择一种方案'}</button>}</article>;
-}
-
-function CustomContribution({ threadId, onSelectCandidate, busy }: {
-  threadId?: string; onSelectCandidate: (resultId: string, threadId?: string) => void; busy?: boolean;
-}) {
-  const [yuanInput, setYuanInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [forecast, setForecast] = useState<{ projectedDate: string | null; targetDate: string;
-    firstMonthBufferCents: number; availableMonthlyCents: number; withinCap: boolean;
-    selectable: boolean; resultId: string | null } | null>(null);
-  const [error, setError] = useState('');
-  async function calculate() {
-    const amount = Number(yuanInput);
-    if (!threadId || !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount * 100)) {
-      setError('请输入有效的每月存款金额'); return;
-    }
-    setLoading(true); setError(''); setForecast(null);
-    try {
-      setForecast(await api<NonNullable<typeof forecast>>('/api/agent/candidate/custom', 'POST',
-        { threadId, monthlyContributionCents: Math.round(amount * 100) }));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : '试算失败'); }
-    finally { setLoading(false); }
-  }
-  return <div className="mt-3 rounded-xl border border-[#D8E7E7] bg-[#F5FAFA] p-3">
-    <h5 className="text-[12px] font-semibold">自定义每月存多少</h5>
-    <div className="mt-2 flex gap-2"><label className="flex-1 text-[11px] text-[#5A616B]">每月存款（元）
-      <input aria-label="自定义每月存款" type="number" min="1" step="1" value={yuanInput}
-        onChange={event => { setYuanInput(event.target.value); setForecast(null); }}
-        className="mt-1 w-full rounded-lg border border-[#D0D5DD] bg-white px-3 py-2 text-[12px]" /></label>
-      <button type="button" disabled={busy || loading || !threadId} onClick={() => void calculate()}
-        className="self-end rounded-lg bg-[#0F6B6D] px-3 py-2 text-[11px] font-semibold text-white disabled:opacity-50">
-        {loading ? '计算中…' : '算完成日期'}</button></div>
-    {error && <p className="mt-2 text-[11px] text-rose-700">{error}</p>}
-    {forecast && <div className="mt-2 text-[11px] leading-relaxed text-[#36404A]">
-      <b>预计完成：{forecast.projectedDate ?? '目前无法算出'}</b>
-      <p>原目标日 {forecast.targetDate}。首月存完后约留 {money(forecast.firstMonthBufferCents)} 可动用。</p>
-      <p>{!forecast.withinCap ? '这个金额超过你设定的月存上限，需要先调整上限。'
-        : forecast.firstMonthBufferCents < 0 ? '首月可用金额不够，不能按这个节奏直接执行。'
-          : forecast.projectedDate && forecast.projectedDate > forecast.targetDate
-            ? '按这个金额会晚于原目标日；如果愿意延期，请先修改目标日期。'
-              : '按当前模拟收支，预计能赶上目标日。'}</p>
-      {forecast.selectable && forecast.resultId && <button type="button" disabled={busy}
-        onClick={() => onSelectCandidate(forecast.resultId!, threadId)}
-        className="mt-2 min-h-11 w-full rounded-xl border border-[#0F6B6D] bg-white px-3 font-semibold text-[#0F6B6D] disabled:opacity-50">选择这个金额并核对确认</button>}
-    </div>}
-  </div>;
 }
 
 function AgentRequestBatch({ component, onAction, busy }: {
@@ -257,7 +216,7 @@ export function AgentComponentRenderer({ value, onAction, onCancel, onSelectCand
       <div className="flex justify-between font-semibold"><span>保守方案</span><span className="text-amber-700">需调整日期</span></div>
       <p className="mt-1">每月存 {money(component.conditionalPlan.monthlyContributionCents)} · 预计 {component.conditionalPlan.projectedDate} 完成</p>
       <p className="mt-1 text-[#5A616B]">每月留给日常的钱更多，但赶不上原目标日 {component.conditionalPlan.targetDate}。愿意延期的话，先修改目标日期再选择。</p>
-    </div>}{component.items.map((item, index) => <div key={item.resultId} className="rounded-xl border border-[#D8E7E7] bg-[#F5FAFA] p-2.5">
+    </div>}{component.items.map((item, index) => <div key={item.resultId ?? `user-${index}`} className="rounded-xl border border-[#D8E7E7] bg-[#F5FAFA] p-2.5">
       <div className="flex flex-wrap items-center justify-between gap-1 text-[12px] font-semibold"><span>{item.label || `方案 ${index + 1}`}</span><span className={item.status === 'on_track' ? 'text-emerald-700' : 'text-amber-700'}>{item.status === 'on_track' ? '预计按时' : '存在延期风险'}</span></div>
       <p className="mt-1 text-[11px] text-[#36404A]">{item.firstMonthContributionCents === undefined ? `每月存 ${money(item.monthlyContributionCents)}` : `首月存 ${money(item.firstMonthContributionCents)}，之后每月存 ${money(item.monthlyContributionCents)}`} · 预计 {item.projectedDate ?? '待补充数据'} 完成</p>
       <p className="mt-1 text-[11px] text-[#5A616B]">首月可用余量 {money(item.bufferCents)}。{item.firstMonthContributionCents === undefined ? '每个月保持同一笔存款。' : '先给这个月留出更多空间，之后再恢复月存。'}</p>
@@ -266,9 +225,12 @@ export function AgentComponentRenderer({ value, onAction, onCancel, onSelectCand
         : '适合这个月想留点余地，同时仍想赶上原定日期的人。'} 收入和日常支出若有变化，可以再重新计算。</p>
       <details className="mt-2 text-[11px] text-[#5A616B]"><summary className="cursor-pointer text-[#0F6B6D]">看看计算依据</summary>
         <p className="mt-1 whitespace-pre-line leading-relaxed">{item.explanation}</p></details>
-      <button type="button" disabled={busy} onClick={() => onSelectCandidate(item.resultId, component.taskThreadId)} className="mt-2 min-h-11 w-full rounded-xl border border-[#0F6B6D] bg-white px-3 text-[11px] font-semibold text-[#0F6B6D] disabled:opacity-50">选择此候选并核对确认</button>
+      {item.source === 'both' && <p className="mt-1 text-xs font-semibold text-[#0F6B6D]">你的方案 · NOVA 推荐</p>}
+      {item.delayDays > 0 && <p className="mt-1 text-xs text-amber-800">原目标日 {item.originalTargetDate}，预计晚 {item.delayDays} 天；确认时同时调整目标日期。</p>}
+      {!item.selectable && <p role="status" className="mt-1 text-xs text-rose-700">暂不可选：{item.blockingReasons.map(reason => planReason[reason] ?? '请核对当前数据和目标条件').join('；')}</p>}
+      <button type="button" disabled={busy || !item.selectable || !item.resultId} onClick={() => item.resultId && onSelectCandidate(item.resultId, component.taskThreadId)} className="mt-2 min-h-11 w-full rounded-xl border border-[#0F6B6D] bg-white px-3 text-[11px] font-semibold text-[#0F6B6D] disabled:opacity-50">选择此候选并核对确认</button>
     </div>)}</div><p className="mt-2 text-[11px] text-[#5A616B]">你更想这个月轻松一些，还是早点完成？</p>
-    <CustomContribution threadId={component.taskThreadId} onSelectCandidate={onSelectCandidate} busy={busy}/>
+    <p className="mt-2 text-xs text-[#5A616B]">想换一个月存金额？直接告诉 NOVA，我会重新计算。</p>
   </article>;
   if (component.type === 'stress_analysis') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-3 shadow-sm">
     <h4 className="text-[13px] font-bold">{component.title}</h4>

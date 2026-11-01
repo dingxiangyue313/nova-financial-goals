@@ -69,7 +69,7 @@ test('monitor stays silent until opt-in and deduplicates a material risk notific
     .find(component => component.type === 'candidate_recommendations');
   assert.ok(repair && repair.type === 'candidate_recommendations');
   const confirmation = prepareCandidateConfirmation(sessionId, threadId,
-    repair.items[0].resultId, getState(sessionId));
+    repair.items[0].resultId!, getState(sessionId));
   assert.equal(confirmation.component.type, 'confirmation');
   assert.equal(getState(sessionId).goal.targetDate, '2026-12-31');
   tickMonitorWorker(new Date());

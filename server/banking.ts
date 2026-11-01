@@ -49,8 +49,8 @@ const schemas = {
     targetDate: z.iso.date().optional(), protectedCents: z.number().int().nonnegative().optional(),
     monthlyContributionCents: z.number().int().nonnegative().optional(), quote: z.string().max(500).optional(),
     flexibilityWeeks: z.number().int().min(0).max(52).optional() }),
-  select_goal_plan: z.object({ planId: z.enum(['conservative', 'balanced', 'accelerated']) }),
-  activate_goal: z.object({ planId: z.enum(['conservative', 'balanced', 'accelerated']), approvalToken: z.string() }),
+  select_goal_plan: z.object({ planId: z.string().min(1) }),
+  activate_goal: z.object({ planId: z.string().min(1), approvalToken: z.string() }),
   apply_goal_candidate: z.object({ goalId: z.string().min(1), title: z.string().min(1).max(60),
     savedCents: z.number().int().nonnegative(), targetCents: money, targetDate: z.iso.date(),
     originalDate: z.iso.date(), monthlyContributionCents: z.number().int().nonnegative(),
@@ -222,6 +222,7 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
     }
     case 'update_goal': {
       const updated = { ...state.goal, ...input, originalDate: input.targetDate ?? state.goal.originalDate,
+        contributionMode: undefined,
         status: 'draft' as const, selectedPlanId: null,
         monthlyContributionCents: input.monthlyContributionCents ?? 0 };
       let next: DemoState = { ...state, twinVersion: state.twinVersion + 1,
@@ -235,7 +236,7 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
     case 'select_goal_plan': {
       const plan = assessGoal(state).plans.find(item => item.id === input.planId);
       if (!plan || plan.status === 'infeasible') throw new Error('PLAN_NOT_AVAILABLE');
-      const updated = { ...state.goal, selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents, status: 'draft' as const };
+      const updated = { ...state.goal, contributionMode: undefined, selectedPlanId: plan.id, monthlyContributionCents: plan.monthlyCents, status: 'draft' as const };
       let next: DemoState = { ...state, twinVersion: state.twinVersion + 1,
         goal: updated, goals: state.goals.map(goal => goal.id === updated.id ? updated : goal) };
       next = appendAuditEvent(next, 'select_goal_plan', 'selected', plan.id);
@@ -256,6 +257,7 @@ export function runBankingTool(state: DemoState, name: BankingToolName, raw: unk
         targetDate: input.targetDate, originalDate: input.originalDate,
         monthlyContributionCents: input.monthlyContributionCents,
         firstMonthContributionCents: input.firstMonthContributionCents,
+        contributionMode: input.firstMonthContributionCents === undefined ? 'fixed_monthly' as const : undefined,
         protectedCents: input.protectedCents, flexibilityWeeks: 0,
         selectedPlanId: 'custom', status: 'active' as const,
         quote: '由 NOVA 已验证候选应用' };

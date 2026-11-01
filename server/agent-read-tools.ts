@@ -5,11 +5,11 @@ import { AgentReadToolNameSchema, AgentToolResultSchema, CandidateInputSchema, S
   BillPeriodInputSchema, EvidenceDetailInputSchema,
   DatedCashflowForecastInputSchema,
   type AgentToolResult, type AgentToolSource, type CandidateInput, type DemoState,
-  type DatedCashflowForecast, type GoalPlanOption } from '../shared/contracts.ts';
+  type DatedCashflowForecast, type GoalPlanChangeCandidate, type GoalPlanOption } from '../shared/contracts.ts';
 import { assessCandidateScenario, availableMonthly } from './domain.ts';
 import { searchGoalOptions } from './goal-option-search.ts';
 import { searchStressRepair } from './stress-repair-search.ts';
-import { previewGoalScenario } from './scenario.ts';
+import { previewGoalPlanChange, previewGoalScenario } from './scenario.ts';
 import { buildBillBrief, inspectEvidence } from './bill-analysis.ts';
 import { buildDatedCashflowForecast } from './cashflow-forecast.ts';
 import { hasDatedCashflowEvidence } from './money-mission-plans.ts';
@@ -316,6 +316,82 @@ function candidateResult(sessionId: string, threadId: string, input: CandidateIn
     : assessment.dataSufficient ? 'ok' as const : 'insufficient_data' as const,
   errorCode: assessment.constraintViolations[0] ?? null,
   output: { input, assessment, previewId: preview?.id ?? null }, sources, assumptions, gaps };
+}
+
+function preferredPlanState(sessionId: string, threadId: string): DemoState {
+  const state = getState(sessionId);
+  const task = getAgentTaskForThread(sessionId, threadId);
+  const id = task?.goalId ?? task?.goalDraftId ?? task?.taskId ?? state.goal.id;
+  const goal = state.goals.find(item => item.id === id) ?? { ...state.goal, id,
+    selectedPlanId: null, status: 'draft' as const, contributionMode: undefined };
+  return { ...state, goal };
+}
+
+export function previewPreferredMonthlyPlan(sessionId: string, threadId: string): GoalPlanChangeCandidate | null {
+  const task = getAgentTaskForThread(sessionId, threadId);
+  const state = preferredPlanState(sessionId, threadId);
+  const monthly = Number(task?.preferences.find(item => item.key === 'preferred_monthly_cents')?.value ?? 0);
+  const monthlySource = task?.fieldSources.monthlyContributionCents;
+  if (!task || !monthly || monthlySource?.kind !== 'user_message' || !task.facts.targetCents ||
+    !task.facts.originalTargetDate || task.facts.savedCents === null) return null;
+  return previewGoalPlanChange(state, {
+    targetCents: task.facts.targetCents, targetDate: task.facts.originalTargetDate,
+    savedCents: task.facts.savedCents,
+    protectedCents: Math.max(task.constraints.protectedCents ?? 0, state.finance.emergencyCents),
+    monthlyContributionCents: monthly, flexibilityWeeks: state.goal.flexibilityWeeks,
+  }).customPlan;
+}
+
+export function runPreferredMonthlyCandidate(sessionId: string, threadId: string): {
+  plan: GoalPlanChangeCandidate | null; result: AgentToolResult | null;
+} {
+  const task = getAgentTaskForThread(sessionId, threadId);
+  const state = preferredPlanState(sessionId, threadId);
+  const plan = previewPreferredMonthlyPlan(sessionId, threadId);
+  if (!task || !plan || !plan.selectable || task.facts.savedCents === null ||
+    !task.facts.targetCents || !task.facts.originalTargetDate) return { plan, result: null };
+  const input: CandidateInput = {
+    targetCents: task.facts.targetCents, targetDate: plan.effectiveTargetDate,
+    monthlyContributionCents: plan.monthlyCents,
+    protectedCents: Math.max(task.constraints.protectedCents ?? 0, state.finance.emergencyCents),
+    scenario: { kind: 'baseline' }, evidenceResultIds: [],
+  };
+  const assessment = assessCandidateScenario(state, { ...input, targetDate: hasDatedCashflowEvidence(state)
+    ? plan.effectiveTargetDate : task.facts.originalTargetDate },
+    task.facts.savedCents, [], '9999-12-31');
+  const result = AgentToolResultSchema.parse({
+    toolResultId: randomUUID(), taskId: task.taskId, threadId, demoRunId: task.demoRunId,
+    twinVersion: state.twinVersion, dataAsOf: state.finance.updatedAt,
+    createdAt: new Date().toISOString(), tool: 'candidate_preview', status: 'ok', errorCode: null,
+    sourceEntities: [{ kind: 'task', id: task.taskId }, { kind: 'finance', id: 'finance' },
+      ...state.accounts.filter(item => item.type === 'checking' || item.type === 'emergency')
+        .map(item => ({ kind: 'account' as const, id: item.id }))],
+    assumptions: ['月存金额由用户明确提供', '预计日期基于当前模拟收支',
+      ...(plan.requiresTargetDateChange ? ['确认时将同时更新目标日期'] : [])],
+    gaps: [], output: { input, assessment: { ...assessment,
+      status: plan.requiresTargetDateChange ? 'at_risk' : assessment.status,
+      projectedDate: plan.projectedDate, delayDays: plan.delayDays, constraintViolations: [] },
+      previewId: null },
+  });
+  const dedupeKey = createHash('sha256').update(JSON.stringify({ kind: 'user_preferred_plan',
+    input, state, taskId: task.taskId })).digest('hex');
+  const saved = saveAgentToolResult(sessionId, result, dedupeKey);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const current = getAgentTaskForThread(sessionId, threadId)!;
+    if (current.candidateRefs.includes(saved.toolResultId)) break;
+    try {
+      updateAgentTask(sessionId, current.taskId, current.taskRevision, {
+        phase: current.phase === 'investigating' ? 'simulating' : current.phase,
+        candidateRefs: [...current.candidateRefs.slice(-29), saved.toolResultId],
+        runRecord: { id: randomUUID(), kind: 'tool_completed', summary: 'user_preferred_plan: ok',
+          at: new Date().toISOString(), toolResultId: saved.toolResultId },
+      });
+      break;
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== 'TASK_REVISION_CONFLICT' || attempt === 2) throw error;
+    }
+  }
+  return { plan, result: saved };
 }
 
 export function runAgentReadTool(sessionId: string, threadId: string, name: string,

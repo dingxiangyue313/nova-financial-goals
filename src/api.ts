@@ -21,6 +21,7 @@ export async function api<T = Snapshot>(url: string, method = 'GET', body?: unkn
   if(!response.headers.get('content-type')?.includes('application/json')) throw new ApiError(response.status,'接口未返回有效数据，请刷新页面；若仍出现，请确认打开的是当前服务端口。','INVALID_API_RESPONSE');
   const json = await response.json();
   if (!response.ok) throw new ApiError(response.status, json.error || '请求失败，请稍后重试', json.code || json.error);
+  if (url === '/api/goals/current/plan-preview' || url === '/api/goals/current/plan-change') return json as T;
   if (url === '/api/ai-safety') return AiSafetyOverviewSchema.parse(json) as T;
   if (url === '/api/ai-safety/control' || url === '/api/demo/ai-safety/safe-mode') return AiSafetyControlSchema.parse(json) as T;
   if (/^\/api\/ai-safety\/runs\/[^/]+\/receipt$/.test(url)) return AiSafetyDecisionReceiptSchema.parse(json) as T;

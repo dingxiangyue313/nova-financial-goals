@@ -107,7 +107,8 @@ export function processMonitorEvent(event: MonitorEvent, now = new Date()): void
     const { input, assessment } = candidate.output;
     components.push({ id: randomUUID(), type: 'candidate_recommendations', title: '修复候选 · 待确认',
       body: `假设：${candidate.assumptions.join('；')}。${next}`, taskThreadId: threadId,
-      items: [{ resultId: candidate.toolResultId, targetCents: input.targetCents,
+      items: [{ resultId: candidate.toolResultId, source: 'nova', selectable: true, blockingReasons: [],
+        originalTargetDate: input.targetDate, delayDays: assessment.delayDays, targetCents: input.targetCents,
         targetDate: input.targetDate, monthlyContributionCents: input.monthlyContributionCents,
         protectedCents: input.protectedCents, projectedDate: assessment.projectedDate,
         bufferCents: assessment.bufferCents, status: assessment.status as 'on_track' | 'at_risk',
