@@ -56,14 +56,14 @@ async function activateGoalFromWorkspace(page: Page) {
   expect(connected.ok()).toBeTruthy();
   await page.reload();
   await page.getByRole('button', { name: '1. 首页' }).click();
-  await expect(page.getByRole('button', { name: '查看计划' })).toBeVisible();
+  await expect(page.locator('#btn-adjust-plan')).toBeVisible();
 }
 
 test('对话故事一：自然语言生成目标卡，明确确认后激活并长期保留', async ({ page }) => {
   await openApp(page);
   await activateGoalFromWorkspace(page);
   await page.reload();
-  await expect(page.getByRole('button', { name: '查看计划' })).toBeVisible();
+  await expect(page.locator('#btn-adjust-plan')).toBeVisible();
   await openWorkspace(page);
   await page.getByRole('button', { name: /我想在 12 月 15 日前/ }).click();
   await expect(page.getByText(/正在核算不同月存节奏/).first()).toBeVisible();
