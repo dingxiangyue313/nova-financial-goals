@@ -1,12 +1,20 @@
 import {
   GoalAssumptionsSchema,
+  GoalPlanChangeDraftSchema,
+  GoalPlanChangePreviewSchema,
+  GoalPlanChangeRequestSchema,
   GoalScenarioPreviewSchema,
   type DemoState,
   type GoalAssumptions,
+  type GoalPlanChangeCandidate,
+  type GoalPlanChangeDraft,
+  type GoalPlanChangePreview,
+  type GoalPlanChangeRequest,
   type GoalScenarioPreview,
   type PlanStep,
 } from '../shared/contracts.ts';
 import { assessGoal } from './domain.ts';
+import { appendAuditEvent } from './governance.ts';
 
 function previewId(state: DemoState, assumptions: GoalAssumptions) {
   return [
@@ -65,4 +73,92 @@ export function previewGoalScenario(state: DemoState, input: GoalAssumptions,
       delayDays: assessment.delayDays,
     },
   });
+}
+
+const candidateKey = (monthlyCents: number, projectedDate: string | null) =>
+  `${monthlyCents}:${projectedDate ?? 'unknown'}`;
+
+function virtualPlanState(state: DemoState, draft: GoalPlanChangeDraft): DemoState {
+  const goal = { ...state.goal, ...draft, originalDate: draft.targetDate,
+    selectedPlanId: null, status: 'draft' as const, firstMonthContributionCents: undefined };
+  return { ...state, goal, goals: state.goals.map(item => item.id === goal.id ? goal : item) };
+}
+
+export function previewGoalPlanChange(state: DemoState, input: GoalPlanChangeDraft): GoalPlanChangePreview {
+  const draft = GoalPlanChangeDraftSchema.parse(input);
+  const virtual = virtualPlanState(state, draft);
+  const assessment = assessGoal(virtual);
+  const seen = new Set<string>();
+  const novaPlans = assessment.plans.flatMap<GoalPlanChangeCandidate>(plan => {
+    const key = candidateKey(plan.monthlyCents, plan.projectedDate);
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ ...plan, source: 'nova', duplicatePlanId: null,
+      effectiveTargetDate: draft.targetDate, delayDays: plan.projectedDate && plan.projectedDate > draft.targetDate
+        ? Math.max(0, Math.ceil((Date.parse(`${plan.projectedDate}T00:00:00Z`) - Date.parse(`${draft.targetDate}T00:00:00Z`)) / 86_400_000)) : 0,
+      selectable: plan.status !== 'infeasible', requiresTargetDateChange: false,
+      blockingReasons: plan.status === 'infeasible' ? ['PLAN_NOT_AVAILABLE'] : [] }];
+  });
+  const customBlockingReasons: string[] = [];
+  if (draft.monthlyContributionCents > assessment.availableMonthlyCents)
+    customBlockingReasons.push('MONTHLY_CAPACITY_EXCEEDED');
+  if (assessment.safeToSpendCents < 0) customBlockingReasons.push('FIRST_MONTH_BUFFER_NEGATIVE');
+  if (state.finance.emergencyCents < draft.protectedCents)
+    customBlockingReasons.push('PROTECTED_FUNDS_UNAVAILABLE');
+  if (state.finance.historyMonths < 2 || !assessment.projectedDate)
+    customBlockingReasons.push('INSUFFICIENT_DATA');
+  for (const reason of ['GOAL_DEADLINE_PASSED', 'FORECAST_HORIZON_INCOMPLETE', 'AMBIGUOUS_SCHEDULE']) {
+    if (assessment.assumptions.includes(reason)) customBlockingReasons.push(reason);
+  }
+  const projectedDate = assessment.projectedDate;
+  const requiresTargetDateChange = Boolean(projectedDate && projectedDate > draft.targetDate);
+  const duplicate = novaPlans.find(plan => candidateKey(plan.monthlyCents, plan.projectedDate) ===
+    candidateKey(draft.monthlyContributionCents, projectedDate));
+  const customPlan: GoalPlanChangeCandidate = {
+    id: 'custom', source: duplicate ? 'both' : 'user', duplicatePlanId: duplicate?.id ?? null,
+    label: '你的方案', monthlyCents: draft.monthlyContributionCents, projectedDate,
+    effectiveTargetDate: requiresTargetDateChange ? projectedDate! : draft.targetDate,
+    delayDays: requiresTargetDateChange ? assessment.delayDays : 0,
+    safeToSpendCents: assessment.safeToSpendCents,
+    status: assessment.status === 'infeasible' || assessment.status === 'insufficient_data' ? 'infeasible'
+      : requiresTargetDateChange ? 'at_risk' : assessment.status,
+    explanation: requiresTargetDateChange
+      ? `按这个金额预计 ${projectedDate} 完成，比原目标日晚 ${assessment.delayDays} 天`
+      : projectedDate ? `按当前模拟收支，预计 ${projectedDate} 完成` : '当前数据不足，暂时无法算出完成日期',
+    recommended: Boolean(duplicate?.recommended), selectable: customBlockingReasons.length === 0,
+    requiresTargetDateChange, blockingReasons: [...new Set(customBlockingReasons)],
+  };
+  return GoalPlanChangePreviewSchema.parse({
+    baseTwinVersion: state.twinVersion, draft,
+    novaPlans: novaPlans.filter(plan => plan.id !== duplicate?.id).slice(0, 3), customPlan,
+  });
+}
+
+export function applyGoalPlanChange(state: DemoState, input: GoalPlanChangeRequest): {
+  state: DemoState; preview: GoalPlanChangePreview; scheduleReviewRequired: boolean;
+} {
+  const request = GoalPlanChangeRequestSchema.parse(input);
+  if (request.expectedTwinVersion !== state.twinVersion) throw new Error('TWIN_VERSION_CHANGED');
+  const preview = previewGoalPlanChange(state, request.draft);
+  const candidate = request.selection.candidateId === 'custom' ? preview.customPlan
+    : preview.novaPlans.find(plan => plan.id === request.selection.candidateId);
+  if (!candidate?.selectable) throw new Error('PLAN_NOT_AVAILABLE');
+  if (candidate.requiresTargetDateChange && !request.selection.acceptTargetDateChange)
+    throw new Error('TARGET_DATE_CHANGE_CONFIRMATION_REQUIRED');
+  const goal = { ...state.goal, targetCents: request.draft.targetCents,
+    savedCents: request.draft.savedCents, targetDate: candidate.effectiveTargetDate,
+    originalDate: request.draft.targetDate, monthlyContributionCents: candidate.monthlyCents,
+    firstMonthContributionCents: undefined, protectedCents: request.draft.protectedCents,
+    flexibilityWeeks: request.draft.flexibilityWeeks, status: 'active' as const,
+    selectedPlanId: request.selection.candidateId === 'custom' ? 'custom' : candidate.id };
+  const changed = goal.targetCents !== state.goal.targetCents || goal.savedCents !== state.goal.savedCents ||
+    goal.targetDate !== state.goal.targetDate || goal.monthlyContributionCents !== state.goal.monthlyContributionCents ||
+    goal.protectedCents !== state.goal.protectedCents || goal.flexibilityWeeks !== state.goal.flexibilityWeeks;
+  const scheduleReviewRequired = changed && state.transferSchedules.some(schedule =>
+    schedule.goalId === goal.id && ['active', 'paused'].includes(schedule.status));
+  const updated = { ...state, goal, goals: state.goals.map(item => item.id === goal.id ? goal : item),
+    twinVersion: state.twinVersion + 1 };
+  return { state: appendAuditEvent(updated, 'goal_plan_changed', 'succeeded',
+    `目标方案已修改为每月 ¥${candidate.monthlyCents / 100}；未自动修改转入安排。`),
+    preview, scheduleReviewRequired };
 }

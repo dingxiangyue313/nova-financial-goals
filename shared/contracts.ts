@@ -668,6 +668,40 @@ export const AssessmentSchema = z.object({
 });
 export type Assessment = z.infer<typeof AssessmentSchema>;
 
+export const GoalPlanChangeDraftSchema = z.object({
+  targetCents: MoneySchema.positive(), targetDate: IsoDateSchema,
+  savedCents: MoneySchema, protectedCents: MoneySchema,
+  monthlyContributionCents: MoneySchema.positive(),
+  flexibilityWeeks: z.number().int().min(0).max(52),
+}).strict().refine(value => value.savedCents <= value.targetCents, {
+  message: 'SAVED_AMOUNT_EXCEEDS_TARGET', path: ['savedCents'],
+});
+export type GoalPlanChangeDraft = z.infer<typeof GoalPlanChangeDraftSchema>;
+
+export const GoalPlanChangeCandidateSchema = z.object({
+  id: z.string().min(1), source: z.enum(['nova', 'user', 'both']),
+  duplicatePlanId: z.string().nullable(), label: z.string().min(1),
+  monthlyCents: MoneySchema.positive(), projectedDate: IsoDateSchema.nullable(),
+  effectiveTargetDate: IsoDateSchema, delayDays: z.number().int().nonnegative(),
+  safeToSpendCents: z.number().int(), status: PlanSchema.shape.status,
+  explanation: z.string(), recommended: z.boolean(), selectable: z.boolean(),
+  requiresTargetDateChange: z.boolean(), blockingReasons: z.array(z.string()),
+}).strict();
+export type GoalPlanChangeCandidate = z.infer<typeof GoalPlanChangeCandidateSchema>;
+
+export const GoalPlanChangePreviewSchema = z.object({
+  baseTwinVersion: z.number().int().positive(), draft: GoalPlanChangeDraftSchema,
+  novaPlans: z.array(GoalPlanChangeCandidateSchema).max(3),
+  customPlan: GoalPlanChangeCandidateSchema,
+}).strict();
+export type GoalPlanChangePreview = z.infer<typeof GoalPlanChangePreviewSchema>;
+
+export const GoalPlanChangeRequestSchema = z.object({
+  expectedTwinVersion: z.number().int().positive(), draft: GoalPlanChangeDraftSchema,
+  selection: z.object({ candidateId: z.string().min(1), acceptTargetDateChange: z.boolean() }).strict(),
+}).strict();
+export type GoalPlanChangeRequest = z.infer<typeof GoalPlanChangeRequestSchema>;
+
 export const GoalAssumptionsSchema = z.object({
   targetCents: MoneySchema.positive(),
   targetDate: IsoDateSchema,
