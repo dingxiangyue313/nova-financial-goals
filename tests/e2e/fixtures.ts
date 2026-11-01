@@ -4,6 +4,7 @@ import { test as base, expect } from '@playwright/test';
 // The dedicated input/navigation suites exercise that entry explicitly.
 export const test = base.extend({
   page: async ({ page }, use) => {
+    await page.route(/https:\/\/(fonts\.(googleapis|gstatic)\.com|images\.unsplash\.com|lh3\.googleusercontent\.com)\/.*/, route => route.abort());
     // Keep business scenarios on their explicitly created goals. Sample-gallery
     // seeding is independent of the banking operations exercised by these suites.
     await page.route('**/api/product/goal-samples', async route => {

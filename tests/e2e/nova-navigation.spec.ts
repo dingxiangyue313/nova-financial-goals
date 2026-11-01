@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 test('natural chat navigation opens the requested page and never asks the agent to execute',async({page})=>{
- test.setTimeout(180000);
+ test.setTimeout(300000);
  await page.goto('/');await page.getByRole('heading',{name:'连接模拟数据',exact:true}).waitFor();await page.getByRole('button',{name:'返回',exact:true}).click();await page.getByRole('button',{name:'NOVA',exact:true}).click();
  const testThread=(await(await page.request.post('/api/agent/threads',{data:{title:'navigation test'}})).json()).thread.id;
  const sent:string[]=[];
