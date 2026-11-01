@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 test.use({serviceWorkers:'block'});
 test('subscription cancellation stays verified after reload without changing account cash',async({page})=>{
- await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();
+ await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByRole('button',{name:'订阅管理',exact:true}).click();
  await page.getByRole('button',{name:'不再使用，准备取消'}).click();
  await page.getByRole('dialog').getByRole('button',{name:'确认并执行模拟操作'}).click();
  await expect(page.getByText(/已关闭自动续费：CloudBox Plus/)).toBeVisible();
@@ -15,9 +15,9 @@ test('subscription cancellation stays verified after reload without changing acc
 test('empty-history import preserves authoritative balances',async({page})=>{
  await page.request.get('/api/session');await page.request.post('/api/demo/reset');
  expect((await page.request.post('/api/product/start',{data:{includeHistory:false}})).ok()).toBeTruthy();
- await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByText('数据覆盖与账单导入',{exact:true}).click();
- await page.getByRole('button',{name:'导入 NOVA 合成样例'}).click();
- await page.getByRole('button',{name:'提交并去重'}).click();
+ await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByRole('button',{name:'订阅管理',exact:true}).click();await page.getByRole('button',{name:'数据管理',exact:true}).click();
+ await page.getByRole('button',{name:'导入示例账单'}).click();
+ await page.getByRole('button',{name:'提交并去重'}).click();await page.getByRole('button',{name:'订阅管理',exact:true}).click();
  await expect(page.getByRole('button',{name:'不再使用，准备取消'})).toBeVisible();
  const state=await (await page.request.get('/api/session')).json();
  expect(state.statementImportBatches.some((b:{status:string})=>b.status==='committed')).toBe(true);
@@ -25,7 +25,7 @@ test('empty-history import preserves authoritative balances',async({page})=>{
 });
 
 test('dated cashflow explains salary stress and editable expense without changing money or authorization',async({page})=>{
- await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByText('查看工资前余额与日期试算',{exact:true}).click();
+ await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByRole('button',{name:'订阅管理',exact:true}).click();await page.getByRole('button',{name:'NOVA',exact:true}).click();await page.getByRole('textbox',{name:'告诉 NOVA 你的需求'}).fill('收支试算');await page.getByRole('button',{name:'发送',exact:true}).click();
  const timeline=page.getByRole('region',{name:'日期现金流试算'});
  await expect(timeline).toContainText('最低余额 ¥3,172');
  const before=await (await page.request.get('/api/session')).json();
