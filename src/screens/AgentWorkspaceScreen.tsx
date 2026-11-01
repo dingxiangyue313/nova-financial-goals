@@ -14,7 +14,8 @@ const suggestions = ['帮我看看目标能否按时完成', '这笔支出会影
 const currentPreferences = (components: AgentComponent[], preferences: RiskPreferences) => components.map(component =>
   component.type === 'notification_preference_card' ? { ...component, preferences } : component);
 
-export function AgentWorkspaceScreen({ snapshot, compact, starter, preferredThreadId, onThreadChange, onSnapshot, onNavigate, onConnectData, onFinancialTask, onFinancialCategory }: {
+export function AgentWorkspaceScreen({ snapshot, compact, starter, preferredThreadId, onThreadChange, onSnapshot, onNavigate, onConnectData, onFinancialTask, onFinancialCategory, demoGoalRunner = false }: {
+  demoGoalRunner?: boolean;
   preferredThreadId?:string|null;onThreadChange?:(id:string)=>void; snapshot: Snapshot; compact: boolean; starter?: string; onSnapshot: (snapshot: Snapshot) => void;
   onNavigate: (screen: ScreenId) => void; onConnectData: (threadId: string) => void;
   onFinancialTask?:(message:string,destination:FinancialDestination,memory?:import('../../shared/chat-routing').ChatMemory)=>void;
@@ -91,6 +92,13 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, preferredThre
     setBusy(true); setError(null); replaceDraft('');
     try {
       const writableThreadId = activeThread && activeThread.status === 'active' && !activeThread.readOnly ? activeThread.id : null;
+      if (demoGoalRunner) {
+        const turn = await api<AgentTurnWithRun>('/api/agent/turn', 'POST', { message: message.trim(), threadId: writableThreadId });
+        setRun(turn.run);
+        setCanvasComponents(turn.canvasComponents.length ? turn.canvasComponents : turn.components);
+        await refreshThreads(turn.thread.id);
+        return;
+      }
       const response=await api<import('../../shared/chat-routing').ChatConversationResponse>('/api/agent/chat','POST',{message:message.trim(),threadId:writableThreadId});
       const routed=ChatRouteResponseSchema.parse(response);onThreadChange?.(response.threadId);setActiveThreadId(response.threadId);
       if(routed.decision.mode==='navigate'&&routed.decision.destination&&onFinancialTask){

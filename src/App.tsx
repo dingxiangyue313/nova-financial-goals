@@ -681,7 +681,7 @@ export default function App() {
           {currentScreen === 'banking_demo' && <BankingDemoScreen snapshot={snapshot} mutate={mutate}
             onNavigateActivity={() => navigateTo('activity')} />}
 
-          {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame}
+          {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame} demoGoalRunner={demoControl}
             starter={workspaceStarter} preferredThreadId={workspaceThreadId} onThreadChange={setWorkspaceThreadId} onSnapshot={setSnapshot} onNavigate={navigateTo}
             onFinancialCategory={category=>{setFinancialMemory(undefined);setFinancialStarter('');setFinancialSection(undefined);if(category==='bills'){navigateTo('money_mission');return;}setFinancialTab(category);navigateTo('financial_services');}}
             onFinancialTask={(message,destination,memory)=>{setFinancialMemory(memory);setFinancialStarter(message);setFinancialSection(destination.section);if(destination.category==='bills'){navigateTo('money_mission');return;}setFinancialTab(destination.category);navigateTo('financial_services');}} onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} />}
