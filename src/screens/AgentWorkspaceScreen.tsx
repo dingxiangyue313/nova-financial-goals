@@ -6,15 +6,17 @@ import { api, ApiError } from '../api';
 import type { ScreenId } from '../types';
 import { AgentComponentRenderer } from '../components/AgentComponentRenderer';
 import { NovaMark } from '../components/NovaMark';
+import { financialCategories, type FinancialCategory } from '../lib/financial-categories';
 
-const suggestions = ['我想年底去日本旅行，预算 ¥8,000', '这笔 ¥900 支出会影响目标吗？', '允许旅行 Agent 在 ¥500 内订票'];
+const suggestions = ['帮我看看目标能否按时完成', '这笔支出会影响目标吗？', '帮我安排旅行预算'];
 const currentPreferences = (components: AgentComponent[], preferences: RiskPreferences) => components.map(component =>
   component.type === 'notification_preference_card' ? { ...component, preferences } : component);
 
-export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, onNavigate, onConnectData, onFinancialTask }: {
+export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, onNavigate, onConnectData, onFinancialTask, onFinancialCategory }: {
   snapshot: Snapshot; compact: boolean; starter?: string; onSnapshot: (snapshot: Snapshot) => void;
   onNavigate: (screen: ScreenId) => void; onConnectData: (threadId: string) => void;
   onFinancialTask?:(message:string)=>void;
+  onFinancialCategory: (category: FinancialCategory) => void;
 }) {
   const [receiptRunId, setReceiptRunId] = useState<string | null>(null);
   const receiptOpener = useRef<HTMLButtonElement | null>(null);
@@ -206,10 +208,9 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
   const conversation = <section className="flex min-h-0 flex-1 flex-col bg-[#F5F7F8]">
     {receiptRunId && <DecisionReceiptCard runId={receiptRunId} returnFocusTo={receiptOpener.current} onClose={() => setReceiptRunId(null)} />}
     <header className="border-b border-[#E5E8EB] bg-white px-4 py-3">
-      <div className="flex items-center justify-between"><div><h1 className="text-[16px] font-bold">NOVA 目标工作台</h1><p className="text-[10px] text-[#5A616B]">对话生成界面 · 操作前始终确认</p></div><button onClick={() => onNavigate('home')} aria-label="返回首页" className="rounded-lg border border-[#E5E8EB] px-2 py-1 text-[11px] text-[#5A616B]">返回首页</button></div>
+      <div className="flex items-center justify-between"><div><h1 className="text-[16px] font-bold">NOVA 财务助手</h1><p className="text-[10px] text-[#5A616B]">帮你推进目标，安排日常财务 · 仅模拟数据</p></div><button onClick={() => onNavigate('home')} aria-label="返回首页" className="rounded-lg border border-[#E5E8EB] px-2 py-1 text-[11px] text-[#5A616B]">返回首页</button></div>
       <div className="mt-2 flex gap-2"><button type="button" onClick={() => setHistoryOpen(value => !value)} className="rounded-full border border-[#D8E7E7] px-3 py-1.5 text-[11px] font-semibold text-[#0F6B6D]">{historyOpen ? '收起会话' : `会话历史 ${threads.length}`}</button>
         <button onClick={createThread} className="shrink-0 rounded-full bg-[#0F6B6D] px-3 py-1.5 text-[11px] font-semibold text-white">＋ 新会话</button>
-        <button type="button" onClick={()=>onNavigate('financial_services')} className="shrink-0 rounded-full border border-[#D8E7E7] px-3 py-1.5 text-[11px] font-semibold text-[#0F6B6D]">转账、理财与旅行任务</button>
       </div>
       {historyOpen && <div className="mt-2 flex gap-2 overflow-x-auto no-scrollbar">{threads.map(thread => <button key={thread.id} data-unread={thread.unread ? 'true' : 'false'} onClick={() => { setRun(null); void loadMessages(thread.id); void loadRun(thread.id); }} className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] ${thread.id === activeThreadId ? 'border-[#0F6B6D] bg-[#E6F2F2] text-[#0F6B6D]' : 'border-[#E5E8EB] bg-white text-[#5A616B]'}`}><span className={thread.unread ? 'font-bold' : ''}>{thread.unread ? '● ' : ''}{thread.kind === 'summary' ? '摘要 · ' : ''}{thread.status === 'archived' ? '历史 · ' : ''}{thread.title}</span></button>)}</div>}
       {activeThread && <div className="mt-2 flex items-center gap-2 text-[10px] text-[#5A616B]"><button onClick={renameThread}>重命名</button><button disabled={activeThread.readOnly} onClick={() => void updateThread({ status: activeThread.status === 'active' ? 'archived' : 'active' })}>{activeThread.status === 'active' ? '归档' : '恢复'}</button><button onClick={removeThread} className="text-rose-600">删除</button>{activeThread.readOnly && <span className="ml-auto rounded-full bg-[#F0F2F5] px-2 py-1">旧演示 · 只读</span>}</div>}
@@ -229,9 +230,19 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, onSnapshot, o
       </div>)}{busy && <div className="mr-20 rounded-2xl rounded-bl-md border border-[#E5E8EB] bg-white px-3 py-2 text-[12px] text-[#5A616B]">NOVA 正在理解任务并组合安全界面…</div>}<div ref={bottom} /></div>
     </div>
     <footer className="border-t border-[#E5E8EB] bg-white p-3">
+      <section aria-label="金融任务快捷入口" className="mb-3">
+        <h2 className="mb-2 text-[12px] font-semibold text-[#1F2329]">你想办理什么？</h2>
+        <div className="flex flex-wrap gap-2">
+          {financialCategories.map(category => <button key={category.id} type="button"
+            onClick={() => onFinancialCategory(category.id)}
+            className="min-h-11 rounded-2xl border border-[#D0D5DD] bg-white px-3 py-2.5 text-[12px] font-semibold text-[#1F2329] transition-colors hover:border-[#0F6B6D] hover:bg-[#E6F2F2] hover:text-[#0F6B6D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F6B6D]">
+            {category.label}
+          </button>)}
+        </div>
+      </section>
       {!messages.length && <div className="mb-2 flex gap-2 overflow-x-auto no-scrollbar">{suggestions.map(item => <button key={item} onClick={() => void send(item)} className="shrink-0 rounded-xl border border-[#D8E7E7] bg-[#F2FAFA] px-3 py-2 text-left text-[11px] text-[#0F6B6D]">{item}</button>)}</div>}
       {error && <div className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-700">{error}</div>}
-      <form onSubmit={submit} className="flex items-end gap-2"><textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder={activeThread?.readOnly || activeThread?.status === 'archived' ? '历史会话仅供查看；发送会新建会话' : '描述目标、风险或授权范围…'} rows={1} className="min-h-11 flex-1 resize-none rounded-xl border border-[#D0D5DD] bg-[#F8FAFB] px-3 py-3 text-[12px] outline-none focus:border-[#0F6B6D]"/><button type="submit" aria-label="发送" disabled={busy || !draft.trim()} className="grid h-11 w-11 place-items-center rounded-xl bg-[#0F6B6D] text-white disabled:opacity-40"><span className="material-symbols-outlined text-[18px]">arrow_upward</span></button></form>
+      <form onSubmit={submit} className="flex items-end gap-2"><textarea value={draft} onChange={event => setDraft(event.target.value)} aria-label="告诉 NOVA 你的需求" placeholder={activeThread?.readOnly || activeThread?.status === 'archived' ? '历史会话仅供查看；发送会新建会话' : '说说你的目标，或想办理的事情…'} rows={1} className="min-h-11 flex-1 resize-none rounded-xl border border-[#D0D5DD] bg-[#F8FAFB] px-3 py-3 text-[12px] outline-none focus:border-[#0F6B6D]"/><button type="submit" aria-label="发送" disabled={busy || !draft.trim()} className="grid h-11 w-11 place-items-center rounded-xl bg-[#0F6B6D] text-white disabled:opacity-40"><span className="material-symbols-outlined text-[18px]">arrow_upward</span></button></form>
     </footer>
   </section>;
 

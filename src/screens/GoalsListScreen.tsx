@@ -22,10 +22,11 @@ export function GoalsListScreen({ goals, primaryGoalId, emergencyCents, hasImpac
       const progress = goal.targetCents ? Math.min(100, goal.savedCents / goal.targetCents * 100) : 0;
       const primary = goal.id === primaryGoalId;
       return <article key={goal.id} className={`rounded-xl border bg-white p-3.5 shadow-sm ${primary ? 'border-[#0F6B6D]' : 'border-[#E5E8EB]'}`}>
-        <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="text-[15px] font-bold">{goal.title}</h3>{primary && <span className="rounded-full bg-[#E6F2F2] px-2 py-0.5 text-[10px] font-semibold text-[#0F6B6D]">首页主目标</span>}</div><p className="mt-1 text-[11px] text-[#5A616B]">目标日 {goal.targetDate} · {goal.status === 'active' ? '守护中' : '待启用'}</p></div><strong className="text-[13px]">{yuan(goal.savedCents)} / {yuan(goal.targetCents)}</strong></div>
+        <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="text-[15px] font-bold">{goal.title}</h3>{primary && <span className="rounded-full bg-[#E6F2F2] px-2 py-0.5 text-[10px] font-semibold text-[#0F6B6D]">首页主目标</span>}</div><p className="mt-1 text-[11px] text-[#5A616B]">目标日 {goal.targetDate} · {goal.status === 'active' ? '推进中' : goal.status === 'paused' ? '已暂停' : goal.status === 'achieved' ? '已完成' : '待启用'}</p></div><strong className="text-[13px]">{yuan(goal.savedCents)} / {yuan(goal.targetCents)}</strong></div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F0F2F5]"><div className="h-full rounded-full bg-[#0F6B6D]" style={{ width: `${progress}%` }}/></div>
-        <div className="mt-3 flex gap-2"><button onClick={() => void onSelectGoal(goal.id)} className={`flex-1 rounded-lg px-3 py-2 text-[11px] font-semibold ${primary ? 'bg-[#F2FAFA] text-[#0F6B6D]' : 'border border-[#0F6B6D] text-[#0F6B6D]'}`}>{primary ? '查看主目标' : '设为主目标并查看'}</button>{primary && hasImpactPending && <button onClick={onNavigateToImpact} className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">查看影响</button>}</div>
+        <div className="mt-3 flex gap-2"><button onClick={() => void onSelectGoal(goal.id)} className={`flex-1 rounded-lg px-3 py-2 text-[11px] font-semibold ${primary ? 'bg-[#F2FAFA] text-[#0F6B6D]' : 'border border-[#0F6B6D] text-[#0F6B6D]'}`}>查看目标详情</button>{primary && hasImpactPending && <button onClick={onNavigateToImpact} className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">查看影响</button>}</div>
       </article>;
     })}
   </div>;
 }
+

@@ -1,4 +1,5 @@
 import { AISafetyScreen } from './screens/AISafetyScreen';
+import { financialCategories, type FinancialTab } from './lib/financial-categories';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ScreenId, Goal, type MoneyMissionReadModel } from './types';
 import { api, cents, displayGoal, displayImpact } from './api';
@@ -7,6 +8,7 @@ import { normalizeUiCard } from '../shared/generative';
 import { TopBar } from './components/TopBar';
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './screens/HomeScreen';
+import { GoalDetailScreen } from './screens/GoalDetailScreen';
 import { CreateGoalScreen } from './screens/CreateGoalScreen';
 import { NewGoalScreen } from './screens/NewGoalScreen';
 import { FeasibilityScreen } from './screens/FeasibilityScreen';
@@ -48,6 +50,8 @@ export default function App() {
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
   const [workspaceStarter, setWorkspaceStarter] = useState('');
   const [financialStarter,setFinancialStarter]=useState('');
+  const [detailGoalId, setDetailGoalId] = useState<string | null>(null);
+  const [financialTab,setFinancialTab]=useState<FinancialTab>('overview');
   const [pendingConnectionThreadId, setPendingConnectionThreadId] = useState<string | null>(null);
   const [connectionBusy, setConnectionBusy] = useState(false);
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
@@ -85,6 +89,7 @@ export default function App() {
       try {
         let live = await api<Snapshot>('/api/session');
         if (!live.goals.length && window.location.pathname !== '/demo-control') live = await api<Snapshot>('/api/product/start', 'POST', {});
+        if (window.location.pathname !== '/demo-control') live = await api<Snapshot>('/api/product/goal-samples', 'POST', {});
         if (active) { setSnapshot(live); setLoadError(null); }
       } catch (error) {
         const cached = await loadOfflineSnapshot();
@@ -221,7 +226,9 @@ export default function App() {
   };
 
   const handleBack = () => {
-    if (currentScreen === 'feasibility') {
+    if (currentScreen === 'goal_detail') {
+      setCurrentScreen(previousScreen === 'goals_list' ? 'goals_list' : 'home');
+    } else if (currentScreen === 'feasibility') {
       if (previousScreen === 'create_goal') {
         setCurrentScreen('create_goal');
       } else {
@@ -235,6 +242,10 @@ export default function App() {
       setCurrentScreen(previousScreen === 'profile' ? 'profile' : 'create_goal');
     } else if (currentScreen === 'impact') {
       setCurrentScreen('home');
+    } else if (currentScreen === 'financial_services') {
+      setCurrentScreen('workspace');
+    } else if (currentScreen === 'money_mission' && (previousScreen === 'workspace' || previousScreen === 'financial_services')) {
+      setCurrentScreen(previousScreen);
     } else if (currentScreen === 'workspace' || currentScreen === 'goals_list' || currentScreen === 'activity' || currentScreen === 'profile' || currentScreen === 'banking_demo') {
       setCurrentScreen('home');
     } else {
@@ -409,13 +420,17 @@ export default function App() {
         return '我的目标';
       case 'activity':
         return '动态脉络';
+      case 'goal_detail':
+        return '目标详情';
+      case 'financial_services':
+        return financialCategories.find(category => category.id === financialTab)?.label;
       case 'ai_safety': return 'NOVA AI 安全';
       case 'profile':
         return '个人设置';
       case 'banking_demo':
         return '授权与执行记录';
       case 'workspace':
-        return 'NOVA 工作台';
+        return 'NOVA 财务助手';
       case 'money_mission':
         return '旅行任务';
       default:
@@ -548,7 +563,7 @@ export default function App() {
               onNavigateToImpact={() => navigateTo('impact')}
               onNavigateToCreate={() => { setDraftChanges({}); navigateTo('create_goal'); }}
               onNavigateToMoneyMission={() => navigateTo('money_mission')}
-              onNavigateToServices={() => navigateTo('financial_services')}
+              onViewGoal={id => { setDetailGoalId(id); navigateTo('goal_detail'); }}
             />
           )}
 
@@ -556,7 +571,7 @@ export default function App() {
             onSnapshot={setSnapshot}
             error={missionError} compact={deviceFrame} onRefresh={() => void refreshMission()}
             onNavigate={() => { setWorkspaceStarter('请继续日本旅行目标的当前任务'); navigateTo('workspace'); }} />}
-          {currentScreen === 'financial_services' && <FinancialServicesScreen initialMessage={financialStarter} onBills={() => navigateTo('money_mission')}
+          {currentScreen === 'financial_services' && <FinancialServicesScreen initialMessage={financialStarter} initialTab={financialTab} onBills={() => navigateTo('money_mission')}
             onChanged={() => { void api<Snapshot>('/api/session').then(setSnapshot).catch(error => showToast(error.message)); }} />}
 
           {currentScreen === 'create_goal' && !demoControl && <NewGoalScreen snapshot={snapshot} onSnapshot={setSnapshot} onDone={()=>navigateTo('home')} />}
@@ -611,12 +626,14 @@ export default function App() {
 
           {currentScreen === 'impact' && !scenario && <div className="m-4 bg-white rounded-xl p-5 text-sm text-[#5A616B]">目前没有显著支出影响。连接数据并激活计划后，NOVA 会随新流水自动判断。</div>}
 
+          {currentScreen === 'goal_detail' && snapshot.goals.find(item => item.id === detailGoalId) &&
+            <GoalDetailScreen goal={snapshot.goals.find(item => item.id === detailGoalId)!} />}
           {currentScreen === 'goals_list' && (
             <GoalsListScreen
               goals={snapshot.goals}
               primaryGoalId={snapshot.primaryGoalId}
               emergencyCents={snapshot.finance.emergencyCents}
-              onSelectGoal={async id => { const next = await mutate(`/api/goals/${id}/set-primary`, 'POST'); setSnapshot(next); navigateTo('home'); }}
+              onSelectGoal={id => { setDetailGoalId(id); navigateTo('goal_detail'); }}
               onNavigateToCreate={() => { setDraftChanges({}); navigateTo('create_goal'); }}
               onNavigateToImpact={() => navigateTo('impact')}
               hasImpactPending={hasImpactPending}
@@ -624,8 +641,8 @@ export default function App() {
           )}
 
           {currentScreen === 'activity' && (
-            <ActivityScreen snapshot={snapshot} mutate={mutate} hasImpactPending={hasImpactPending}
-              onNavigateToImpact={() => navigateTo('impact')} onNavigateToBanking={() => navigateTo('banking_demo')} />
+            <ActivityScreen twinVersion={snapshot.twinVersion}
+              onChanged={() => { void api<Snapshot>('/api/session').then(setSnapshot).catch(error => showToast(error.message)); }} />
           )}
 
           {currentScreen === 'banking_demo' && <BankingDemoScreen snapshot={snapshot} mutate={mutate}
@@ -633,7 +650,8 @@ export default function App() {
 
           {currentScreen === 'workspace' && <AgentWorkspaceScreen snapshot={snapshot} compact={deviceFrame}
             starter={workspaceStarter} onSnapshot={setSnapshot} onNavigate={navigateTo}
-            onFinancialTask={message=>{setFinancialStarter(message);navigateTo('financial_services');}} onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} />}
+            onFinancialCategory={category=>{setFinancialStarter('');if(category==='bills'){navigateTo('money_mission');return;}setFinancialTab(category);navigateTo('financial_services');}}
+            onFinancialTask={message=>{setFinancialStarter(message);setFinancialTab('overview');navigateTo('financial_services');}} onConnectData={threadId => { setPendingConnectionThreadId(threadId); navigateTo('data_connections'); }} />}
 
           {currentScreen === 'ai_safety' && <AISafetyScreen />}
           {currentScreen === 'profile' && goal && (

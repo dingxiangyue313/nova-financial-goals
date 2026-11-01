@@ -1,4 +1,5 @@
 import {fixedMonthlyRange} from '../shared/fixed-monthly.ts';
+import { addSecondaryGoalSamples } from './secondary-goal-samples.ts';
 import {aaCatalogFixture} from './aa-catalog.ts';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -57,6 +58,10 @@ export async function fundedConsumerFixture(){
 
 export function registerProductMission(app: Express, sessionId: (req: Request, res: Response) => string,
   route: (fn: (req: Request, res: Response) => unknown) => RequestHandler) {
+  app.post('/api/product/goal-samples', route((req, res) => {
+    const next = mutateState(sessionId(req, res), addSecondaryGoalSamples);
+    res.json(productMission(next).snapshot);
+  }));
   app.post('/api/product/subscription-samples',route((req,res)=>{
     const body=z.object({expectedTwinVersion:z.number().int().positive()}).strict().parse(req.body);
     const next=mutateState(sessionId(req,res),state=>{

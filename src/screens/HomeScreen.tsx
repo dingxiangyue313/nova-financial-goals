@@ -28,7 +28,7 @@ interface HomeScreenProps {
   onNavigateToImpact: () => void;
   onNavigateToCreate: () => void;
   onNavigateToMoneyMission: () => void;
-  onNavigateToServices: () => void;
+  onViewGoal: (id: string) => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -39,7 +39,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateToImpact,
   onNavigateToCreate,
   onNavigateToMoneyMission,
-  onNavigateToServices,
+  onViewGoal,
 }) => {
   const [now, setNow] = useState(() => new Date());
 
@@ -255,7 +255,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <span>查看计划</span>
         </button>
       </section>
-      <button type="button" className="mission-secondary" onClick={onNavigateToServices}>金融任务：转账、AA、理财、卡片与旅行预订</button>
+      {snapshot.goals.some(item => item.id !== snapshot.primaryGoalId) && <section className="space-y-3" aria-label="目标计划">
+        {snapshot.goals.filter(item => item.id !== snapshot.primaryGoalId).map(item => {
+          const progress = item.targetCents ? Math.min(100, item.savedCents / item.targetCents * 100) : 0;
+          return <button key={item.id} onClick={() => onViewGoal(item.id)} className="w-full rounded-xl border border-[#E5E8EB] bg-white p-3.5 text-left shadow-sm">
+            <div className="flex items-center justify-between gap-2"><h3 className="text-[14px] font-bold">{item.title}</h3><span className="text-[11px] text-[#5A616B]">{item.status === 'active' ? '推进中' : item.status === 'achieved' ? '已完成' : item.status === 'paused' ? '已暂停' : '待启用'}</span></div>
+            <p className="mt-2 text-[12px] text-[#5A616B]">已存 ¥{(item.savedCents / 100).toLocaleString('zh-CN')} / ¥{(item.targetCents / 100).toLocaleString('zh-CN')}</p>
+            <div className="my-2 h-1.5 overflow-hidden rounded-full bg-[#F0F2F5]"><div className="h-full rounded-full bg-[#0F6B6D]" style={{ width: `${progress}%` }} /></div>
+            <p className="text-[11px] text-[#5A616B]">每月计划 ¥{(item.monthlyContributionCents / 100).toLocaleString('zh-CN')} · 查看计划 →</p>
+          </button>;
+        })}
+      </section>}
     </div>
   );
 };
