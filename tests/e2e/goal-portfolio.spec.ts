@@ -5,7 +5,7 @@ test('two goals share one dated budget, edit exact constraints and confirm a bou
  await page.goto('/');await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();
  const snapshot=await (await page.request.get('/api/session')).json();
  expect((await page.request.post('/api/product/goals',{data:{title:'培训目标',targetCents:3000000,targetDate:'2027-06-30',protectedCents:2000000,expectedTwinVersion:snapshot.twinVersion}})).ok()).toBe(true);
- await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();
+ await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();await page.getByRole('button',{name:'目标资金',exact:true}).click();await page.getByRole('button',{name:'计划调整',exact:true}).click();
  const before=await (await page.request.get('/api/services')).json();
  const confirm=async()=>{const dialog=page.getByRole('dialog');await expect(dialog).toContainText('不移动资金');await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(dialog).toBeHidden();};
  await page.getByRole('button',{name:'编辑「日本旅行」目标约束'}).click();
@@ -27,6 +27,6 @@ test('two goals share one dated budget, edit exact constraints and confirm a bou
  await page.screenshot({path:`artifacts/goal-portfolio-${testInfo.project.name}.png`,fullPage:true});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(axe.violations.filter(v=>['critical','serious'].includes(v.impact??''))).toEqual([]);
- await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();
+ await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();await page.getByRole('button',{name:'目标资金',exact:true}).click();await page.getByRole('button',{name:'计划调整',exact:true}).click();
  await expect(page.getByText('按当前模拟假设，各目标的投入可以同时满足。',{exact:true})).toBeVisible();
 });
