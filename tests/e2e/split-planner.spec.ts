@@ -1,8 +1,9 @@
+import { openCategory } from './fixtures';
 import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('custom AA with another payer records liability, then confirms only my exact share',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'NOVA',exact:true}).click();
- await page.getByRole('button',{name:'转账与AA',exact:true}).click();
+ await openCategory(page,'转账与AA');await page.getByRole('button',{name:'AA收付款',exact:true}).click();
  const before=await (await page.request.get('/api/services')).json();
  await page.getByLabel('总额（元）',{exact:true}).fill('400');
  await page.getByLabel('谁已垫付').selectOption('contact-1');
@@ -12,7 +13,7 @@ test('custom AA with another payer records liability, then confirms only my exac
  await page.getByRole('button',{name:'预览整数分拆分'}).click();
  const dialog=page.getByRole('dialog');await expect(dialog).toContainText('同行已垫付');
  await dialog.getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(dialog).toBeHidden();
- const split=page.getByRole('region',{name:'AA ¥400'});
+ await page.getByRole('button',{name:'我的收付款',exact:true}).click();const split=page.getByRole('region',{name:'AA ¥400'});
  await expect(split).toContainText('本人应付款');
  expect((await (await page.request.get('/api/services')).json()).accounts).toEqual(before.accounts);
  await split.getByRole('button',{name:'核对并支付本人份额'}).click();
@@ -22,6 +23,6 @@ test('custom AA with another payer records liability, then confirms only my exac
  const after=await (await page.request.get('/api/services')).json();
  expect(after.accounts.find((a:{id:string})=>a.id==='checking').balanceCents).toBe(before.accounts.find((a:{id:string})=>a.id==='checking').balanceCents-11000);
  expect(after.splits[0].shares.find((s:{recipientId:string})=>s.recipientId==='self').collectedCents).toBe(11000);
- await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();await page.getByRole('button',{name:'转账与AA',exact:true}).click();
+ await page.reload();await page.getByRole('button',{name:'NOVA',exact:true}).click();await openCategory(page,'转账与AA');await page.getByRole('button',{name:'AA收付款',exact:true}).click();
  await expect(page.getByRole('region',{name:'AA ¥400'})).toContainText('已结算¥110');
 });

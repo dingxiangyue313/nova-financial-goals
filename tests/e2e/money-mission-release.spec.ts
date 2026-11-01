@@ -3,7 +3,7 @@ test.use({serviceWorkers:'block'});
 test('subscription cancellation stays verified after reload without changing account cash',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByRole('button',{name:'订阅管理',exact:true}).click();
  await page.getByRole('button',{name:'不再使用，准备取消'}).click();
- await page.getByRole('dialog').getByRole('button',{name:'确认并执行模拟操作'}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'确认操作'}).click();
  await expect(page.getByText(/已关闭自动续费：CloudBox Plus/)).toBeVisible();
  const state=await (await page.request.get('/api/session')).json();
  expect(state.goal.savedCents).toBe(200000);expect(state.finance.checkingCents).toBe(724000);

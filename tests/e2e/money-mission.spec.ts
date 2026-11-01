@@ -30,7 +30,7 @@ test('new goal contains plan comparison and preserves existing account money',as
  await page.getByRole('button',{name:'下一步：比较目标方案'}).click();
  await expect(page.getByRole('heading',{name:'选择适合你的存钱节奏'})).toBeVisible();
  await page.getByRole('button',{name:'选择并核对平衡方案'}).click();
- await page.getByRole('dialog').getByRole('button',{name:'确认并执行模拟操作'}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'确认操作'}).click();
  await expect(page.getByRole('dialog')).toBeHidden();
  await page.getByRole('button',{name:'完成，返回首页'}).click();
  await expect(page.getByRole('button',{name:'查看账单与消费'})).toBeVisible();

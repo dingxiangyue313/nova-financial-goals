@@ -1,10 +1,11 @@
+import { openCategory } from './fixtures';
 import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('unknown payments expose a local case pack and resolve only the original operation',async({page,request})=>{
  await page.goto('/');await page.getByRole('button',{name:'NOVA',exact:true}).click();
  const before=await (await page.request.get('/api/services')).json();
  expect((await page.request.post('/api/demo/services/fault',{data:{fault:'timeout_after'}})).ok()).toBe(true);
- await page.getByRole('button',{name:'转账与AA',exact:true}).click();
+ await openCategory(page,'转账与AA');
  await page.getByLabel('明确选择收款人').selectOption('contact-1');await page.getByLabel('转账金额（元）',{exact:true}).fill('100');
  await page.getByRole('button',{name:'预览联系人转账'}).click();
  await page.getByRole('dialog').getByRole('button',{name:'确认此模拟金融操作'}).click();

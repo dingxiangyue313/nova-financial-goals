@@ -1,7 +1,8 @@
+import { openCategory } from './fixtures';
 import {test,expect} from './fixtures';
 test.use({serviceWorkers:'block'});
 test('synthetic missing employment requires explicit supplement and later review without increasing cash',async({page})=>{
- await page.goto('/');await page.getByRole('button',{name:'NOVA',exact:true}).click();await page.getByRole('button',{name:'卡片',exact:true}).click();await page.getByRole('button',{name:'申请新卡',exact:true}).click();
+ await page.goto('/');await page.getByRole('button',{name:'NOVA',exact:true}).click();await openCategory(page,'卡片');await page.getByRole('button',{name:'申请新卡',exact:true}).click();
  const before=await (await page.request.get('/api/services')).json();
  const confirm=async()=>{await page.getByRole('dialog').getByRole('button',{name:'确认此模拟金融操作'}).click();await expect(page.getByRole('dialog')).toBeHidden();};
  await page.getByRole('checkbox',{name:'信用卡申请暂缺就业说明（合成资料）'}).check();await page.getByRole('button',{name:'申请日常信用卡',exact:true}).click();await expect(page.getByRole('dialog')).toContainText('缺少就业说明');await confirm();

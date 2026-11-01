@@ -14,7 +14,7 @@ test('twelve subscriptions keep annual terms, explicit decisions and original-op
  const design=page.getByRole('article',{name:'DesignKit订阅处理'});
  await design.getByRole('button',{name:'不再使用，准备取消'}).click();
  await expect(page.getByRole('dialog')).toContainText('每年 ¥299.00');
- await page.getByRole('dialog').getByRole('button',{name:'确认并执行模拟操作'}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'确认操作'}).click();
  await expect(design).toContainText('结果待核对');await design.getByRole('button',{name:'查询商户结果'}).click();
  await expect(design).toContainText('已关闭自动续费：DesignKit');
  await page.reload();await page.getByRole('button',{name:'查看账单与消费'}).click();await page.getByRole('button',{name:'订阅管理',exact:true}).click();

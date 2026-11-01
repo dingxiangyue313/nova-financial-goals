@@ -18,3 +18,12 @@ export const test = base.extend({
 });
 export { expect };
 export type { Page } from '@playwright/test';
+
+export async function openCategory(page: import('@playwright/test').Page, name: string) {
+  const entry = page.getByRole('button', { name, exact: true });
+  if (!await entry.isVisible()) {
+    await page.getByRole('button', { name: '返回', exact: true }).click();
+    if (!await entry.isVisible()) await page.getByRole('button', { name: 'NOVA', exact: true }).click();
+  }
+  await entry.click();
+}
