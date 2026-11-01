@@ -21,7 +21,6 @@ function Correction({ issue, disabled, onCorrect }: { issue: ImportIssue; disabl
     {issue.kind === 'low_confidence' ? <button className="mission-secondary" disabled={disabled} onClick={() => onCorrect(true)}>已核对这条记录</button> : <><label>正确的{issue.field === 'date' ? '日期' : issue.field === 'amountCents' ? '金额（整数分）' : '商户'}<input className="mission-input" value={value} type={issue.field === 'date' ? 'date' : issue.field === 'amountCents' ? 'number' : 'text'} onChange={e => setValue(e.target.value)} /></label><button className="mission-secondary" disabled={disabled || !value} onClick={() => onCorrect(issue.field === 'amountCents' ? Number(value) : value)}>确认修正</button></>}
   </article>;
 }
-
 export function ProductMissionPanel({ stage, onSnapshot, onChanged,allowSchedule=true }: { stage: string; onSnapshot?: (snapshot: Snapshot) => void; onChanged: () => void;allowSchedule?:boolean }) {
   const [view, setView] = useState<ProductMission | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null), [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -108,4 +107,3 @@ export function ProductMissionPanel({ stage, onSnapshot, onChanged,allowSchedule
     {confirmation && <div className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4"><div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="product-confirm-title" className="mission-card w-full max-w-[350px] max-h-[80vh] overflow-auto shadow-xl"><h2 id="product-confirm-title" className="text-lg font-bold">{confirmation.title}</h2><p>{confirmation.body}</p><p>所有操作仅使用模拟数据。本确认5分钟有效，数据变化需重新准备。</p>{error && <p role="alert">{error}</p>}<button className="mission-primary" disabled={busy} onClick={() => void confirm('confirm')}>确认并执行模拟操作</button><button className="mission-secondary" disabled={busy} onClick={() => void confirm('cancel')}>暂不操作</button></div></div>}
   </div>;
 }
-
