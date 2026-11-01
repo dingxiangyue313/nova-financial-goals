@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentComponent, AgentToolResult } from '../shared/contracts.ts';
-import { availableMonthly } from './domain.ts';
+import type { AgentComponent } from '../shared/contracts.ts';
 import { runAgentReadTool } from './agent-read-tools.ts';
 import { notificationDelivery } from './risk.ts';
 import { ensureImpactThread } from './workspace.ts';
@@ -10,33 +9,6 @@ import { claimMonitorEvent, createAgentThread, deferMonitorEvent,
   updateAgentTask, type MonitorEvent } from './store.ts';
 
 const yuan = (cents: number) => `¥${(cents / 100).toLocaleString('zh-CN')}`;
-
-function repairCandidate(event: MonitorEvent, threadId: string,
-  shortfallCents: number): AgentToolResult | null {
-  const state = getState(event.sessionId);
-  const goal = state.goals.find(item => item.id === event.goalId);
-  const task = getAgentTaskForThread(event.sessionId, threadId);
-  if (!goal || !task || !task.facts.originalTargetDate || !monitorEventIsCurrent(event)) return null;
-  const months = Math.max(1, Math.ceil((Date.parse(`${goal.targetDate}T00:00:00Z`)
-    - Date.parse(`${state.clock}T00:00:00Z`)) / 2_592_000_000));
-  const capacity = availableMonthly(state);
-  const cap = task.constraints.monthlyContributionCapCents ?? capacity;
-  const monthly = Math.min(cap, capacity,
-    goal.monthlyContributionCents + Math.ceil(shortfallCents / months / 10000) * 10000);
-  const dates = [...new Set([goal.targetDate, task.constraints.latestAllowedDate].filter(Boolean))] as string[];
-  for (const targetDate of dates) {
-    const result = runAgentReadTool(event.sessionId, threadId, 'candidate_preview', {
-      targetCents: goal.targetCents, targetDate, monthlyContributionCents: monthly,
-      protectedCents: Math.max(goal.protectedCents, state.finance.emergencyCents),
-      scenario: { kind: 'baseline' }, evidenceResultIds: [],
-    });
-    if (!monitorEventIsCurrent(event)) return null;
-    if (result.tool === 'candidate_preview' && result.status === 'ok' &&
-      result.output.assessment?.dataSufficient &&
-      ['on_track', 'at_risk'].includes(result.output.assessment.status)) return result;
-  }
-  return null;
-}
 
 export function processMonitorEvent(event: MonitorEvent, now = new Date()): void {
   if (!monitorEventIsCurrent(event)) { finishMonitorEvent(event, 'stale', now); return; }
@@ -91,30 +63,17 @@ export function processMonitorEvent(event: MonitorEvent, now = new Date()): void
   const transactions = runAgentReadTool(event.sessionId, threadId, 'relevant_transactions',
     { limit: 20 });
   const shortfall = signal?.impact.shortfallCents ?? impact?.shortfallCents ?? 0;
-  const candidate = repairCandidate(event, threadId, shortfall);
-  if (!monitorEventIsCurrent(event)) { finishMonitorEvent(event, 'stale', now); return; }
   const evidence = signal?.evidence.map(item => `${item.date} ${yuan(item.amountCents)}`).join('、')
     || (transactions.tool === 'relevant_transactions'
       ? `${transactions.output.transactions.length} 条相关模拟流水` : '当前模拟财务数据');
   const title = signal?.title ?? impact?.title ?? '目标条件变化';
   const delay = signal?.impact.delayDays ?? impact?.delayDays ?? 0;
   const body = `${title}。依据：${evidence}。预计目标可能延后 ${delay} 天，缺口约 ${yuan(shortfall)}。`;
-  const next = candidate ? '已试算一项未生效的修复候选；请核对并单独确认。'
-    : '当前硬约束内尚无已验证的修复候选；请调整期限或每月投入上限后重新试算。';
+  const next = '请进入统一调整页核验两种方案；NOVA 会在那里重新计算，当前会话不会直接修改计划。';
   const components: AgentComponent[] = [{ id: randomUUID(), type: 'goal_impact_brief',
     title: '目标变化与证据', body: `${body} ${next}`, ...(signal ? { signal } : {}) }];
-  if (candidate?.tool === 'candidate_preview' && candidate.output.assessment) {
-    const { input, assessment } = candidate.output;
-    components.push({ id: randomUUID(), type: 'candidate_recommendations', title: '修复候选 · 待确认',
-      body: `假设：${candidate.assumptions.join('；')}。${next}`, taskThreadId: threadId,
-      items: [{ resultId: candidate.toolResultId, source: 'nova', selectable: true, blockingReasons: [],
-        originalTargetDate: input.targetDate, delayDays: assessment.delayDays, targetCents: input.targetCents,
-        targetDate: input.targetDate, monthlyContributionCents: input.monthlyContributionCents,
-        protectedCents: input.protectedCents, projectedDate: assessment.projectedDate,
-        bufferCents: assessment.bufferCents, status: assessment.status as 'on_track' | 'at_risk',
-        tradeoff: 'balanced', explanation: `每月投入 ${yuan(input.monthlyContributionCents)}，按当前模拟数据预计 ${assessment.projectedDate ?? '暂无法确定日期'}完成；首月缓冲 ${yuan(assessment.bufferCents)}。`,
-        assumptions: candidate.assumptions, gaps: candidate.gaps }] });
-  }
+  if (state.pendingImpact) components.push({ id: randomUUID(), type: 'risk_repair_entry',
+    title: '查看调整方案', body: next, impactId: state.pendingImpact.id });
   const notificationThread = signal ? createAgentThread(event.sessionId,
     { title: `${title} · NOVA 修复建议`, kind: 'risk', dedupeKey: `monitor:${signal.id}` })
     : ensureImpactThread(event.sessionId, state, now)
@@ -123,8 +82,7 @@ export function processMonitorEvent(event: MonitorEvent, now = new Date()): void
   if (notificationThread.status !== 'active' || notificationThread.readOnly) {
     finishMonitorEvent(event, 'done', now); return;
   }
-  deliverMonitorNotification(event, notificationThread.id, `${body} ${next}`, components,
-    candidate?.tool === 'candidate_preview' ? candidate.toolResultId : null, subjectKey);
+  deliverMonitorNotification(event, notificationThread.id, `${body} ${next}`, components, null, subjectKey);
 }
 
 export function tickMonitorWorker(now = new Date(), maxEvents = 10): number {

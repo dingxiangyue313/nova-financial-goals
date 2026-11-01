@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AgentComponent, GoalAssumptions, RiskPreferences } from '../../shared/contracts';
+import type { AgentComponent, GoalAssumptions, RiskPreferences, Snapshot } from '../../shared/contracts';
 import { normalizeAgentComponent } from '../../shared/generative';
 import type { ScreenId } from '../types';
 import { ClaimBadge } from './money-mission/ClaimBadge';
@@ -102,17 +102,33 @@ function PreferenceEditor({ preferences, goalId, onUpdate, busy }: {
 }
 
 export function AgentComponentRenderer({ value, onAction, onCancel, onSelectCandidate, onConnectData,
-  onMonitoring, onFollowup, onNavigate, busy, onPreview, onUpdateRiskPreferences }: {
+  onMonitoring, onFollowup, onNavigate, riskSignals, busy, onPreview, onUpdateRiskPreferences }: {
   value: unknown; onAction: (actionId: string, selection?: string[]) => void; onCancel: (actionId: string) => void;
   onSelectCandidate: (resultId: string, threadId?: string) => void;
   onConnectData: (threadId: string) => void;
   onMonitoring: (threadId: string, enabled: boolean) => void;
   onFollowup: (threadId: string) => void;
   onNavigate: (screen: ScreenId) => void; busy?: boolean;
+  riskSignals?: Snapshot['riskSignals'];
   onPreview?: (assumptions: GoalAssumptions, twinVersion: number) => void;
   onUpdateRiskPreferences?: (changes: Partial<RiskPreferences>) => void;
 }) {
   const component = normalizeAgentComponent(value);
+
+  if (component.type === 'risk_repair_entry') {
+    const status = riskSignals?.find(signal => signal.impactId === component.impactId)?.status;
+    const available = status === 'active' || status === 'later';
+    return <article className="rounded-2xl border border-[#B9D9D8] bg-white p-4 shadow-sm">
+      <h4 className="text-[14px] font-bold">{component.title}</h4>
+      <p className="mt-2 text-[12px] leading-relaxed text-[#5A616B]">{available ? component.body
+        : status === 'resolved' ? '这条风险已经处理，历史证据保留。'
+          : status === 'dismissed' ? '这条提醒已忽略，历史证据保留。' : '这条风险判断已过期，请重新核算。'}</p>
+      <button type="button" disabled={!available} onClick={() => onNavigate('impact')}
+        className="mt-3 min-h-11 w-full rounded-xl bg-[#0F6B6D] px-3 text-[12px] font-semibold text-white disabled:bg-[#D0D5DD]">
+        {available ? '查看调整方案' : '当前不可执行'}
+      </button>
+    </article>;
+  }
 
   if (component.type === 'data_connection_prompt') return <article className="rounded-2xl border border-[#B9D9D8] bg-white p-4 shadow-sm">
     <h4 className="text-[14px] font-bold">{component.title}</h4>
