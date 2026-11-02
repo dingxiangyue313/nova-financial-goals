@@ -7,7 +7,7 @@ test('six scenario entry preserves goal-first home and explicit money confirmati
   await page.goto('/');await page.request.post('/api/product/start',{data:{}});
   await expect(page.getByRole('heading',{name:'早上好，Alex'})).toBeVisible();
   await expect(page.getByText('快速直达:')).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'模拟数据',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'支出影响案例',exact:true})).toBeEnabled();
   await expect(page.getByText('10月花了 ¥4,778')).toBeVisible();
   await page.screenshot({path:`artifacts/home-${testInfo.project.name}.png`,fullPage:true});
   await page.getByRole('button',{name:'NOVA',exact:true}).click();
