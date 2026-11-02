@@ -43,7 +43,7 @@ export async function requestDeepSeekJson<T>(schema: z.ZodType<T>, options: {
     try { return { ok: true, data: schema.parse(JSON.parse(content)) }; }
     catch (error) {
       if (process.env.NOVA_EVAL_MODEL_DIAGNOSTICS === '1') console.error('DeepSeek JSON validation',
-        error instanceof z.ZodError ? error.issues.slice(0,10).map(issue => ({code:issue.code,path:issue.path})) : 'parse_error');
+        error instanceof z.ZodError ? error.issues.slice(0,10).map(issue => ({code:issue.code,pathDepth:issue.path.length})) : 'parse_error');
       return { ok: false, reason: error instanceof z.ZodError?'DEEPSEEK_SCHEMA_ERROR':'DEEPSEEK_INVALID_JSON' };
     }
   } catch (error) {
