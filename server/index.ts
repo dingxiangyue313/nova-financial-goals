@@ -733,7 +733,7 @@ app.post('/api/demo/expense', route((req, res) => {
       suppressionKey: `one-off:${old.goal.id}:${transactionId}`,
     } : null;
     const riskBase = signal ? supersedeGoalRisks(result.state, old.goal.id) : result.state;
-    const withTransaction = { ...riskBase, pendingImpact: acceptedImpact,
+    const withTransaction = { ...riskBase, pendingImpact: acceptedImpact ?? old.pendingImpact,
       riskSignals: signal ? [...riskBase.riskSignals, signal] : riskBase.riskSignals,
       transactions: [{ id: transactionId, accountId: 'checking',
       date: old.clock, title: body.title, category: 'expense', amountCents: -body.amountCents }, ...result.state.transactions] };

@@ -260,10 +260,23 @@ test('GoalGuard HTTP repair uses preview/apply/status and rejects the legacy A/B
     await call('/api/goals/activate', 'POST', { planId: 'balanced' });
     const firstRisk = (await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'first-sequential-risk' })).data as Snapshot;
     await call('/api/impact/decision', 'POST', { decision: 'later', impactId: firstRisk.pendingImpact!.id });
+    const quietExpense = (await call('/api/demo/expense', 'POST', { amountCents: 100, title: '小额支出' })).data as Snapshot;
+    assert.equal(quietExpense.pendingImpact?.id, firstRisk.pendingImpact!.id);
+    assert.equal(quietExpense.riskSignals.find(signal => signal.impactId === firstRisk.pendingImpact!.id)?.status, 'later');
+    await call('/api/risk/preferences', 'PATCH', { amountThresholdCents: 1000000 });
+    const suppressedImpact = (await call('/api/demo/expense', 'POST', { amountCents: 90000, title: '阈值内支出' })).data as Snapshot;
+    assert.equal(suppressedImpact.pendingImpact?.id, firstRisk.pendingImpact!.id);
+    assert.equal(suppressedImpact.riskSignals.find(signal => signal.impactId === firstRisk.pendingImpact!.id)?.status, 'later');
+
+    cookie = '';
+    await call('/api/demo/load-japan', 'POST');
+    await call('/api/goals/activate', 'POST', { planId: 'balanced' });
+    const replaceableRisk = (await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'replaceable-risk' })).data as Snapshot;
+    await call('/api/impact/decision', 'POST', { decision: 'later', impactId: replaceableRisk.pendingImpact!.id });
     const secondRisk = (await call('/api/demo/expense', 'POST', { amountCents: 90000, title: '第二笔风险支出' })).data as Snapshot;
-    assert.equal(secondRisk.riskSignals.find(signal => signal.impactId === firstRisk.pendingImpact!.id)?.status, 'stale');
+    assert.equal(secondRisk.riskSignals.find(signal => signal.impactId === replaceableRisk.pendingImpact!.id)?.status, 'stale');
     assert.equal(secondRisk.riskSignals.filter(signal => signal.status === 'active').length, 1);
-    assert.notEqual(secondRisk.pendingImpact?.id, firstRisk.pendingImpact!.id);
+    assert.notEqual(secondRisk.pendingImpact?.id, replaceableRisk.pendingImpact!.id);
 
     cookie = '';
     await call('/api/demo/load-japan', 'POST');
