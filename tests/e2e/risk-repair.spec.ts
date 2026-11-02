@@ -60,3 +60,17 @@ test('later makes the homepage quiet while the NOVA risk evidence remains retrie
   expect(state.pendingImpact).not.toBeNull();
   expect(state.riskSignals[0].status).toBe('later');
 });
+
+test('a transient preview failure can be retried without leaving the risk flow', async ({ page }) => {
+  let failing = true;
+  await page.route('**/api/impact/plan-preview', async route => {
+    if (failing) await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'TEMPORARY_PREVIEW_FAILURE' }) });
+    else await route.continue();
+  });
+  await loadActiveRisk(page);
+  await expect(page.getByRole('alert')).toContainText('TEMPORARY_PREVIEW_FAILURE');
+  failing = false;
+  await page.getByRole('button', { name: '重新加载方案' }).click();
+  await expect(page.getByRole('button', { name: /方案 A · 保持目标日期/ })).toBeVisible();
+  await expect(page.getByRole('alert')).toBeHidden();
+});

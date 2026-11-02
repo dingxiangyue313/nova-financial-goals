@@ -18,6 +18,7 @@ import {
   postponeRisk,
   previewRiskRepair,
 } from './risk-repair.ts';
+import { supersedeGoalRisks } from './risk-lifecycle.ts';
 
 function activeRiskFixture(): DemoState {
   return applySpendingTrendDemo(activatePlan(createFixture(), 'balanced')).state;
@@ -158,6 +159,16 @@ test('later keeps a retrievable risk quiet while dismiss clears the current remi
   assert.equal(dismissed.riskSignals[0].status, 'dismissed');
   assert.equal(dismissed.pendingImpact, null);
   assert.equal(dismissed.twinVersion, later.twinVersion + 1);
+});
+
+test('a newer material risk makes the postponed risk stale before becoming current', () => {
+  const state = activeRiskFixture();
+  const firstImpactId = state.pendingImpact!.id;
+  const later = postponeRisk(state, firstImpactId);
+  const superseded = supersedeGoalRisks(later, later.goal.id);
+
+  assert.equal(superseded.riskSignals.find(signal => signal.impactId === firstImpactId)?.status, 'stale');
+  assert.equal(superseded.pendingImpact, null);
 });
 
 test('ordinary goal writes make active and postponed risk judgments stale in the same state change', () => {

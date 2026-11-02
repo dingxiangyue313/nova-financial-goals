@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { consumerFixture, productMission, fundedConsumerFixture } from './product-mission.ts';
+import { applyProductPlanSelection, consumerFixture, productMission, fundedConsumerFixture } from './product-mission.ts';
 import { verifyAuditChain } from './governance.ts';
 import {snapshot} from './presentation.ts';
 import {connectDataSources} from './data-connections.ts';
+import { activatePlan } from './domain.ts';
+import { createFixture } from './fixtures.ts';
+import { applySpendingTrendDemo } from './risk.ts';
 
 test('the consumer adapter uses the updated core without changing authoritative balances', async () => {
   const state = await consumerFixture();
@@ -30,4 +33,15 @@ test('the funded trip is an explicit separate simulation opening, with no presel
   assert.equal(state.accounts.find(a=>a.id==='goal-wallet')!.balanceCents,800000);
   assert.equal(state.financialServices.bookings.length,0);assert.equal(state.financialServices.mandates.length,0);
   assert.equal(productMission(state).brief.totalExpenseCents,477800);
+});
+test('confirming a product plan makes the previous goal risk stale in the same state change',()=>{
+  const risk = applySpendingTrendDemo(activatePlan(createFixture(), 'balanced')).state;
+  const impactId = risk.pendingImpact!.id;
+  const updated = applyProductPlanSelection(risk, { monthlyCents: 120000,
+    firstMonthContributionCents: 180000 });
+  assert.equal(updated.riskSignals.find(signal => signal.impactId === impactId)?.status, 'stale');
+  assert.equal(updated.pendingImpact, null);
+  assert.equal(updated.goal.monthlyContributionCents, 120000);
+  assert.equal(updated.goal.firstMonthContributionCents, 180000);
+  assert.equal(updated.twinVersion, risk.twinVersion + 1);
 });

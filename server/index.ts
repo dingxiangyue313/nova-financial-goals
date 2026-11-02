@@ -52,7 +52,7 @@ import { registerFinancialServices } from './financial-services-routes.ts';
 import { tickFinancialServices,tickSubscriptionReminderQueue,tickGoalNoticeQueue } from './store.ts';
 import { applyGoalPlanChange, previewGoalPlanChange } from './scenario.ts';
 import { hasDatedCashflowEvidence } from './money-mission-plans.ts';
-import { applyRiskRepair, dismissRisk, invalidateGoalRisks, postponeRisk, previewRiskRepair,
+import { applyRiskRepair, dismissRisk, invalidateGoalRisks, postponeRisk, previewRiskRepair, supersedeGoalRisks,
   type RiskRepairApplyResult } from './risk-repair.ts';
 
 const app = express();
@@ -732,8 +732,9 @@ app.post('/api/demo/expense', route((req, res) => {
       twinVersion: old.twinVersion + 1, impact: decision.goalImpact!, status: 'active' as const,
       suppressionKey: `one-off:${old.goal.id}:${transactionId}`,
     } : null;
-    const withTransaction = { ...result.state, pendingImpact: acceptedImpact,
-      riskSignals: signal ? [...result.state.riskSignals, signal] : result.state.riskSignals,
+    const riskBase = signal ? supersedeGoalRisks(result.state, old.goal.id) : result.state;
+    const withTransaction = { ...riskBase, pendingImpact: acceptedImpact,
+      riskSignals: signal ? [...riskBase.riskSignals, signal] : riskBase.riskSignals,
       transactions: [{ id: transactionId, accountId: 'checking',
       date: old.clock, title: body.title, category: 'expense', amountCents: -body.amountCents }, ...result.state.transactions] };
     return audit(withTransaction, 'simulate_expense', decision.outcome, body.title);

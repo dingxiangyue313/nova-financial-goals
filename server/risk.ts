@@ -11,6 +11,7 @@ import type {
 } from '../shared/contracts.ts';
 import { assessGoal } from './domain.ts';
 import {protectedCheckingReserve} from './financial-constraints.ts';
+import { supersedeGoalRisks } from './risk-lifecycle.ts';
 
 const DAY = 86_400_000;
 export const RISK_RULE_VERSION = 'goal-aware-v1';
@@ -373,9 +374,10 @@ export function applySpendingTrendDemo(state: DemoState): {
     confidence: pattern.confidence, ruleVersion: RISK_RULE_VERSION, twinVersion: state.twinVersion + 1,
     impact: impactData, status: 'active', suppressionKey,
   };
+  const superseded = supersedeGoalRisks(common, state.goal.id);
   const next: DemoState = {
-    ...common,
-    riskSignals: [...state.riskSignals, signal],
+    ...superseded,
+    riskSignals: [...superseded.riskSignals, signal],
     weeklyRiskSummaries: state.weeklyRiskSummaries.map(summary => summary.goalId === state.goal.id
       && summary.status === 'available' ? { ...summary, status: 'dismissed' as const } : summary),
     pendingImpact: impact,

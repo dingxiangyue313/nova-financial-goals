@@ -254,6 +254,26 @@ test('GoalGuard HTTP repair uses preview/apply/status and rejects the legacy A/B
     assert.equal(directChange.code, 200);
     assert.equal(directChange.data.riskSignals[0].status, 'stale');
     assert.equal(directChange.data.pendingImpact, null);
+
+    cookie = '';
+    await call('/api/demo/load-japan', 'POST');
+    await call('/api/goals/activate', 'POST', { planId: 'balanced' });
+    const firstRisk = (await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'first-sequential-risk' })).data as Snapshot;
+    await call('/api/impact/decision', 'POST', { decision: 'later', impactId: firstRisk.pendingImpact!.id });
+    const secondRisk = (await call('/api/demo/expense', 'POST', { amountCents: 90000, title: '第二笔风险支出' })).data as Snapshot;
+    assert.equal(secondRisk.riskSignals.find(signal => signal.impactId === firstRisk.pendingImpact!.id)?.status, 'stale');
+    assert.equal(secondRisk.riskSignals.filter(signal => signal.status === 'active').length, 1);
+    assert.notEqual(secondRisk.pendingImpact?.id, firstRisk.pendingImpact!.id);
+
+    cookie = '';
+    await call('/api/demo/load-japan', 'POST');
+    await call('/api/goals/activate', 'POST', { planId: 'balanced' });
+    const productGoalRisk = (await call('/api/demo/spending-trend', 'POST', { idempotencyKey: 'product-goal-risk' })).data as Snapshot;
+    const productGoal = await call('/api/product/goals', 'POST', { title: '课程培训', targetCents: 1200000,
+      targetDate: '2027-06-30', protectedCents: 2000000, expectedTwinVersion: productGoalRisk.twinVersion });
+    assert.equal(productGoal.code, 200);
+    assert.equal(productGoal.data.riskSignals.find((signal: { impactId: string }) => signal.impactId === productGoalRisk.pendingImpact!.id)?.status, 'stale');
+
   } finally {
     child.kill('SIGTERM');
     await new Promise(resolve => child.once('exit', resolve));

@@ -11,3 +11,9 @@ export function invalidateGoalRisks(state: DemoState, goalId: string): DemoState
   return { ...state, riskSignals,
     pendingImpact: state.pendingImpact?.goalId === goalId ? null : state.pendingImpact };
 }
+
+// A goal has one current repair context. When new evidence creates a replacement,
+// retire every older executable judgment before installing the new impact.
+export function supersedeGoalRisks(state: DemoState, goalId: string): DemoState {
+  return invalidateGoalRisks(state, goalId);
+}

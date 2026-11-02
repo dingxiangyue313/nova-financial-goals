@@ -28,6 +28,9 @@ export function PlanCandidateCard({ candidate, title, selected, busy, onSelect }
     <span className="mt-1 block text-sm font-semibold">{money(candidate.monthlyCents)}/月</span>
     <span className="mt-1 block text-xs text-[#5A616B]">{candidate.explanation}</span>
     <span className="mt-1 block text-xs">预计完成 {candidate.projectedDate ?? '待补充数据'}</span>
+    {candidate.firstMonthContributionCents != null && candidate.firstMonthContributionCents !== candidate.monthlyCents && <span className="mt-1 block text-xs">
+      首月合计 {money(candidate.firstMonthContributionCents)}
+    </span>}
     <span className="mt-1 block text-xs">首月缓冲 {money(candidate.safeToSpendCents)}</span>
     {candidate.blockingReasons.length > 0 && <span className="mt-1 block text-xs text-rose-700">
       {candidate.blockingReasons.map(reason => planBlockingReason[reason] ?? '需核对当前数据').join('；')}

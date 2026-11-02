@@ -154,7 +154,11 @@ export function GoalImpactScreen({ snapshot, goal, onRefresh, onResolved, onManu
         ]} />
         <TargetDateConfirmation candidate={chosen.candidate} accepted={accepted} onChange={setAccepted} />
       </section>}
-      {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
+      {error && <div className="space-y-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
+        <p role="alert">{error}</p>
+        {!loading && <button type="button" onClick={() => setRefreshKey(value => value + 1)}
+          className="min-h-11 rounded-lg border border-rose-200 bg-white px-3 font-semibold text-rose-700">重新加载方案</button>}
+      </div>}
       <button type="button" disabled={busy || !chosen?.candidate.selectable
         || Boolean(chosen?.candidate.requiresTargetDateChange && !accepted)} onClick={() => void apply()}
         className="min-h-11 w-full rounded-xl bg-[#0F6B6D] px-4 text-sm font-semibold text-white disabled:bg-[#D0D5DD]">

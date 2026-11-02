@@ -23,6 +23,7 @@ import { syntheticStatements } from './synthetic-statements.ts';
 import { saveStatementImportPreview } from './store.ts';
 import { initializeServices } from './financial-services.ts';
 import {addSubscriptionSamples,subscriptionReminders,subscriptionDisputes} from './subscription-catalog.ts';
+import { invalidateGoalRisks } from './risk-lifecycle.ts';
 
 const categories: Record<string, string> = { 工资: 'income', 餐饮: 'dining', 住房: 'housing', 交通: 'transport', 购物: 'shopping', 订阅: 'subscriptions', 水电: 'utilities', 保险: 'insurance', 退款: 'refund', 内部转账: 'internal_transfer' };
 export async function consumerFixture(history = true) {
@@ -50,6 +51,15 @@ export function productMission(state: DemoState) {
     rows: state.normalizedStatementRows.map(({ originalValues: _o, correctedValues: _c, ...row }) => row) };
 }
 export type ProductMission = ReturnType<typeof productMission>;
+export function applyProductPlanSelection(state: DemoState, plan: {
+  monthlyCents: number; firstMonthContributionCents: number;
+}): DemoState {
+  const invalidated = invalidateGoalRisks(state, state.goal.id);
+  const goal = { ...invalidated.goal, selectedPlanId: 'custom', monthlyContributionCents: plan.monthlyCents,
+    firstMonthContributionCents: plan.firstMonthContributionCents, status: 'active' as const };
+  return { ...invalidated, goal, goals: invalidated.goals.map(item => item.id === goal.id ? goal : item),
+    twinVersion: invalidated.twinVersion + 1 };
+}
 export async function fundedConsumerFixture(){
   const fixture=await consumerFixture(),goal={...fixture.goal,savedCents:800000,status:'active' as const};
   return {...fixture,goal,goals:[goal],accounts:fixture.accounts.map(a=>a.id==='goal-wallet'?{...a,balanceCents:800000}:a),
@@ -74,7 +84,7 @@ export function registerProductMission(app: Express, sessionId: (req: Request, r
     const id=sessionId(req,res),next=mutateState(id,old=>{
       if(old.twinVersion!==body.expectedTwinVersion)throw new Error('TWIN_VERSION_CHANGED');
       if(body.targetDate<=old.clock)throw new Error('GOAL_DATE_MUST_BE_FUTURE');
-      const state=initializeServices(old),goal={...state.goal,id:randomUUID(),title:body.title,targetCents:body.targetCents,targetDate:body.targetDate,originalDate:body.targetDate,
+      const state=invalidateGoalRisks(initializeServices(old),old.goal.id),goal={...state.goal,id:randomUUID(),title:body.title,targetCents:body.targetCents,targetDate:body.targetDate,originalDate:body.targetDate,
         protectedCents:body.protectedCents,savedCents:0,monthlyContributionCents:0,firstMonthContributionCents:0,selectedPlanId:null,status:'draft' as const,quote:`${body.targetDate}前准备${body.targetCents/100}元用于${body.title}`};
       return appendAuditEvent({...state,goal,goals:[...state.goals,goal],primaryGoalId:goal.id,pendingImpact:null,twinVersion:state.twinVersion+1},'consumer_create_goal','draft','已创建目标草稿；原有账户、其他目标资金和授权保持不变。');
     });res.json(productMission(next).snapshot);
@@ -180,9 +190,8 @@ export function registerProductMission(app: Express, sessionId: (req: Request, r
       const plan = productMission(state).plans.find(p => p.id === params.planId);
       if (!plan?.executable || stableHash(plan) !== params.planHash) throw new Error('PLAN_NOT_AVAILABLE');
       const approved = confirmApproval(state, approvalId, snapshotHash), next = consumeApproval(approved.state, approved.token, 'product_choose_plan', params);
-      const goal = { ...next.goal, selectedPlanId: 'custom', monthlyContributionCents: plan.monthlyCents, firstMonthContributionCents: plan.firstMonthContributionCents, status: 'active' as const };
       finishAgentAction(sid, action.id, 'consumed', { planId: plan.id });
-      return appendAuditEvent({ ...next, goal, goals: next.goals.map(g => g.id === goal.id ? goal : g), twinVersion: next.twinVersion + 1 }, 'product_choose_plan', 'succeeded', '已确认目标方案；尚未转移资金。', { approvalId });
+      return appendAuditEvent(applyProductPlanSelection(next, plan), 'product_choose_plan', 'succeeded', '已确认目标方案；尚未转移资金。', { approvalId });
     });
     res.json(snapshot(getState(sid)));
   }));

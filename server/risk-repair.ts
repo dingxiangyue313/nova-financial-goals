@@ -16,7 +16,7 @@ import {
 } from '../shared/contracts.ts';
 import { appendAuditEvent, stableHash } from './governance.ts';
 import { applyGoalPlanChange, previewGoalPlanChange } from './scenario.ts';
-export { invalidateGoalRisks } from './risk-lifecycle.ts';
+export { invalidateGoalRisks, supersedeGoalRisks } from './risk-lifecycle.ts';
 
 type CurrentRisk = { impact: Impact; signal: GoalImpactSignal };
 
