@@ -1,3 +1,4 @@
+import { LayoutDashboard, Target, ChartNoAxesCombined, CircleUserRound } from 'lucide-react';
 import React from 'react';
 import { ScreenId } from '../types';
 
@@ -8,19 +9,19 @@ interface BottomNavProps {
 
 export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate }) => {
   return (
-    <nav className="sticky bottom-0 w-full z-50 pb-safe bg-white border-t border-[#E5E8EB]">
-      <div className="h-14 px-2 grid grid-cols-5 items-center">
+    <nav className="sticky bottom-0 w-full min-w-0 shrink-0 z-50 pb-safe bg-white border-t border-[#E5E8EB]">
+      <div className="h-16 px-3 grid grid-cols-5 items-center">
         {/* Tab 1: 首页 */}
         <button
           aria-label="首页"
           onClick={() => onNavigate('home')}
-          className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
+          className={`min-w-0 flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'home'
               ? 'text-[#0F6B6D] font-bold'
               : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
-          <span aria-hidden="true" className="material-symbols-outlined w-5 overflow-hidden text-[20px]">dashboard</span>
+          <LayoutDashboard aria-hidden="true" size={22} strokeWidth={1.8} className="shrink-0" />
           <span className="text-[11px]">首页</span>
         </button>
 
@@ -28,20 +29,20 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
         <button
           aria-label="目标"
           onClick={() => onNavigate('goals_list')}
-          className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
+          className={`min-w-0 flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'goals_list'
               ? 'text-[#0F6B6D] font-bold'
               : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
-          <span aria-hidden="true" className="material-symbols-outlined w-5 overflow-hidden text-[20px]">track_changes</span>
+          <Target aria-hidden="true" size={22} strokeWidth={1.8} className="shrink-0" />
           <span className="text-[11px]">目标</span>
         </button>
 
         {/* Tab 3: NOVA Center Button */}
         <button
           onClick={() => onNavigate('workspace')}
-          className={`flex flex-col items-center justify-center h-full transition-transform active:scale-95 cursor-pointer group ${currentScreen === 'workspace' ? 'font-bold' : ''}`}
+          className={`min-w-0 flex flex-col items-center justify-center h-full transition-transform active:scale-95 cursor-pointer group ${currentScreen === 'workspace' ? 'font-bold' : ''}`}
           title="新建目标 / NOVA 智能对话"
         >
           <div className="w-9 h-9 rounded-full bg-[#0F6B6D] group-hover:bg-[#084C4E] text-white flex items-center justify-center shadow-sm transition-colors">
@@ -64,13 +65,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
         <button
           aria-label="动态"
           onClick={() => onNavigate('activity')}
-          className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
+          className={`min-w-0 flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'activity'
               ? 'text-[#0F6B6D] font-bold'
               : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
-          <span aria-hidden="true" className="material-symbols-outlined w-5 overflow-hidden text-[20px]">timeline</span>
+          <ChartNoAxesCombined aria-hidden="true" size={22} strokeWidth={1.8} className="shrink-0" />
           <span className="text-[11px]">动态</span>
         </button>
 
@@ -78,13 +79,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentScreen, onNavigate 
         <button
           aria-label="我的"
           onClick={() => onNavigate('profile')}
-          className={`flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
+          className={`min-w-0 flex flex-col items-center justify-center gap-0.5 h-full transition-colors cursor-pointer ${
             currentScreen === 'profile'
               ? 'text-[#0F6B6D] font-bold'
               : 'text-[#5A616B] hover:text-[#1F2329]'
           }`}
         >
-          <span aria-hidden="true" className="material-symbols-outlined w-5 overflow-hidden text-[20px]">account_circle</span>
+          <CircleUserRound aria-hidden="true" size={22} strokeWidth={1.8} className="shrink-0" />
           <span className="text-[11px]">我的</span>
         </button>
       </div>
