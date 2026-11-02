@@ -122,7 +122,7 @@ export function GoalImpactScreen({ snapshot, goal, onRefresh, onResolved, onManu
     <div className="space-y-3 pb-5">
       {verified && <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-[19px] font-bold">{goal.title}可能延期 {verified.candidate.delayDays} 天</h2>
+          <h2 className="text-[19px] font-bold">{goal.title}可能延期 <span className="whitespace-nowrap">{verified.candidate.delayDays} 天</span></h2>
           <span className="shrink-0 rounded-full bg-[#E6F2F2] px-2 py-1 text-[11px] font-semibold text-[#0F6B6D]">NOVA 洞察</span>
         </div>
         <p className="text-sm leading-relaxed text-[#5A616B]">{verified.evidence.title}；{verified.evidence.transactions.length} 笔核验流水累计 {money(evidenceTotal)}，影响了原有储蓄节奏。</p>
@@ -132,7 +132,7 @@ export function GoalImpactScreen({ snapshot, goal, onRefresh, onResolved, onManu
       </section>}
       {verified && <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
         <h3 className="text-sm font-bold">为什么会受影响</h3>
-        <p className="text-xs text-[#5A616B]">数据截至 {verified.evidence.dataAsOf} · 风险识别于 {verified.evidence.detectedAt} · 置信度 {verified.evidence.confidence}</p>
+        <p className="text-xs text-[#5A616B]">数据截至 {verified.evidence.dataAsOf} · 风险识别于 {verified.evidence.detectedAt} · 置信度 {{ high: '高', medium: '中', low: '低' }[verified.evidence.confidence]}</p>
         <p className="text-xs text-[#5A616B]">原计划 {verified.comparison.before.targetDate}，保持当前月投入后预计 {verified.comparison.after.projectedDate ?? '仍需补充数据'} 完成，延期 {verified.candidate.delayDays} 天。</p>
         <p className="text-[11px] text-[#5A616B]">证据、金额与日期均来自同一服务端预览；选择方案后仍需最终确认。</p>
       </section>}
