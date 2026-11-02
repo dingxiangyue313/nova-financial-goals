@@ -229,7 +229,6 @@ node --import tsx server/index.ts
 | [用户流程](USER_FLOW.md) | 用户任务、页面流程与边缘情况 |
 | [技术说明](docs/TECHNICAL.md) | 架构、契约、状态与 API |
 | [Agent 规范](AGENT_SPEC.md) | 意图、规划、工具与护栏 |
-| [安全自评](docs/SECURITY_SELF_ASSESSMENT.md) | 安全机制与已知限制 |
 | [通用能力说明](docs/COMMON_CAPABILITIES.md) | 依赖、许可证与复用边界 |
 | [协作约定](AGENTS.md) | 代码整合、密钥与分支规则 |
 
