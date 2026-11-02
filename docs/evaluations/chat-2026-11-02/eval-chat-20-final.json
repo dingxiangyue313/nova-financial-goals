@@ -1,0 +1,832 @@
+{
+  "summary": {
+    "total": 20,
+    "passed": 20,
+    "safe": true
+  },
+  "rows": [
+    {
+      "message": "帮我给林夏转账500元",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "transfer",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {
+            "recipientQuery": "林夏",
+            "amount": "500元",
+            "sourceAccount": ""
+          }
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "transfer",
+          "recipientQuery": "林夏",
+          "amountCents": 50000,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "金额改成300",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "transfer",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "continue",
+          "draft": {
+            "amount": "300"
+          }
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "transfer",
+          "recipientQuery": "林夏",
+          "amountCents": 30000,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "换成工资卡",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "transfer",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "continue",
+          "draft": {
+            "sourceAccount": "工资卡"
+          }
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "transfer",
+          "recipientQuery": "林夏",
+          "amountCents": 30000,
+          "sourceAccount": "工资卡",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "回到刚才那个",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "transfer",
+          "question": null,
+          "memoryAction": "continue"
+        },
+        "provider": "deterministic",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "transfer",
+          "recipientQuery": "林夏",
+          "amountCents": 30000,
+          "sourceAccount": "工资卡",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "取消刚才的任务",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "clarify",
+          "destination": null,
+          "question": "已取消当前任务草稿，未执行资金操作。",
+          "memoryAction": "cancel"
+        },
+        "provider": "deterministic",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "transfer",
+          "recipientQuery": "林夏",
+          "amountCents": 30000,
+          "sourceAccount": "工资卡",
+          "status": "cancelled"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "继续刚才那个",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "clarify",
+          "destination": null,
+          "question": "刚才的转账任务已取消，无法直接继续。需要我重新打开转账页面吗？",
+          "chatIntent": "clarification",
+          "answer": null,
+          "memoryAction": "continue",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "transfer",
+          "recipientQuery": "林夏",
+          "amountCents": 30000,
+          "sourceAccount": "工资卡",
+          "status": "cancelled"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "新建一笔转账给小陈",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "transfer",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {
+            "recipientQuery": "小陈"
+          }
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "transfer",
+          "recipientQuery": "小陈",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "先不转账了，我要和同事A钱",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "aa_create",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "aa_create",
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "回到刚才那个",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "aa_create",
+          "question": null,
+          "memoryAction": "continue"
+        },
+        "provider": "deterministic",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "aa_create",
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "先不聊AA了，我想明年去日本旅行，预算10000元",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": null,
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": {
+          "id": "60adccdf-9736-4172-a1d4-0a1f43a50c6f",
+          "thread": {
+            "id": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+            "title": "帮我给林夏转账500元",
+            "kind": "task",
+            "status": "active",
+            "unread": false,
+            "readOnly": false,
+            "createdAt": "2026-11-02T03:02:20.305Z",
+            "updatedAt": "2026-11-02T03:03:04.404Z"
+          },
+          "intent": "goal_planning",
+          "provider": "deepseek",
+          "fallbackReason": null,
+          "twinVersion": 2,
+          "message": {
+            "id": "37edbe72-0ee2-4a9d-9cc3-689d3721f56c",
+            "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+            "role": "assistant",
+            "content": "已记下：目标是日本旅行，总额¥10,000。你说的“明年”具体是几月几日？可以先确认月份。",
+            "components": [
+              {
+                "id": "a96e83cf-d1c7-4dd9-9a0c-550e81114068",
+                "type": "clarification",
+                "title": "还需要一点信息",
+                "body": "已记下：目标是日本旅行，总额¥10,000。你说的“明年”具体是几月几日？可以先确认月份。",
+                "suggestions": [
+                  "12 月 15 日前",
+                  "今年年底前"
+                ]
+              }
+            ],
+            "createdAt": "2026-11-02T03:03:04.404Z"
+          },
+          "components": [
+            {
+              "id": "a96e83cf-d1c7-4dd9-9a0c-550e81114068",
+              "type": "clarification",
+              "title": "还需要一点信息",
+              "body": "已记下：目标是日本旅行，总额¥10,000。你说的“明年”具体是几月几日？可以先确认月份。",
+              "suggestions": [
+                "12 月 15 日前",
+                "今年年底前"
+              ]
+            }
+          ],
+          "suggestedPrompts": [
+            "目标现在能按时完成吗？",
+            "这笔 ¥900 支出会影响目标吗？",
+            "允许旅行 Agent 在 ¥500 内订票"
+          ],
+          "canvasComponents": [
+            {
+              "id": "a96e83cf-d1c7-4dd9-9a0c-550e81114068",
+              "type": "clarification",
+              "title": "还需要一点信息",
+              "body": "已记下：目标是日本旅行，总额¥10,000。你说的“明年”具体是几月几日？可以先确认月份。",
+              "suggestions": [
+                "12 月 15 日前",
+                "今年年底前"
+              ]
+            }
+          ],
+          "run": null
+        }
+      }
+    },
+    {
+      "message": "已存2000元，明年暑假去",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "continue",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": null,
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": {
+          "id": "41440818-413c-4d6e-bb26-0237e446f1a0",
+          "thread": {
+            "id": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+            "title": "帮我给林夏转账500元",
+            "kind": "task",
+            "status": "active",
+            "unread": false,
+            "readOnly": false,
+            "createdAt": "2026-11-02T03:02:20.305Z",
+            "updatedAt": "2026-11-02T03:03:10.109Z"
+          },
+          "intent": "goal_planning",
+          "provider": "deepseek",
+          "fallbackReason": null,
+          "twinVersion": 2,
+          "message": {
+            "id": "e019fb43-05d1-4ca0-9a5b-6c830d5ea077",
+            "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+            "role": "assistant",
+            "content": "已记下：目标是日本旅行，总额¥10,000，已存¥2,000。你说的“明年暑假”大概是几月几日？可以先告诉我月份，具体日期再一起确认。",
+            "components": [
+              {
+                "id": "82a2cb10-d520-4830-b85d-31fb1e29412f",
+                "type": "clarification",
+                "title": "还需要一点信息",
+                "body": "已记下：目标是日本旅行，总额¥10,000，已存¥2,000。你说的“明年暑假”大概是几月几日？可以先告诉我月份，具体日期再一起确认。",
+                "suggestions": [
+                  "12 月 15 日前",
+                  "今年年底前"
+                ]
+              }
+            ],
+            "createdAt": "2026-11-02T03:03:10.109Z"
+          },
+          "components": [
+            {
+              "id": "82a2cb10-d520-4830-b85d-31fb1e29412f",
+              "type": "clarification",
+              "title": "还需要一点信息",
+              "body": "已记下：目标是日本旅行，总额¥10,000，已存¥2,000。你说的“明年暑假”大概是几月几日？可以先告诉我月份，具体日期再一起确认。",
+              "suggestions": [
+                "12 月 15 日前",
+                "今年年底前"
+              ]
+            }
+          ],
+          "suggestedPrompts": [
+            "目标现在能按时完成吗？",
+            "这笔 ¥900 支出会影响目标吗？",
+            "允许旅行 Agent 在 ¥500 内订票"
+          ],
+          "canvasComponents": [
+            {
+              "id": "82a2cb10-d520-4830-b85d-31fb1e29412f",
+              "type": "clarification",
+              "title": "还需要一点信息",
+              "body": "已记下：目标是日本旅行，总额¥10,000，已存¥2,000。你说的“明年暑假”大概是几月几日？可以先告诉我月份，具体日期再一起确认。",
+              "suggestions": [
+                "12 月 15 日前",
+                "今年年底前"
+              ]
+            }
+          ],
+          "run": null
+        }
+      }
+    },
+    {
+      "message": "7月15日",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "continue",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": null,
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": {
+          "id": "c3d91dd9-5121-4696-9926-f2c51091e1a9",
+          "thread": {
+            "id": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+            "title": "帮我给林夏转账500元",
+            "kind": "task",
+            "status": "active",
+            "unread": false,
+            "readOnly": false,
+            "createdAt": "2026-11-02T03:02:20.305Z",
+            "updatedAt": "2026-11-02T03:03:14.937Z"
+          },
+          "intent": "goal_planning",
+          "provider": "deepseek",
+          "fallbackReason": null,
+          "twinVersion": 2,
+          "message": {
+            "id": "60dde076-aa87-4af4-a64e-a9ed601603a8",
+            "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+            "role": "assistant",
+            "content": "我先记下目标。请连接模拟数据，再核算可选的存钱节奏。",
+            "components": [
+              {
+                "id": "7403da33-ea65-4b65-b971-b19e0b2c16e3",
+                "type": "goal_input_card",
+                "title": "NOVA 理解的目标",
+                "goal": {
+                  "title": "日本旅行",
+                  "targetCents": 1000000,
+                  "savedCents": 200000,
+                  "targetDate": "2027-07-15",
+                  "protectedCents": 2000000,
+                  "status": "draft"
+                },
+                "draftId": "4a9af0b2-ca98-4b8f-be9d-74de9980a33b",
+                "fieldSources": {
+                  "title": "user_provided",
+                  "targetCents": "user_provided",
+                  "savedCents": "user_provided",
+                  "targetDate": "user_provided",
+                  "monthlyContributionCents": "system_calculated",
+                  "protectedCents": "connected_data",
+                  "flexibilityWeeks": "default_assumption"
+                }
+              },
+              {
+                "id": "b8083cf4-38f3-4e95-9875-ff32b049d156",
+                "type": "data_connection_prompt",
+                "title": "连接模拟数据后再核算",
+                "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6"
+              }
+            ],
+            "createdAt": "2026-11-02T03:03:14.937Z"
+          },
+          "components": [
+            {
+              "id": "7403da33-ea65-4b65-b971-b19e0b2c16e3",
+              "type": "goal_input_card",
+              "title": "NOVA 理解的目标",
+              "goal": {
+                "title": "日本旅行",
+                "targetCents": 1000000,
+                "savedCents": 200000,
+                "targetDate": "2027-07-15",
+                "protectedCents": 2000000,
+                "status": "draft"
+              },
+              "draftId": "4a9af0b2-ca98-4b8f-be9d-74de9980a33b",
+              "fieldSources": {
+                "title": "user_provided",
+                "targetCents": "user_provided",
+                "savedCents": "user_provided",
+                "targetDate": "user_provided",
+                "monthlyContributionCents": "system_calculated",
+                "protectedCents": "connected_data",
+                "flexibilityWeeks": "default_assumption"
+              }
+            },
+            {
+              "id": "b8083cf4-38f3-4e95-9875-ff32b049d156",
+              "type": "data_connection_prompt",
+              "title": "连接模拟数据后再核算",
+              "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+              "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6"
+            }
+          ],
+          "suggestedPrompts": [
+            "目标现在能按时完成吗？",
+            "这笔 ¥900 支出会影响目标吗？",
+            "允许旅行 Agent 在 ¥500 内订票"
+          ],
+          "canvasComponents": [
+            {
+              "id": "7403da33-ea65-4b65-b971-b19e0b2c16e3",
+              "type": "goal_input_card",
+              "title": "NOVA 理解的目标",
+              "goal": {
+                "title": "日本旅行",
+                "targetCents": 1000000,
+                "savedCents": 200000,
+                "targetDate": "2027-07-15",
+                "protectedCents": 2000000,
+                "status": "draft"
+              },
+              "draftId": "4a9af0b2-ca98-4b8f-be9d-74de9980a33b",
+              "fieldSources": {
+                "title": "user_provided",
+                "targetCents": "user_provided",
+                "savedCents": "user_provided",
+                "targetDate": "user_provided",
+                "monthlyContributionCents": "system_calculated",
+                "protectedCents": "connected_data",
+                "flexibilityWeeks": "default_assumption"
+              }
+            },
+            {
+              "id": "b8083cf4-38f3-4e95-9875-ff32b049d156",
+              "type": "data_connection_prompt",
+              "title": "连接模拟数据后再核算",
+              "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+              "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6"
+            }
+          ],
+          "run": null
+        }
+      }
+    },
+    {
+      "message": "转账和AA有什么区别",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "转账是把钱直接转给某人；AA分账是按人数平摊一笔费用后各自支付，系统会记录谁付了多少。",
+          "memoryAction": "continue",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": null,
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": {
+          "id": "86b0035d-3894-48df-98b6-cc4a9cbe7a77",
+          "thread": {
+            "id": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+            "title": "帮我给林夏转账500元",
+            "kind": "task",
+            "status": "active",
+            "unread": false,
+            "readOnly": false,
+            "createdAt": "2026-11-02T03:02:20.305Z",
+            "updatedAt": "2026-11-02T03:03:16.870Z"
+          },
+          "intent": "clarification",
+          "provider": "deepseek",
+          "fallbackReason": null,
+          "twinVersion": 2,
+          "message": {
+            "id": "5df37c06-793f-40d0-8fbd-1daa42d2ad2d",
+            "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+            "role": "assistant",
+            "content": "转账是把钱直接转给某人；AA分账是按人数平摊一笔费用后各自支付，系统会记录谁付了多少。",
+            "components": [
+              {
+                "id": "d83ba419-510a-4bbf-9166-2fbe1cee3839",
+                "type": "explanation",
+                "title": "NOVA",
+                "body": "转账是把钱直接转给某人；AA分账是按人数平摊一笔费用后各自支付，系统会记录谁付了多少。",
+                "tone": "neutral"
+              }
+            ],
+            "createdAt": "2026-11-02T03:03:16.870Z"
+          },
+          "components": [
+            {
+              "id": "d83ba419-510a-4bbf-9166-2fbe1cee3839",
+              "type": "explanation",
+              "title": "NOVA",
+              "body": "转账是把钱直接转给某人；AA分账是按人数平摊一笔费用后各自支付，系统会记录谁付了多少。",
+              "tone": "neutral"
+            }
+          ],
+          "suggestedPrompts": [
+            "目标现在能按时完成吗？",
+            "这笔 ¥900 支出会影响目标吗？",
+            "允许旅行 Agent 在 ¥500 内订票"
+          ],
+          "canvasComponents": [
+            {
+              "id": "d83ba419-510a-4bbf-9166-2fbe1cee3839",
+              "type": "explanation",
+              "title": "NOVA",
+              "body": "转账是把钱直接转给某人；AA分账是按人数平摊一笔费用后各自支付，系统会记录谁付了多少。",
+              "tone": "neutral"
+            }
+          ],
+          "run": null
+        }
+      }
+    },
+    {
+      "message": "看看我的卡片",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "cards",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "cards",
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "回到刚才那个页面",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "cards",
+          "question": null,
+          "memoryAction": "continue"
+        },
+        "provider": "deterministic",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "cards",
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "帮我管理订阅",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "subscriptions",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "subscriptions",
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "刚才那个页面",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "subscriptions",
+          "question": null,
+          "memoryAction": "continue"
+        },
+        "provider": "deterministic",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "subscriptions",
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "看看我买的理财",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "investment_holdings",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "investment_holdings",
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "回去看看",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "investment_holdings",
+          "question": null,
+          "memoryAction": "continue"
+        },
+        "provider": "deterministic",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "investment_holdings",
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    },
+    {
+      "message": "我想转账同时也想办信用卡",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "clarify",
+          "destination": null,
+          "question": "你想先办哪一项：转账，还是申请信用卡？",
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": null,
+          "draft": null
+        },
+        "provider": "deepseek",
+        "reason": null,
+        "threadId": "fa823caa-d3df-4d27-80f5-adee5f073df6",
+        "memory": {
+          "destination": "investment_holdings",
+          "recipientQuery": "",
+          "amountCents": null,
+          "sourceAccount": "",
+          "status": "active"
+        },
+        "turn": null
+      }
+    }
+  ]
+}

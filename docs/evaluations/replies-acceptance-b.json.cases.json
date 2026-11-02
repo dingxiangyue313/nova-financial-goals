@@ -1,0 +1,367 @@
+[
+  {
+    "steps": [
+      {
+        "text": "计划2028年6月12日去兰州，预算8000元，已存2000元",
+        "contains": [
+          "¥8,000",
+          "2028年6月12日",
+          "¥2,000"
+        ]
+      },
+      {
+        "text": "预算改为9500，日期和已存不变",
+        "contains": [
+          "¥9,500",
+          "2028年6月12日",
+          "¥2,000"
+        ],
+        "excludes": [
+          "¥8,000"
+        ],
+        "goal": {
+          "targetCents": 950000,
+          "savedCents": 200000
+        }
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "text": "想2028年9月去苏州，预算4600元",
+        "contains": [
+          "¥4,600",
+          "具体"
+        ],
+        "excludes": [
+          "已存¥0"
+        ]
+      },
+      {
+        "text": "9月17号出发",
+        "contains": [
+          "2028年9月17日",
+          "¥4,600",
+          "存了多少"
+        ],
+        "goal": {
+          "targetDate": "2028-09-17"
+        }
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "text": "我想买一架钢琴，预算22000元，已存6000元",
+        "contains": [
+          "¥22,000",
+          "¥6,000"
+        ]
+      },
+      {
+        "text": "另外新建一个健身目标，预算1800元",
+        "contains": [
+          "¥1,800"
+        ],
+        "excludes": [
+          "¥22,000",
+          "¥6,000"
+        ],
+        "goal": {
+          "savedCents": null
+        }
+      },
+      {
+        "text": "回到钢琴目标",
+        "contains": [
+          "已切回",
+          "¥22,000",
+          "¥6,000"
+        ]
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "text": "为换电脑准备7000元",
+        "contains": [
+          "¥7,000"
+        ]
+      },
+      {
+        "text": "暂时先问一下什么是退款在途",
+        "contains": [
+          "尚未退回到账"
+        ],
+        "excludes": [
+          "退款已到账"
+        ]
+      },
+      {
+        "text": "继续电脑目标，预算改为7600元",
+        "contains": [
+          "¥7,600"
+        ],
+        "goal": {
+          "targetCents": 760000
+        }
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "text": "想存9000元去旅行",
+        "contains": [
+          "¥9,000"
+        ]
+      },
+      {
+        "text": "取消这个规划",
+        "mode": "clarify",
+        "contains": [
+          "已取消",
+          "未执行资金操作"
+        ]
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "text": "银行卡现在余额多少？",
+        "contains": [
+          "缺少当前有效余额"
+        ],
+        "noProof": true,
+        "excludes": [
+          "余额¥5,000"
+        ]
+      }
+    ]
+  },
+  {
+    "fixture": "current",
+    "steps": [
+      {
+        "text": "我的日常活期账户余额是多少？直接告诉我",
+        "contains": [
+          "日常活期",
+          "¥5,000"
+        ],
+        "proof": "account_snapshot",
+        "mode": "chat"
+      }
+    ]
+  },
+  {
+    "fixture": "current",
+    "steps": [
+      {
+        "text": "应急金账户里有多少钱？",
+        "contains": [
+          "应急金",
+          "¥20,000"
+        ],
+        "proof": "account_snapshot"
+      }
+    ]
+  },
+  {
+    "fixture": "stale",
+    "steps": [
+      {
+        "text": "查一下日常活期目前的余额",
+        "contains": [
+          "缺少当前有效余额"
+        ],
+        "noProof": true,
+        "excludes": [
+          "余额¥5,000"
+        ]
+      }
+    ]
+  },
+  {
+    "fixture": "current",
+    "steps": [
+      {
+        "text": "你帮我看看余额，再给我讲讲AA和转账的区别",
+        "mode": "clarify",
+        "excludes": [
+          "已付款"
+        ],
+        "noProof": true
+      },
+      {
+        "text": "先只查日常活期余额",
+        "contains": [
+          "¥5,000"
+        ],
+        "proof": "account_snapshot"
+      }
+    ]
+  },
+  {
+    "fixture": "ledger",
+    "steps": [
+      {
+        "text": "日本旅行现在分配了多少钱？直接告诉我",
+        "contains": [
+          "分配资金¥3,500",
+          "订单预留¥0"
+        ],
+        "proof": "goal_ledger",
+        "excludes": [
+          "已经完成旅行"
+        ]
+      }
+    ]
+  },
+  {
+    "fixture": "multiple",
+    "steps": [
+      {
+        "text": "我目标的分配资金是多少？",
+        "contains": [
+          "请选择",
+          "日本旅行",
+          "学习"
+        ],
+        "noProof": true
+      },
+      {
+        "text": "我问日本旅行这个",
+        "contains": [
+          "¥3,500"
+        ],
+        "proof": "goal_ledger"
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "text": "我想攒6000元买相机，已存1000元",
+        "contains": [
+          "¥6,000",
+          "¥1,000"
+        ]
+      },
+      {
+        "text": "查一下相机目标实际分配的资金有多少",
+        "contains": [
+          "聊天草稿",
+          "不能代替"
+        ],
+        "noProof": true,
+        "excludes": [
+          "分配资金¥1,000"
+        ]
+      }
+    ]
+  },
+  {
+    "fixture": "current",
+    "steps": [
+      {
+        "text": "我的日本旅行目标能按时完成吗？",
+        "contains": [
+          "尚未启用计划"
+        ],
+        "excludes": [
+          "一定能完成"
+        ],
+        "noProof": true
+      }
+    ]
+  },
+  {
+    "fixture": "active",
+    "steps": [
+      {
+        "text": "根据当前数据算下日本旅行的进度，能按时吗？",
+        "contains": [
+          "依据当前",
+          "43.8%"
+        ],
+        "proof": "calculation",
+        "excludes": [
+          "保证完成"
+        ]
+      }
+    ]
+  },
+  {
+    "fixture": "ledger",
+    "steps": [
+      {
+        "text": "日本旅行的机票酒店订单都付完了吗？",
+        "contains": [
+          "没有找到对应旅行订单"
+        ],
+        "noProof": true,
+        "excludes": [
+          "都已付款"
+        ]
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "text": "AA和直接给别人转账有什么不同？",
+        "contains": [
+          "共同消费",
+          "核对"
+        ],
+        "excludes": [
+          "已转账"
+        ]
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "text": "退款在途能拿来付别的订单吗？",
+        "contains": [
+          "不能作为当前可用现金"
+        ],
+        "excludes": [
+          "已经到账"
+        ]
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "text": "目标资金分配是不是已经把钱转出去了？",
+        "contains": [
+          "不等于发起银行转账"
+        ],
+        "excludes": [
+          "已经转出"
+        ]
+      }
+    ]
+  },
+  {
+    "steps": [
+      {
+        "text": "授权了旅行预算是不是已经扣款了？",
+        "contains": [
+          "不代表已付款",
+          "确认后"
+        ],
+        "excludes": [
+          "已扣款成功"
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,286 @@
+[
+  [
+    {
+      "text": "明年准备翻新书房，要两万四千元，已有6000元",
+      "goal": {
+        "targetCents": 2400000,
+        "savedCents": 600000
+      }
+    },
+    {
+      "text": "再建个买运动相机的目标，预算3200元",
+      "goal": {
+        "targetCents": 320000,
+        "savedCents": null
+      }
+    },
+    {
+      "text": "继续书房翻新，先不用谈相机",
+      "goal": {
+        "targetCents": 2400000,
+        "savedCents": 600000
+      }
+    }
+  ],
+  [
+    {
+      "text": "攒钱2028年4月30日去成都，需要5500元，已有1800元",
+      "goal": {
+        "targetCents": 550000,
+        "savedCents": 180000
+      }
+    },
+    {
+      "text": "时间换成5月12号，别的照旧",
+      "goal": {
+        "targetCents": 550000,
+        "savedCents": 180000,
+        "targetDate": "2028-05-12"
+      }
+    }
+  ],
+  [
+    {
+      "text": "想买音箱，需要2600元",
+      "goal": {
+        "targetCents": 260000
+      }
+    },
+    {
+      "text": "新开一个学烘焙的计划",
+      "goal": {
+        "targetCents": null,
+        "savedCents": null
+      }
+    },
+    {
+      "text": "返回音箱那个",
+      "goal": {
+        "targetCents": 260000
+      }
+    }
+  ],
+  [
+    {
+      "text": "学滑雪打算花9000元",
+      "goal": {
+        "targetCents": 900000
+      }
+    },
+    {
+      "text": "先看看我的银行卡",
+      "capability": "cards"
+    },
+    {
+      "text": "接着聊滑雪，已经存了1300元",
+      "goal": {
+        "targetCents": 900000,
+        "savedCents": 130000
+      }
+    }
+  ],
+  [
+    {
+      "text": "计划明年换床垫，预算6800元",
+      "goal": {
+        "targetCents": 680000
+      }
+    },
+    {
+      "text": "预算更正为7400元",
+      "goal": {
+        "targetCents": 740000
+      }
+    },
+    {
+      "text": "目前准备好了2000元",
+      "goal": {
+        "targetCents": 740000,
+        "savedCents": 200000
+      }
+    }
+  ],
+  [
+    {
+      "text": "计划2027年8月给孩子买钢琴，三万元",
+      "goal": {
+        "targetCents": 3000000
+      }
+    },
+    {
+      "text": "8月16号就要用钱",
+      "goal": {
+        "targetCents": 3000000,
+        "targetDate": "2027-08-16"
+      }
+    }
+  ],
+  [
+    {
+      "text": "我想攒12000元买跑步机，已经有4000元",
+      "goal": {
+        "targetCents": 1200000,
+        "savedCents": 400000
+      }
+    },
+    {
+      "text": "每个月最多存650元",
+      "goal": {
+        "targetCents": 1200000,
+        "savedCents": 400000,
+        "monthlyContributionCapCents": 65000
+      }
+    }
+  ],
+  [
+    {
+      "text": "想攒一万元自驾游",
+      "goal": {
+        "targetCents": 1000000
+      }
+    },
+    {
+      "text": "这个自驾规划取消了",
+      "status": "cancelled"
+    },
+    {
+      "text": "新建一个电动车目标，预算7000元",
+      "goal": {
+        "targetCents": 700000,
+        "savedCents": null
+      },
+      "kind": "goal"
+    }
+  ],
+  [
+    {
+      "text": "帮我给苏禾转360元",
+      "capability": "transfer",
+      "recipientQuery": "苏禾",
+      "amountCents": 36000
+    },
+    {
+      "text": "金额调整为280元",
+      "capability": "transfer",
+      "recipientQuery": "苏禾",
+      "amountCents": 28000
+    }
+  ],
+  [
+    {
+      "text": "给韩星转520元",
+      "capability": "transfer",
+      "amountCents": 52000
+    },
+    {
+      "text": "另起一笔给唐悦的转账，金额先空着",
+      "capability": "transfer",
+      "recipientQuery": "唐悦",
+      "amountCents": null
+    }
+  ],
+  [
+    {
+      "text": "先设置出行的消费授权额度",
+      "capability": "travel_mandate"
+    },
+    {
+      "text": "现在去核对本次已选机票住宿的付款",
+      "capability": "travel_payment"
+    },
+    {
+      "text": "我想回到刚才设置授权的地方",
+      "capability": "travel_mandate"
+    }
+  ],
+  [
+    {
+      "text": "去核对旅行这次付款",
+      "capability": "travel_payment"
+    },
+    {
+      "text": "改一下未来预订的授权上限",
+      "capability": "travel_mandate"
+    }
+  ],
+  [
+    {
+      "text": "以后每次收到工资就向储蓄目标转入，想安排一下",
+      "capability": "goal_transfer"
+    },
+    {
+      "text": "再看看目标目前实际可支付多少",
+      "capability": "goal_allocation"
+    }
+  ],
+  [
+    {
+      "text": "设一个每月二十号存钱进目标的安排",
+      "capability": "goal_transfer"
+    },
+    {
+      "text": "看看多个目标未来月存方案怎么调整",
+      "capability": "goal_adjust"
+    }
+  ],
+  [
+    {
+      "text": "上周出游的开销想让三个人AA",
+      "capability": "aa_create"
+    },
+    {
+      "text": "看以前的分摊账有哪些待收",
+      "capability": "aa_records"
+    }
+  ],
+  [
+    {
+      "text": "我想把丢失的卡挂失",
+      "capability": "cards"
+    },
+    {
+      "text": "再打开新卡申请",
+      "capability": "card_apply"
+    }
+  ],
+  [
+    {
+      "text": "打开理财持仓看看",
+      "capability": "investment_holdings"
+    },
+    {
+      "text": "看看可以选购哪些理财",
+      "capability": "investment_products"
+    }
+  ],
+  [
+    {
+      "text": "打开我的自动续费服务列表",
+      "capability": "subscriptions"
+    },
+    {
+      "text": "选个别的卡来付订阅费",
+      "capability": "subscription_card"
+    }
+  ],
+  [
+    {
+      "text": "查看本月账单",
+      "capability": "bills"
+    },
+    {
+      "text": "算算以后多花一笔钱余额够不够",
+      "capability": "cashflow"
+    }
+  ],
+  [
+    {
+      "text": "我想了解什么叫订单预留",
+      "mode": "chat"
+    },
+    {
+      "text": "我只是问问，不要替我付款",
+      "mode": "notNavigate"
+    }
+  ]
+]

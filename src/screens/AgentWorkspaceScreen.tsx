@@ -105,6 +105,9 @@ export function AgentWorkspaceScreen({ snapshot, compact, starter, preferredThre
         onFinancialTask(message.trim(),chatDestinations[routed.decision.destination],response.memory);return;
       }
       if(routed.decision.mode==='clarify'){
+        if(routed.provider!=='unavailable'){
+          replaceDraft('');setError(null);await loadMessages(response.threadId);await refreshThreads(response.threadId);return;
+        }
         replaceDraft(message);setError(routed.decision.question??'请确认你想办理的事项。');return;
       }
       const turn=response.turn;if(!turn)throw new Error('未收到有效回复，请重试。');

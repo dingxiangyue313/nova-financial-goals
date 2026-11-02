@@ -1,4 +1,5 @@
 import { aiSafetyCancellationGeneration } from './store.ts';
+import { expiredGoalQuestion, safeGoalQuestion } from './goal-clarification.ts';
 import { externalModelCallsAllowed } from './ai-safety-control.ts';
 import { randomUUID } from 'node:crypto';
 import { MoneyMissionDecisionSchema, MoneyMissionDecisionContextSchema, EnabledSkillIdSchema,
@@ -503,6 +504,9 @@ export async function runAgentTask(sessionId: string, threadId: string, runId: s
       waitingReason: null, runRecord: { id: randomUUID(), kind: 'started',
         summary: '开始只读调查', at: new Date().toISOString(), toolResultId: null } });
     expectedRevision = getAgentTaskForThread(sessionId, threadId)!.taskRevision;
+    const expiredQuestion = expiredGoalQuestion(initial.task, getState(sessionId).clock);
+    if (expiredQuestion) return finishRun(sessionId, threadId, runId, expectedRevision, twinVersion,
+      'awaiting_user', null, expiredQuestion, [], 'balanced', expiredQuestion);
     while (true) {
       const { run, task } = checked(sessionId, threadId, runId, expectedRevision, twinVersion);
       if (run.decisionCount >= maxDecisions || run.toolCallCount >= maxTools) {
@@ -594,7 +598,7 @@ export async function runAgentTask(sessionId: string, threadId: string, runId: s
         continue;
       }
       if (decision.type === 'ask_user') {
-        const question = /¥|\d{3,}/.test(decision.question) ? '请补充完成试算所需的一项关键信息。' : decision.question;
+        const question = safeGoalQuestion(task, getState(sessionId).clock, decision.question);
         return finishRun(sessionId, threadId, runId, expectedRevision, twinVersion,
           'awaiting_user', null, question, [], 'balanced', question);
       }

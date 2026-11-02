@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { MoneyMissionDecisionSchema, MoneyMissionDecisionContextSchema,
   type MoneyMissionDecisionContext, type MoneyMissionDecision } from '../shared/contracts.ts';
 
-export type DeepSeekFailure = 'AI_SAFE_MODE' | 'DEEPSEEK_NOT_CONFIGURED' | 'DEEPSEEK_HTTP_ERROR' | 'DEEPSEEK_INVALID_OR_TIMEOUT';
+export type DeepSeekFailure = 'AI_SAFE_MODE' | 'DEEPSEEK_NOT_CONFIGURED' | 'DEEPSEEK_HTTP_ERROR' | 'DEEPSEEK_INVALID_OR_TIMEOUT' | 'DEEPSEEK_TIMEOUT' | 'DEEPSEEK_NETWORK' | 'DEEPSEEK_INVALID_JSON' | 'DEEPSEEK_SCHEMA_ERROR' | 'DEEPSEEK_BILLING' | 'DEEPSEEK_AUTH' | 'DEEPSEEK_RATE_LIMIT';
 
 export type DeepSeekMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -35,21 +35,21 @@ export async function requestDeepSeekJson<T>(schema: z.ZodType<T>, options: {
     });
     if (!response.ok) {
       if (process.env.NOVA_EVAL_MODEL_DIAGNOSTICS === '1') console.error('DeepSeek HTTP status', response.status);
-      return { ok: false, reason: 'DEEPSEEK_HTTP_ERROR' };
+      return { ok: false, reason: response.status===402?'DEEPSEEK_BILLING':response.status===401||response.status===403?'DEEPSEEK_AUTH':response.status===429?'DEEPSEEK_RATE_LIMIT':'DEEPSEEK_HTTP_ERROR' };
     }
     const raw = await response.json();
     const content = raw?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string') return { ok: false, reason: 'DEEPSEEK_INVALID_OR_TIMEOUT' };
+    if (typeof content !== 'string') return { ok: false, reason: 'DEEPSEEK_INVALID_JSON' };
     try { return { ok: true, data: schema.parse(JSON.parse(content)) }; }
     catch (error) {
       if (process.env.NOVA_EVAL_MODEL_DIAGNOSTICS === '1') console.error('DeepSeek JSON validation',
-        error instanceof z.ZodError ? error.issues.slice(0,10).map(issue => issue.code) : 'parse_error');
-      return { ok: false, reason: 'DEEPSEEK_INVALID_OR_TIMEOUT' };
+        error instanceof z.ZodError ? error.issues.slice(0,10).map(issue => ({code:issue.code,pathDepth:issue.path.length})) : 'parse_error');
+      return { ok: false, reason: error instanceof z.ZodError?'DEEPSEEK_SCHEMA_ERROR':'DEEPSEEK_INVALID_JSON' };
     }
   } catch (error) {
     if (process.env.NOVA_EVAL_MODEL_DIAGNOSTICS === '1') console.error('DeepSeek request failure',
       error instanceof Error && ['TimeoutError','AbortError','TypeError'].includes(error.name) ? error.name : 'request_error');
-    return { ok: false, reason: 'DEEPSEEK_INVALID_OR_TIMEOUT' };
+    return { ok: false, reason: error instanceof Error&&['TimeoutError','AbortError'].includes(error.name)?'DEEPSEEK_TIMEOUT':'DEEPSEEK_NETWORK' };
   }
 }
 

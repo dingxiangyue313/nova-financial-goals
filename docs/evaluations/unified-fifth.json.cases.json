@@ -1,0 +1,261 @@
+[
+  [
+    {
+      "text": "想在2027年五月去看极光，总共准备两万元",
+      "goal": {
+        "targetCents": 2000000
+      }
+    },
+    {
+      "text": "现在手头为这件事攒了3500元",
+      "goal": {
+        "targetCents": 2000000,
+        "savedCents": 350000
+      }
+    }
+  ],
+  [
+    {
+      "text": "我打算2027年8月买一辆自行车，预算6500元",
+      "goal": {
+        "targetCents": 650000
+      }
+    },
+    {
+      "text": "预算不是6500，是7200元",
+      "goal": {
+        "targetCents": 720000
+      }
+    }
+  ],
+  [
+    {
+      "text": "明年十月搬家，需要一万五千元",
+      "goal": {
+        "targetCents": 1500000
+      }
+    },
+    {
+      "text": "现有三千元，月存不能超过900元",
+      "goal": {
+        "savedCents": 300000,
+        "monthlyContributionCapCents": 90000
+      }
+    }
+  ],
+  [
+    {
+      "text": "我想2027年6月去西安玩，费用5000元",
+      "goal": {
+        "targetCents": 500000
+      }
+    },
+    {
+      "text": "六月18号出发",
+      "goal": {
+        "targetDate": "2027-06-18",
+        "targetCents": 500000
+      }
+    }
+  ],
+  [
+    {
+      "text": "计划在2027年9月30日换电脑，总预算12000，已存4000元",
+      "goal": {
+        "targetCents": 1200000,
+        "savedCents": 400000
+      }
+    },
+    {
+      "text": "只改到10月20日，预算不变",
+      "goal": {
+        "targetDate": "2027-10-20",
+        "targetCents": 1200000
+      }
+    }
+  ],
+  [
+    {
+      "text": "给婚礼存八万元，2027年底用",
+      "goal": {
+        "targetCents": 8000000
+      }
+    },
+    {
+      "text": "另外新建一个学摄影目标",
+      "goal": {},
+      "kind": "goal"
+    }
+  ],
+  [
+    {
+      "text": "明年去云南，预算9000元",
+      "goal": {
+        "targetCents": 900000
+      }
+    },
+    {
+      "text": "先放着，给赵敏转260元",
+      "capability": "transfer"
+    },
+    {
+      "text": "继续刚才云南旅行那个",
+      "goal": {
+        "targetCents": 900000
+      },
+      "kind": "goal"
+    }
+  ],
+  [
+    {
+      "text": "明年考证需要8000元",
+      "goal": {
+        "targetCents": 800000
+      }
+    },
+    {
+      "text": "另外新建买平板目标，预算4500元",
+      "goal": {
+        "targetCents": 450000
+      }
+    },
+    {
+      "text": "回到考证目标",
+      "goal": {
+        "targetCents": 800000
+      }
+    }
+  ],
+  [
+    {
+      "text": "想攒一万元学习基金",
+      "goal": {
+        "targetCents": 1000000
+      }
+    },
+    {
+      "text": "取消这个规划",
+      "status": "cancelled"
+    },
+    {
+      "text": "再新建一个健身目标",
+      "kind": "goal",
+      "goal": {}
+    }
+  ],
+  [
+    {
+      "text": "为养猫准备6000元，已经存了1000元",
+      "goal": {
+        "targetCents": 600000,
+        "savedCents": 100000
+      }
+    },
+    {
+      "text": "另开一个装修目标，要五万元",
+      "goal": {
+        "targetCents": 5000000
+      }
+    }
+  ],
+  [
+    {
+      "text": "给王雯打450块钱",
+      "capability": "transfer"
+    },
+    {
+      "text": "少打一点，改为320元",
+      "capability": "transfer"
+    }
+  ],
+  [
+    {
+      "text": "转700元给刘洋",
+      "capability": "transfer"
+    },
+    {
+      "text": "另外新建一笔给陈晨的转账",
+      "capability": "transfer"
+    }
+  ],
+  [
+    {
+      "text": "聚餐花了560元，我们四个人均摊",
+      "capability": "aa_create"
+    },
+    {
+      "text": "看看之前发起的AA谁还没付",
+      "capability": "aa_records"
+    }
+  ],
+  [
+    {
+      "text": "我的信用卡丢了，想挂失",
+      "capability": "cards"
+    },
+    {
+      "text": "再看看办新卡要怎么申请",
+      "capability": "card_apply"
+    }
+  ],
+  [
+    {
+      "text": "看看我现在持有的基金",
+      "capability": "investment_holdings"
+    },
+    {
+      "text": "我想重新做风险偏好测评",
+      "capability": "investment_profile"
+    }
+  ],
+  [
+    {
+      "text": "帮我看一下上月开支分类",
+      "capability": "spending"
+    },
+    {
+      "text": "我要上传一份银行流水",
+      "capability": "bill_import"
+    }
+  ],
+  [
+    {
+      "text": "我想检查还有哪些自动续费",
+      "capability": "subscriptions"
+    },
+    {
+      "text": "把订阅的付款卡换一下",
+      "capability": "subscription_card"
+    }
+  ],
+  [
+    {
+      "text": "想看东京往返机票和住宿报价",
+      "capability": "travel_quotes"
+    },
+    {
+      "text": "查下已订酒店的退款状态",
+      "capability": "travel_orders"
+    }
+  ],
+  [
+    {
+      "text": "安排每个月5号往目标里转入",
+      "capability": "goal_transfer"
+    },
+    {
+      "text": "看看目标里现在有多少可支付的钱",
+      "capability": "goal_allocation"
+    }
+  ],
+  [
+    {
+      "text": "转账和分摊有什么区别？",
+      "mode": "chat"
+    },
+    {
+      "text": "别替我转账，我只是问问",
+      "mode": "notNavigate"
+    }
+  ]
+]

@@ -5,6 +5,8 @@ import { AgentTurnSchema, GoalAssumptionsSchema, type AgentComponent, type Agent
   type AgentMessage, type AgentTurn, type DemoState, type GoalAssumptions, type GoalDraft, type TransferScheduleInput } from '../shared/contracts.ts';
 import { interpretAgentRequest } from './agent.ts';
 import { understandGoalMessage, type Understanding } from './understanding.ts';
+import {renderGoalReply} from './conversation-replies.ts';
+import type {ConversationState,ConversationTask} from '../shared/conversation.ts';
 import { buildWeeklyRiskSummary, notificationDelivery } from './risk.ts';
 import { assessGoal, availableMonthly } from './domain.ts';
 import { runBankingTool } from './banking.ts';
@@ -19,7 +21,7 @@ import { explainExpenseImpact, understandExpenseQuestion } from './expense-impac
 import {
   createAgentAction, createAgentThread, finishAgentAction, getAgentAction, getAgentMessages, getGoalDraft,
   cancelActiveAgentRunForThread, getAgentTaskForThread, getAgentToolResult, getLatestAgentRunForThread,
-  monitorRecommendationIsCurrent, updateAgentTask, cancelAgentTask,
+  monitorRecommendationIsCurrent, updateAgentTask, cancelAgentTask, resetAgentTaskProjection,
   getAgentThread, listAgentThreads, markAgentThreadRead,
   markAgentThreadUnread, saveAgentMessage, saveAgentTurnRecord, saveGoalDraft,
 } from './store.ts';
@@ -67,10 +69,11 @@ function goalSummary(state: DemoState, overrides: Partial<DemoState['goal']> = {
 }
 
 const requiredDraftFields = ['title', 'targetCents', 'targetDate'] as const;
-function mergedGoalDraft(sessionId: string, threadId: string, parsed: Understanding): GoalDraft {
-  const previous = getGoalDraft(sessionId, threadId);
+function mergedGoalDraft(sessionId: string, threadId: string, parsed: Understanding, canonicalTaskId?:string): GoalDraft {
+  const old = getGoalDraft(sessionId, threadId);
+  const previous=canonicalTaskId&&old?.id!==canonicalTaskId?null:old;
   const next: GoalDraft = {
-    id: previous?.id ?? crypto.randomUUID(), threadId, goalId: previous?.goalId ?? null,
+    id: canonicalTaskId??previous?.id ?? crypto.randomUUID(), threadId, goalId: previous?.goalId ?? null,
     title: previous?.title ?? null, targetCents: previous?.targetCents ?? null,
     targetDate: previous?.targetDate ?? null, savedCents: previous?.savedCents ?? null,
     monthlyContributionCapCents: previous?.monthlyContributionCapCents ?? null,
@@ -96,7 +99,7 @@ function clarificationForDraft(draft: GoalDraft, ambiguity: string | null = null
     draft.savedCents!==null?`已存${yuan(draft.savedCents)}`:null,draft.targetDate?`目标日期${draft.targetDate}`:null].filter(Boolean);
   return { id: componentId(), type: 'clarification', title: '还需要一点信息',
     body: `${known.length?`已记下：${known.join('，')}。`:''}${ambiguity??`请告诉我${missing[0]??'还需要补充的条件'}。`}`,
-    suggestions: draft.missingRequiredFields.includes('targetCents')
+    suggestions: ambiguity?[]:draft.missingRequiredFields.includes('targetCents')
       ? ['预算 ¥8,000', '需要 ¥12,000'] : draft.missingRequiredFields.includes('targetDate')
         ? ['12 月 15 日前', '今年年底前'] : ['去日本旅行', '买一台相机'] };
 }
@@ -267,7 +270,7 @@ export function prepareCandidateConfirmation(sessionId: string, threadId: string
 }
 
 export async function createAgentTurn(sessionId: string, threadId: string | null, message: string,
-  state: DemoState, routed?: {intent:AgentIntent;explanation:string|null;provider:'deepseek'|'deterministic';fallbackReason:string|null}): Promise<AgentTurn> {
+  state: DemoState, routed?: {intent:AgentIntent;explanation:string|null;provider:'deepseek'|'deterministic';fallbackReason:string|null;understanding?:Understanding;canonicalTaskId?:string;goalReply?:{before:ConversationState;task:ConversationTask}}): Promise<AgentTurn> {
   const trimmed = message.trim();
   if (!trimmed || trimmed.length > 500) throw new Error('INVALID_AGENT_MESSAGE');
   const deterministicIntent = detectIntent(trimmed);
@@ -292,7 +295,7 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
   let components: AgentComponent[] = [];
   let reply = '';
   if (intent === 'goal_planning') {
-    const parsed = await understandGoalMessage(trimmed, state.clock, priorTask, context);
+    const parsed = routed?.understanding ?? await understandGoalMessage(trimmed, state.clock, priorTask, context);
     provider = parsed.provider; fallbackReason = parsed.fallbackReason ?? fallbackReason;
     if (parsed.kind === 'cancel' && priorTask) {
       cancelAgentTask(sessionId, priorTask.taskId, priorTask.taskRevision);
@@ -319,7 +322,8 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
         body: parsed.ambiguity ?? '你想了解目标的哪一部分？', suggestions: [] }];
       reply = '请告诉我你想核对的部分。';
     } else {
-    const draft = mergedGoalDraft(sessionId, thread.id, parsed);
+    const draft = mergedGoalDraft(sessionId, thread.id, parsed,routed?.canonicalTaskId);
+    if(routed?.canonicalTaskId&&previousDraft?.id!==routed.canonicalTaskId)resetAgentTaskProjection(sessionId,thread.id);
     const task = getAgentTaskForThread(sessionId, thread.id)!;
     const source = { kind: 'user_message' as const, messageId: userMessage.id, confirmation: 'unconfirmed' as const };
     const sourceFields = { ...task.fieldSources };
@@ -364,7 +368,7 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
         monthlyContributionCents: draft.monthlyContributionCapCents == null
           ? (state.dataConnections.some(item => item.status === 'connected') ? 'connected_data' as const : 'system_calculated' as const)
           : 'user_provided' as const,
-        protectedCents: draft.protectedCents == null ? 'connected_data' as const : 'user_provided' as const,
+        protectedCents: draft.protectedCents == null ? (state.accountSnapshots.some(s=>s.accountId==='emergency'&&s.asOf===state.clock&&s.balanceCents===state.finance.emergencyCents)?'connected_data' as const:'default_assumption' as const) : 'user_provided' as const,
         flexibilityWeeks: draft.flexibilityWeeks == null ? 'default_assumption' as const : 'user_provided' as const };
       components = [{ id: componentId(), type: 'goal_input_card', title: 'NOVA 理解的目标', draftId: draft.id, fieldSources: sources,
         goal: { title: draft.title!, targetCents: draft.targetCents!, savedCents, targetDate: draft.targetDate!, protectedCents, status: 'draft' } },
@@ -430,6 +434,7 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
       suggestions: ['我想年底去日本旅行，预算 ¥8,000', '这笔 ¥900 支出会影响目标吗？', '允许旅行 Agent 在 ¥500 内订票'] }];
     reply = understood.explanation || '我还不能确定你要完成哪类财务任务。';
   }
+  if(routed?.goalReply&&intent==='goal_planning')reply=renderGoalReply(routed.goalReply.before,routed.goalReply.task,state,components);
   const assistant = saveAgentMessage(sessionId, thread.id, { role: 'assistant', content: reply, components });
   markAgentThreadRead(sessionId, thread.id);
   const turnId = crypto.randomUUID();
@@ -438,7 +443,7 @@ export async function createAgentTurn(sessionId: string, threadId: string | null
   return AgentTurnSchema.parse({ id: turnId, thread: getAgentThread(sessionId, thread.id), intent,
     provider, fallbackReason, twinVersion: state.twinVersion, message: assistant, components,
     canvasComponents: components,
-    suggestedPrompts: ['目标现在能按时完成吗？', '这笔 ¥900 支出会影响目标吗？', '允许旅行 Agent 在 ¥500 内订票'] });
+    suggestedPrompts: routed?[]:['目标现在能按时完成吗？', '这笔 ¥900 支出会影响目标吗？', '允许旅行 Agent 在 ¥500 内订票'] });
 }
 
 export function createScenarioPreview(sessionId: string, threadId: string, input: GoalAssumptions,

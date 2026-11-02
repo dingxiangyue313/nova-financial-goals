@@ -1,0 +1,22 @@
+[
+ {"steps":[{"text":"2029年5月16日去泉州，准备7200元，已经存了1600元","contains":["¥7,200","2029年5月16日","¥1,600"]},{"text":"总额提高到8100元，其他照旧","contains":["¥8,100","日期保持2029年5月16日","¥1,600"],"excludes":["¥7,200"],"goal":{"targetCents":810000,"savedCents":160000}}]},
+ {"steps":[{"text":"2028年十一月想买台烘干机，预算5300元","contains":["¥5,300"],"excludes":["已存¥0"]},{"text":"十一月6号就需要了","contains":["2028年11月6日","¥5,300"],"goal":{"targetDate":"2028-11-06"}}]},
+ {"steps":[{"text":"为学游泳准备2800元，已经攒了700元","contains":["¥2,800","¥700"]},{"text":"已存金额先清除，需要核对","contains":["已清除","¥2,800"],"excludes":["¥700","已存¥0"],"goal":{"savedCents":null}}]},
+ {"steps":[{"text":"2028年10月准备搬家，需要13000元，已有4500元","contains":["¥13,000","¥4,500"]},{"text":"再建一个买书架的目标，预算1500元","contains":["已新建","¥1,500"],"excludes":["¥4,500","¥13,000"],"goal":{"savedCents":null}},{"text":"返回搬家那个目标","contains":["已切回","¥13,000","¥4,500"]}]},
+ {"steps":[{"text":"想在2028年6月8日换洗衣机，预算6200元，已存800元","contains":["¥6,200","¥800"]},{"text":"只把已存改成1400元","contains":["¥6,200","¥1,400","2028年6月8日"],"goal":{"savedCents":140000,"targetCents":620000}}]},
+ {"steps":[{"text":"买绘图板总预算5000元，已经存好了5000元","contains":["预算¥5,000","已存¥5,000"],"goal":{"targetCents":500000,"savedCents":500000},"excludes":["已经购买成功"]}]},
+ {"steps":[{"text":"2028年学调酒想准备6600元","contains":["¥6,600"]},{"text":"取消调酒这项任务","contains":["已取消","未执行资金操作"],"mode":"clarify"}]},
+ {"fixture":"current","steps":[{"text":"直接告诉我日常活期账户中现有多少钱，不用打开页面","contains":["¥5,000"],"proof":"account_snapshot","mode":"chat"}]},
+ {"fixture":"current","steps":[{"text":"读一下应急金账户的余额，并说明应急金的用途","contains":["¥20,000","突发支出"],"proof":"account_snapshot"}]},
+ {"fixture":"stale","steps":[{"text":"请给我日常活期最新余额，不要拿旧数据当当前的","contains":["缺少当前有效余额"],"excludes":["余额¥5,000"],"noProof":true}]},
+ {"steps":[{"text":"查一下我日常活期账户现在的准确余额","contains":["缺少当前有效余额"],"excludes":["余额¥5,000"],"noProof":true}]},
+ {"fixture":"ledger","steps":[{"text":"日本旅行已经分配的资金具体是多少？不要跳页","contains":["分配资金¥3,500","订单预留¥0"],"proof":"goal_ledger","mode":"chat"}]},
+ {"fixture":"multiple","steps":[{"text":"查查目标当前资金归属金额","contains":["请选择","日本旅行","学习"],"noProof":true},{"text":"选日本旅行目标，告诉我资金分配金额","contains":["分配资金¥3,500"],"proof":"goal_ledger"}]},
+ {"steps":[{"text":"想买帐篷，预算3700元，已存900元","contains":["¥3,700","¥900"]},{"text":"看看帐篷这个目标的实际分配资金是多少","contains":["聊天草稿","不能代替"],"excludes":["分配资金¥900"],"noProof":true}]},
+ {"fixture":"current","steps":[{"text":"日本旅行能在目标日期前存够钱吗，请根据计划回答","contains":["尚未启用计划"],"excludes":["一定能"],"noProof":true}]},
+ {"fixture":"active","steps":[{"text":"请按已启用计划计算日本旅行现在的已存百分比","contains":["依据当前","43.8%"],"proof":"calculation"}]},
+ {"fixture":"ledger","steps":[{"text":"帮我查已订日本旅行机票是否付款成功","contains":["没有找到对应旅行订单"],"excludes":["已付款成功"],"noProof":true}]},
+ {"steps":[{"text":"AA收付款跟给联系人转钱的区别是什么","contains":["共同消费","指定收款人"],"noProof":true}]},
+ {"steps":[{"text":"我想弄懂退款在途是否意味着钱已经能用了","contains":["不能作为当前可用现金"],"excludes":["已经能用"],"noProof":true}]},
+ {"steps":[{"text":"旅行预算授权已经设好，是否等于我已付这笔钱？","contains":["不代表已付款","确认后"],"noProof":true}]}
+]

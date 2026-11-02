@@ -33,6 +33,7 @@ import { installApiRateLimits, installRequestHardening, setStaticCacheHeaders } 
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
 import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, failDataSource, recoverDataSource, revokeDataSource } from './data-connections.ts';
 import { createFixture } from './fixtures.ts';
+import { expenseImpactCase, expenseImpactCaseState } from './expense-impact-case.ts';
 import { AgentRunCancelRequestSchema, AgentRunStatusResponseSchema, AgentTurnWithRunSchema,
   MonitorStatusSchema } from '../shared/contracts.ts';
 import { getAgentRunStatus, startAgentRun, stopAgentRun } from './agent-runner.ts';
@@ -431,51 +432,9 @@ app.post('/api/agent/route', route(async (req, res) => {
   res.json(ChatRouteResponseSchema.parse(await routeChat(body.message, context)));
 }));
 app.post('/api/agent/chat', route(async(req,res)=>{
-  const body=z.object({message:z.string().trim().min(1).max(500),threadId:z.string().nullable().default(null)}).strict().parse(req.body);
-  const id=sessionId(req,res);
-  const store=await import('./store.ts');
-  const thread=body.threadId?store.getAgentThread(id,body.threadId):createAgentThread(id,{title:body.message.slice(0,40)});
-  if(thread.status==='archived'||thread.readOnly)throw new Error('THREAD_ARCHIVED');
-  const memory=store.getChatMemory(id,thread.id);
-  const context=getAgentMessages(id,thread.id).map(m=>({role:m.role,content:m.content}));
-  const {routeChat}=await import('./chat-routing.ts');
-  const routed=await routeChat(body.message,context,{...memory,goalDraft:store.getGoalDraft(id,thread.id)});
-  const {ChatRouteDecisionSchema}=await import('../shared/chat-routing.ts');
-  const decision=ChatRouteDecisionSchema.parse(routed.decision);
-  if(routed.provider==='unavailable')return res.json({...routed,threadId:thread.id,memory,turn:null});
-  // An old cancellation in the conversation cannot cancel a new current request.
-  if(decision.memoryAction==='cancel'&&!/取消|不做|不转|停止|算了|先不|别做/.test(body.message))decision.memoryAction='continue';
-  if(decision.mode==='navigate'&&memory.status==='cancelled'&&decision.memoryAction!=='new'&&decision.destination===memory.destination)
-    return res.json({...routed,decision:{mode:'clarify',destination:null,question:'刚才的草稿已取消。要新建一项任务吗？'},threadId:thread.id,memory,turn:null});
-  const {parseYuan}=await import('./understanding.ts');
-  const {ChatMemorySchema}=await import('../shared/chat-routing.ts');
-  let next=decision.memoryAction==='new'&&decision.mode!=='clarify'||(decision.mode==='navigate'&&decision.destination!==memory.destination)
-    ?ChatMemorySchema.parse({destination:decision.destination}):{...memory};
-  if(decision.memoryAction==='cancel')next={...next,status:'cancelled'};
-  else if(decision.mode==='navigate'){
-    next={...next,destination:decision.destination,status:'active'};
-    if(decision.draft?.recipientQuery!==undefined)next.recipientQuery=decision.draft.recipientQuery;
-    if(decision.draft?.sourceAccount!==undefined)next.sourceAccount=decision.draft.sourceAccount;
-    if(decision.draft?.amount!==undefined){
-      const quote=decision.draft.amount;
-      const value=body.message.includes(quote)?parseYuan(quote):null;
-      if(value===null)return res.json({...routed,decision:{mode:'clarify',destination:null,question:'请确认本次金额。'},threadId:thread.id,memory,turn:null});
-      next.amountCents=value;
-    }
-  }
-  if(JSON.stringify(store.getChatMemory(id,thread.id))!==JSON.stringify(memory))
-    return res.json({...routed,decision:{mode:'clarify',destination:null,question:'任务信息刚刚更新，请重新确认本次修改。'},threadId:thread.id,memory:store.getChatMemory(id,thread.id),turn:null});
-  next=store.saveChatMemory(id,thread.id,next);
-  if(decision.memoryAction==='cancel'){decision.mode='clarify';decision.destination=null;decision.question='已取消当前任务草稿，未执行资金操作。';}
-  if(decision.mode!=='chat'){
-    saveAgentMessage(id,thread.id,{role:'user',content:body.message,components:[]});
-    saveAgentMessage(id,thread.id,{role:'assistant',content:decision.mode==='navigate'?'已打开对应功能，请继续核对信息。':decision.question??'请确认要办理的事项。',components:[]});
-    return res.json({...routed,decision,threadId:thread.id,memory:next,turn:null});
-  }
-  const turn=await createAgentTurn(id,thread.id,body.message,getState(id),{intent:decision.chatIntent??'goal_planning',explanation:decision.answer??null,provider:'deepseek',fallbackReason:null});
-  const latest=getAgentMessages(id,thread.id).filter(m=>m.role==='user').at(-1);
-  const run=turn.intent==='goal_planning'&&turn.components.some(c=>c.type==='goal_input_card')&&!turn.components.some(c=>c.type==='clarification'||c.type==='data_connection_prompt')&&latest?startAgentRun(id,thread.id,latest.id):null;
-  res.json({...routed,threadId:thread.id,memory:next,turn:AgentTurnWithRunSchema.parse({...turn,run})});
+ const body=z.object({message:z.string().trim().min(1).max(500),threadId:z.string().nullable().default(null)}).strict().parse(req.body);
+ const {converse}=await import('./chat-controller.ts');
+ res.json(await converse(sessionId(req,res),body.threadId,body.message));
 }));
 app.post('/api/agent/threads/:id/navigation-draft',route(async(req,res)=>{
   const body=z.object({recipientQuery:z.string().max(60),amountCents:z.number().int().nonnegative().nullable(),sourceAccount:z.string().max(60)}).strict().parse(req.body);
@@ -670,6 +629,38 @@ app.post('/api/demo/load-japan', route((req, res) => {
     return audit({ ...demo, twinVersion: old.twinVersion + 1 }, 'demo_loaded', 'ready', '已载入日本旅行演示');
   });
   return respond(res, state);
+}));
+app.get('/api/demo/expense-impact-case', route((_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(expenseImpactCase());
+}));
+app.post('/api/demo/expense-impact-case/start', route((req, res) => {
+  assertAiWriteAllowed();
+  z.object({ confirmed: z.literal(true) }).strict().parse(req.body);
+  const original = sessionId(req, res);
+  const id = randomUUID();
+  const state = mutateState(id, () => audit(expenseImpactCaseState(), 'expense_case_started', 'executed',
+    '载入日本旅行案例账户，记录汽车保养模拟支出 ¥900；原账户保留。'));
+  const previous = (req.headers.cookie || '').split(';').map(item => item.trim())
+    .find(item => item.startsWith('nova_expense_previous='))?.slice('nova_expense_previous='.length);
+  res.setHeader('Set-Cookie', [
+    `nova_demo_sid=${id}.${sign(id)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${production ? '; Secure' : ''}`,
+    `nova_expense_previous=${previous || `${original}.${sign(original)}`}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${production ? '; Secure' : ''}`,
+  ]);
+  return respond(res, state);
+}));
+app.post('/api/demo/expense-impact-case/exit', route((req, res) => {
+  const raw = (req.headers.cookie || '').split(';').map(item => item.trim())
+    .find(item => item.startsWith('nova_expense_previous='))?.slice('nova_expense_previous='.length);
+  const [id, mac] = (raw || '').split('.');
+  const expected = id && sign(id);
+  if (!id || !mac || !expected || mac.length !== expected.length || !timingSafeEqual(Buffer.from(mac), Buffer.from(expected)))
+    throw new Error('INVALID_PREVIOUS_ACCOUNT');
+  res.setHeader('Set-Cookie', [
+    `nova_demo_sid=${id}.${sign(id)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${production ? '; Secure' : ''}`,
+    `nova_expense_previous=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${production ? '; Secure' : ''}`,
+  ]);
+  return respond(res, getState(id));
 }));
 app.patch('/api/goals/current', route((req, res) => {
   const changes = z.object({ title: z.string().min(1).max(60).optional(), targetCents: z.number().int().positive().optional(),

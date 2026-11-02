@@ -2,6 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseYuan, parseGoalDate, understandGoalMessage } from './understanding.ts';
 
+test('month-only goal keeps the quoted month and asks only for the day',async()=>{
+ const key=process.env.DEEPSEEK_API_KEY;delete process.env.DEEPSEEK_API_KEY;
+ try{
+  const r=await understandGoalMessage('我想在2027年6月去日本，预算¥8,000。','2026-11-02',null);
+  assert.deepEqual(r.changes.targetCents,{op:'set',value:800000});
+  assert.match(r.ambiguity??'',/2027年6月.*几号/);
+  assert.deepEqual(r.changes.targetDate,{op:'clear'});
+ }finally{if(key!==undefined)process.env.DEEPSEEK_API_KEY=key;}
+});
+
+test('model cannot reuse the budget as a savings balance',async()=>{
+ const original=globalThis.fetch,key=process.env.DEEPSEEK_API_KEY;
+ try{
+  process.env.DEEPSEEK_API_KEY='test-only';
+  globalThis.fetch=async()=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({kind:'create',titleQuote:null,amountQuote:null,amountField:null,dateQuote:null,datePrecision:'missing',dateQuestion:null,amountPatches:[{field:'savedCents',quote:'8,000'}]})}}]}));
+  const r=await understandGoalMessage('我想在2027年6月去日本，预算¥8,000。','2026-11-02',null);
+  assert.deepEqual(r.changes.targetCents,{op:'set',value:800000});
+  assert.equal(r.changes.savedCents,undefined);
+ }finally{globalThis.fetch=original;if(key===undefined)delete process.env.DEEPSEEK_API_KEY;else process.env.DEEPSEEK_API_KEY=key;}
+});
+
 test('goal amounts preserve units and cents rather than truncating numeric prefixes', () => {
   for (const [input, expected] of [['1.2万',1200000],['2.35万元',2350000],['1.5千',150000],['12,500.50元',1250050],['八千',800000]] as const)
     assert.equal(parseYuan(input), expected, input);

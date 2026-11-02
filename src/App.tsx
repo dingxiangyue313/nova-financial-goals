@@ -14,6 +14,7 @@ import { NewGoalScreen } from './screens/NewGoalScreen';
 import { FeasibilityScreen } from './screens/FeasibilityScreen';
 import { PlanChangeScreen } from './screens/PlanChangeScreen';
 import { GoalImpactScreen } from './screens/GoalImpactScreen';
+import { ExpenseImpactDialog } from './components/ExpenseImpactDialog';
 import { GoalsListScreen } from './screens/GoalsListScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
 import { DemoGovernanceActivityScreen } from './screens/DemoGovernanceActivityScreen';
@@ -49,6 +50,11 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [deviceFrame, setDeviceFrame] = useState<boolean>(true);
   const [showSimulateModal, setShowSimulateModal] = useState<boolean>(false);
+  const [showExpenseDialog, setShowExpenseDialog] = useState(false);
+  const [expenseStatus, setExpenseStatus] = useState<'loading' | 'impact' | 'quiet' | 'inactive' | 'error'>('loading');
+  const [expenseError, setExpenseError] = useState('');
+  const [expenseCaseAccount, setExpenseCaseAccount] = useState(() => sessionStorage.getItem('nova-expense-case-account') === '1');
+  const expenseInFlight = useRef(false);
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
   const [workspaceStarter, setWorkspaceStarter] = useState('');
@@ -350,15 +356,32 @@ export default function App() {
       navigateTo('workspace');
     } else showToast('自动同步完成；本次变化保持安静');
   };
-  const handleUnexpectedExpenseDemo = async () => {
+  const handleUnexpectedExpenseDemo = async (example = false) => {
+    if (expenseInFlight.current) return;
+    setShowSimulateModal(false);
+    setShowExpenseDialog(true);
+
+    if (example) {
+      expenseInFlight.current = true; setExpenseStatus('loading');
+      try {
+        const live = await api<Snapshot>('/api/demo/expense-impact-case/start', 'POST', { confirmed: true });
+        setSnapshot(live); setExpenseCaseAccount(true); sessionStorage.setItem('nova-expense-case-account', '1');
+        setExpenseStatus('impact');
+      } catch (error) { setExpenseError(error instanceof Error ? error.message : '案例暂时无法加载'); setExpenseStatus('error'); }
+      finally { expenseInFlight.current = false; }
+      return;
+    }
+    if (activeImpact && activeImpactSignal) { setExpenseStatus('impact'); return; }
+    if (snapshot?.goal.status !== 'active') { setExpenseStatus('inactive'); return; }
+    expenseInFlight.current = true;
+    setExpenseStatus('loading'); setExpenseError('');
     try {
-      const next = await mutate('/api/demo/expense', 'POST', { amountCents: 90000, title: '意外支出' });
-      setShowSimulateModal(false);
-      if (next.pendingImpact) {
-        setCurrentScreen('impact');
-        showToast('发现意外支出对目标的影响');
-      } else showToast('已记录模拟支出；当前未达到提醒条件');
-    } catch (error) { showToast(error instanceof Error ? error.message : '模拟支出失败'); }
+      const next = await mutate('/api/demo/expense', 'POST', { amountCents: 90000, title: '汽车保养' });
+      setExpenseStatus(next.pendingImpact && next.pendingImpact.id !== snapshot.pendingImpact?.id ? 'impact' : 'quiet');
+    } catch (error) {
+      setExpenseError(error instanceof Error ? error.message : '暂时无法核算，请查看账户最新状态');
+      setExpenseStatus('error');
+    } finally { expenseInFlight.current = false; }
   };
   const handleConfirmPlan = async (planId: string) => {
     await mutate('/api/goals/activate', 'POST', { planId });
@@ -553,11 +576,13 @@ export default function App() {
           isHome={isHomeScreen}
           title={getScreenTitle()}
           onBack={handleBack}
-          onOpenSimulateModal={demoControl ? () => setShowSimulateModal(true) : undefined}
+          onOpenSimulateModal={demoEnabled ? () => demoControl ? setShowSimulateModal(true) : void handleUnexpectedExpenseDemo(true) : undefined}
+          simulateLabel={demoEnabled && !demoControl ? '支出影响案例' : '模拟数据'}
           onOpenProfile={() => navigateTo('profile')}
         />
 
         {/* Content Body */}
+        {expenseCaseAccount && <div className="flex items-center justify-between gap-2 border-b border-[#B9D9D8] bg-[#E6F2F2] px-4 py-2 text-xs text-[#0F6B6D]"><span>日本旅行案例账户 · 确认方案后可更新计划</span><button className="min-h-11 shrink-0 font-semibold underline" onClick={() => { void api<Snapshot>('/api/demo/expense-impact-case/exit', 'POST', {}).then(live => { setSnapshot(live); setExpenseCaseAccount(false); sessionStorage.removeItem('nova-expense-case-account'); setShowExpenseDialog(false); navigateTo('home'); }).catch(error => showToast(error instanceof Error ? error.message : '切换失败')); }}>返回原账户</button></div>}
         <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar relative w-full bg-[#F5F7F8]"><Suspense fallback={<p role="status" className="p-4">正在打开任务…</p>}>
           {!goal && ['home', 'feasibility', 'profile'].includes(currentScreen) && (
             <section className="m-4 rounded-2xl border border-[#D8E7E7] bg-white p-5 shadow-sm">
@@ -740,6 +765,16 @@ export default function App() {
         )}
 
         {/* Modal: 模拟数据控制器 */}
+        {showExpenseDialog && <ExpenseImpactDialog
+          onClose={() => setShowExpenseDialog(false)} status={expenseStatus} error={expenseError}
+          onActivate={() => { setShowExpenseDialog(false); navigateTo('feasibility'); }}>
+          {goal && scenario ? <GoalImpactScreen compact snapshot={snapshot} goal={goal} onRefresh={setSnapshot}
+            onResolved={(next, destination) => { setSnapshot(next); setShowExpenseDialog(false); setCurrentScreen(destination); }}
+            onManualAdjust={() => { setShowExpenseDialog(false); navigateTo('plan_change'); }}
+            onLater={() => { void handleLater().then(() => setShowExpenseDialog(false)).catch(error => showToast(error instanceof Error ? error.message : '请重试')); }}
+            onDismiss={() => { void handleDismiss().then(() => setShowExpenseDialog(false)).catch(error => showToast(error instanceof Error ? error.message : '请重试')); }}
+          /> : <p className="p-5 text-sm text-[#5A616B]">这条影响已处理或数据已更新，请返回目标查看最新状态。</p>}
+        </ExpenseImpactDialog>}
         {demoControl && showSimulateModal && (
           <div className="absolute inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-end justify-center p-3">
             <div className="w-full bg-white rounded-2xl p-4 space-y-3 shadow-2xl animate-slideUp">
