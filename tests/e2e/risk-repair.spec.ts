@@ -1,11 +1,16 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
 
-async function loadActiveRisk(page: import('@playwright/test').Page) {
+async function loadActiveRisk(page: Page) {
   await page.goto('/demo-control');
-  await page.request.post('/api/demo/load-japan');
-  await page.request.post('/api/goals/activate', { data: { planId: 'balanced' } });
-  await page.request.post('/api/demo/spending-trend', { data: { idempotencyKey: 'e2e-risk-repair' } });
+  const scenario = await page.request.post('/api/demo/load-japan');
+  expect(scenario.ok()).toBeTruthy();
+  const activation = await page.request.post('/api/goals/activate', { data: { planId: 'balanced' } });
+  expect(activation.ok()).toBeTruthy();
+  const trend = await page.request.post('/api/demo/spending-trend', { data: { idempotencyKey: 'e2e-risk-repair' } });
+  expect(trend.ok()).toBeTruthy();
+  const state = await (await page.request.get('/api/session')).json();
+  expect(state.pendingImpact).not.toBeNull();
   await page.reload();
   await page.getByRole('button', { name: '3. 目标影响' }).click();
 }
