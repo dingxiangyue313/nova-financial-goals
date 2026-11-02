@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AgentComponent, GoalAssumptions, RiskPreferences } from '../../shared/contracts';
+import type { AgentComponent, GoalAssumptions, RiskPreferences, Snapshot } from '../../shared/contracts';
 import { normalizeAgentComponent } from '../../shared/generative';
 import type { ScreenId } from '../types';
 import { ClaimBadge } from './money-mission/ClaimBadge';
@@ -102,17 +102,33 @@ function PreferenceEditor({ preferences, goalId, onUpdate, busy }: {
 }
 
 export function AgentComponentRenderer({ value, onAction, onCancel, onSelectCandidate, onConnectData,
-  onMonitoring, onFollowup, onNavigate, busy, onPreview, onUpdateRiskPreferences }: {
+  onMonitoring, onFollowup, onNavigate, riskSignals, busy, onPreview, onUpdateRiskPreferences }: {
   value: unknown; onAction: (actionId: string, selection?: string[]) => void; onCancel: (actionId: string) => void;
   onSelectCandidate: (resultId: string, threadId?: string) => void;
   onConnectData: (threadId: string) => void;
   onMonitoring: (threadId: string, enabled: boolean) => void;
   onFollowup: (threadId: string) => void;
   onNavigate: (screen: ScreenId) => void; busy?: boolean;
+  riskSignals?: Snapshot['riskSignals'];
   onPreview?: (assumptions: GoalAssumptions, twinVersion: number) => void;
   onUpdateRiskPreferences?: (changes: Partial<RiskPreferences>) => void;
 }) {
   const component = normalizeAgentComponent(value);
+
+  if (component.type === 'risk_repair_entry') {
+    const status = riskSignals?.find(signal => signal.impactId === component.impactId)?.status;
+    const available = status === 'active' || status === 'later';
+    return <article className="rounded-2xl border border-[#B9D9D8] bg-white p-4 shadow-sm">
+      <h4 className="text-[14px] font-bold">{component.title}</h4>
+      <p className="mt-2 text-[12px] leading-relaxed text-[#5A616B]">{available ? component.body
+        : status === 'resolved' ? '这条风险已经处理，历史证据保留。'
+          : status === 'dismissed' ? '这条提醒已忽略，历史证据保留。' : '这条风险判断已过期，请重新核算。'}</p>
+      <button type="button" disabled={!available} onClick={() => onNavigate('impact')}
+        className="mt-3 min-h-11 w-full rounded-xl bg-[#0F6B6D] px-3 text-[12px] font-semibold text-white disabled:bg-[#D0D5DD]">
+        {available ? '查看调整方案' : '当前不可执行'}
+      </button>
+    </article>;
+  }
 
   if (component.type === 'data_connection_prompt') return <article className="rounded-2xl border border-[#B9D9D8] bg-white p-4 shadow-sm">
     <h4 className="text-[14px] font-bold">{component.title}</h4>
@@ -190,7 +206,8 @@ export function AgentComponentRenderer({ value, onAction, onCancel, onSelectCand
   if (component.type === 'confirmation') return <article className={`rounded-2xl border p-3 shadow-sm ${tone[component.tone]}`}>
     <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A6A13]">需要你明确确认</div><h4 className="mt-1 text-[14px] font-bold">{component.title}</h4>
     <p className="mt-1 text-[12px] leading-relaxed text-[#5A616B]">{component.body}</p>
-    <div className="mt-3 grid grid-cols-[1fr_auto] gap-2"><button disabled={busy} onClick={() => onAction(component.action.actionId)} className="min-h-11 rounded-xl bg-[#0F6B6D] px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-50">{busy ? '正在执行…' : component.action.label}</button><button disabled={busy} onClick={() => onCancel(component.action.actionId)} className="min-h-11 rounded-xl border border-[#D0D5DD] bg-white px-3 text-[12px] text-[#5A616B]">取消</button></div>
+    {component.unavailableReason && <p role="status" className="mt-2 rounded-lg bg-[#F0F2F5] p-2 text-[11px] text-[#5A616B]">{component.unavailableReason}</p>}
+    <div className="mt-3 grid grid-cols-[1fr_auto] gap-2"><button disabled={busy || Boolean(component.unavailableReason)} onClick={() => onAction(component.action.actionId)} className="min-h-11 rounded-xl bg-[#0F6B6D] px-3 py-2 text-[12px] font-semibold text-white disabled:opacity-50">{component.unavailableReason ? '当前不可执行' : busy ? '正在执行…' : component.action.label}</button><button disabled={busy || Boolean(component.unavailableReason)} onClick={() => onCancel(component.action.actionId)} className="min-h-11 rounded-xl border border-[#D0D5DD] bg-white px-3 text-[12px] text-[#5A616B] disabled:opacity-50">取消</button></div>
   </article>;
   if (component.type === 'receipt') return <article className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 shadow-sm">
     <div className="text-[10px] font-bold text-emerald-700">{component.status.toUpperCase()}</div><h4 className="mt-1 text-[14px] font-bold">{component.title}</h4><p className="mt-1 text-[12px] text-[#47605A]">{component.body}</p>

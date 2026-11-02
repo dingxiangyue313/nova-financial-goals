@@ -29,6 +29,9 @@ test('首页、工作台、可行性、影响和授权页无严重无障碍问�
   await expect(page.getByText('选择适合你的节奏', { exact: true })).toBeVisible();
   await expectNoSeriousViolations(page, '目标可行性');
 
+  await page.request.post('/api/goals/activate', { data: { planId: 'balanced' } });
+  await page.request.post('/api/demo/spending-trend', { data: { idempotencyKey: 'a11y-risk-repair' } });
+  await page.reload();
   await page.getByRole('button', { name: '3. 目标影响' }).click();
   await expect(page.getByRole('heading', { name: /目标影响|NOVA 洞察/ })).toBeVisible();
   await expectNoSeriousViolations(page, '目标影响');

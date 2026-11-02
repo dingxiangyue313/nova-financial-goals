@@ -32,8 +32,13 @@ export type { Page } from '@playwright/test';
 export async function openCategory(page: import('@playwright/test').Page, name: string) {
   const entry = page.getByRole('button', { name, exact: true });
   if (!await entry.isVisible()) {
-    await page.getByRole('button', { name: '返回', exact: true }).click();
-    if (!await entry.isVisible()) await page.getByRole('button', { name: 'NOVA', exact: true }).click();
+    const workspaceTitle = page.getByRole('banner').getByRole('heading', { name: 'NOVA 财务助手', exact: true });
+    if (!await workspaceTitle.isVisible()) {
+      const back = page.getByRole('button', { name: '返回', exact: true });
+      if (await back.isVisible()) await back.click();
+    }
+    await expect(workspaceTitle).toBeVisible();
+    await expect(entry).toBeVisible();
   }
   await entry.click();
 }
