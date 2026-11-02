@@ -1252,3 +1252,7 @@ export const AiSafetyEvaluationSummarySchema = z.object({
 export type AiSafetyEvaluationSummary = z.infer<typeof AiSafetyEvaluationSummarySchema>;
 export const AiSafetyOverviewSchema = z.object({control:AiSafetyControlSchema,passports:z.array(AiSafetyPassportSchema),evaluation:AiSafetyEvaluationSummarySchema.nullable(),demoControlsEnabled:z.boolean()}).strict();
 export type AiSafetyOverview = z.infer<typeof AiSafetyOverviewSchema>;
+export const ExpenseImpactCaseSchema = z.object({ snapshot: SnapshotSchema, previews: z.object({
+  keep_target_date: RiskRepairPreviewSchema, keep_monthly_contribution: RiskRepairPreviewSchema,
+}) });
+export type ExpenseImpactCase = z.infer<typeof ExpenseImpactCaseSchema>;

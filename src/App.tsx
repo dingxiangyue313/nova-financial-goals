@@ -53,6 +53,7 @@ export default function App() {
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
   const [expenseStatus, setExpenseStatus] = useState<'loading' | 'impact' | 'quiet' | 'inactive' | 'error'>('loading');
   const [expenseError, setExpenseError] = useState('');
+  const [expenseCase, setExpenseCase] = useState<import('../shared/contracts').ExpenseImpactCase | null>(null);
   const expenseInFlight = useRef(false);
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
@@ -355,10 +356,20 @@ export default function App() {
       navigateTo('workspace');
     } else showToast('自动同步完成；本次变化保持安静');
   };
-  const handleUnexpectedExpenseDemo = async () => {
+  const handleUnexpectedExpenseDemo = async (example = false) => {
     if (expenseInFlight.current) return;
     setShowSimulateModal(false);
     setShowExpenseDialog(true);
+    setExpenseCase(null);
+    if (example) {
+      expenseInFlight.current = true; setExpenseStatus('loading');
+      try {
+        setExpenseCase(await api<import('../shared/contracts').ExpenseImpactCase>('/api/demo/expense-impact-case'));
+        setExpenseStatus('impact');
+      } catch (error) { setExpenseError(error instanceof Error ? error.message : '案例暂时无法加载'); setExpenseStatus('error'); }
+      finally { expenseInFlight.current = false; }
+      return;
+    }
     if (activeImpact && activeImpactSignal) { setExpenseStatus('impact'); return; }
     if (snapshot?.goal.status !== 'active') { setExpenseStatus('inactive'); return; }
     expenseInFlight.current = true;
@@ -564,8 +575,8 @@ export default function App() {
           isHome={isHomeScreen}
           title={getScreenTitle()}
           onBack={handleBack}
-          onOpenSimulateModal={demoEnabled ? () => demoControl ? setShowSimulateModal(true) : void handleUnexpectedExpenseDemo() : undefined}
-          simulateLabel={demoEnabled && !demoControl ? activeImpact ? '查看支出影响' : '模拟 ¥900 支出' : '模拟数据'}
+          onOpenSimulateModal={demoEnabled ? () => demoControl ? setShowSimulateModal(true) : void handleUnexpectedExpenseDemo(true) : undefined}
+          simulateLabel={demoEnabled && !demoControl ? '支出影响案例' : '模拟数据'}
           onOpenProfile={() => navigateTo('profile')}
         />
 
@@ -755,7 +766,10 @@ export default function App() {
         {showExpenseDialog && <ExpenseImpactDialog
           onClose={() => setShowExpenseDialog(false)} status={expenseStatus} error={expenseError}
           onActivate={() => { setShowExpenseDialog(false); navigateTo('feasibility'); }}>
-          {goal && scenario ? <GoalImpactScreen compact snapshot={snapshot} goal={goal} onRefresh={setSnapshot}
+          {expenseCase ? <><p className="px-4 pt-3 text-xs leading-5 text-[#5A616B]">日本旅行演示案例：¥900 汽车保养支出影响储蓄节奏。仅展示案例，不改动你的账户或目标。</p><GoalImpactScreen compact examplePreviews={expenseCase.previews}
+            snapshot={expenseCase.snapshot} goal={displayGoal(expenseCase.snapshot)} onRefresh={() => {}}
+            onResolved={() => setShowExpenseDialog(false)} onManualAdjust={() => setShowExpenseDialog(false)}
+            onLater={() => setShowExpenseDialog(false)} onDismiss={() => setShowExpenseDialog(false)} /></> : goal && scenario ? <GoalImpactScreen compact snapshot={snapshot} goal={goal} onRefresh={setSnapshot}
             onResolved={(next, destination) => { setSnapshot(next); setShowExpenseDialog(false); setCurrentScreen(destination); }}
             onManualAdjust={() => { setShowExpenseDialog(false); navigateTo('plan_change'); }}
             onLater={() => { void handleLater().then(() => setShowExpenseDialog(false)).catch(error => showToast(error instanceof Error ? error.message : '请重试')); }}

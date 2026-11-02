@@ -7,6 +7,7 @@ import type { Goal } from '../types';
 
 interface GoalImpactScreenProps {
   compact?: boolean;
+  examplePreviews?: Record<RiskRepairStrategy, RiskRepairPreview>;
   snapshot: Snapshot; goal: Goal;
   onRefresh: (snapshot: Snapshot) => void;
   onResolved: (snapshot: Snapshot, destination: 'home' | 'money_mission') => void;
@@ -25,7 +26,7 @@ function errorText(reason: unknown) {
   return reason instanceof Error ? reason.message : '暂时无法核验调整方案';
 }
 
-export function GoalImpactScreen({ compact = false, snapshot, goal, onRefresh, onResolved, onManualAdjust,
+export function GoalImpactScreen({ compact = false, examplePreviews, snapshot, goal, onRefresh, onResolved, onManualAdjust,
   onLater, onDismiss }: GoalImpactScreenProps) {
   const impactId = snapshot.pendingImpact!.id;
   const [previews, setPreviews] = useState<Record<RiskRepairStrategy, RiskRepairPreview> | null>(null);
@@ -47,6 +48,7 @@ export function GoalImpactScreen({ compact = false, snapshot, goal, onRefresh, o
   }
 
   useEffect(() => {
+    if (examplePreviews) { setPreviews(examplePreviews); setLoading(false); return; }
     let active = true;
     setLoading(true); setError(''); setPreviews(null); setSelected(null); setAccepted(false);
     Promise.all((['keep_target_date', 'keep_monthly_contribution'] as const).map(async strategy => {
@@ -69,7 +71,7 @@ export function GoalImpactScreen({ compact = false, snapshot, goal, onRefresh, o
       }
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [impactId, snapshot.twinVersion, onRefresh, refreshKey]);
+  }, [impactId, snapshot.twinVersion, onRefresh, refreshKey, examplePreviews]);
 
   const chosen = selected && previews ? previews[selected] : null;
   const verified = previews?.keep_monthly_contribution ?? previews?.keep_target_date ?? null;
@@ -85,6 +87,7 @@ export function GoalImpactScreen({ compact = false, snapshot, goal, onRefresh, o
   }
 
   async function apply() {
+    if (examplePreviews) return;
     if (!chosen || !chosen.candidate.selectable) return;
     setBusy(true); setError('');
     try {
@@ -177,13 +180,13 @@ export function GoalImpactScreen({ compact = false, snapshot, goal, onRefresh, o
         {!loading && <button type="button" onClick={() => setRefreshKey(value => value + 1)}
           className="min-h-11 rounded-lg border border-rose-200 bg-white px-3 font-semibold text-rose-700">重新加载方案</button>}
       </div>}
-      <button type="button" disabled={busy || !chosen?.candidate.selectable
+      <button type="button" disabled={Boolean(examplePreviews) || busy || !chosen?.candidate.selectable
         || Boolean(chosen?.candidate.requiresTargetDateChange && !accepted)} onClick={() => void apply()}
         className="min-h-11 w-full rounded-xl bg-[#0F6B6D] px-4 text-sm font-semibold text-white disabled:bg-[#D0D5DD]">
-        {busy ? '正在确认…' : compact && !chosen ? '请选择一个方案' : '确认调整计划'}
+        {examplePreviews ? '示例方案 · 不修改当前账户' : busy ? '正在确认…' : compact && !chosen ? '请选择一个方案' : '确认调整计划'}
       </button>
       <p className="text-center text-[11px] text-[#5A616B]">仅模拟数据，不会自动扣款</p>
-      <button type="button" onClick={onManualAdjust} className="min-h-11 w-full rounded-xl border border-[#B9D9D8] text-sm text-[#0F6B6D]">手动调整目标参数</button>
+      {!examplePreviews && <button type="button" onClick={onManualAdjust} className="min-h-11 w-full rounded-xl border border-[#B9D9D8] text-sm text-[#0F6B6D]">手动调整目标参数</button>}
       <div className="flex justify-center gap-5">
         <button type="button" onClick={onLater} className="min-h-11 text-sm text-[#5A616B]">稍后处理</button>
         <button type="button" onClick={onDismiss} className="min-h-11 text-sm text-[#5A616B]">忽略本次提示</button>

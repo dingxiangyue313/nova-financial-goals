@@ -33,6 +33,7 @@ import { installApiRateLimits, installRequestHardening, setStaticCacheHeaders } 
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
 import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, failDataSource, recoverDataSource, revokeDataSource } from './data-connections.ts';
 import { createFixture } from './fixtures.ts';
+import { expenseImpactCase } from './expense-impact-case.ts';
 import { AgentRunCancelRequestSchema, AgentRunStatusResponseSchema, AgentTurnWithRunSchema,
   MonitorStatusSchema } from '../shared/contracts.ts';
 import { getAgentRunStatus, startAgentRun, stopAgentRun } from './agent-runner.ts';
@@ -628,6 +629,10 @@ app.post('/api/demo/load-japan', route((req, res) => {
     return audit({ ...demo, twinVersion: old.twinVersion + 1 }, 'demo_loaded', 'ready', '已载入日本旅行演示');
   });
   return respond(res, state);
+}));
+app.get('/api/demo/expense-impact-case', route((_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(expenseImpactCase());
 }));
 app.patch('/api/goals/current', route((req, res) => {
   const changes = z.object({ title: z.string().min(1).max(60).optional(), targetCents: z.number().int().positive().optional(),

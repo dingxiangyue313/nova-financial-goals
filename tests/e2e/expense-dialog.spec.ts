@@ -1,5 +1,21 @@
 import { expect, test } from './fixtures';
 
+test('impact example works without an active user goal and leaves the current account untouched', async ({ page }, testInfo) => {
+  await page.goto('/');
+  const before = await (await page.request.get('/api/session')).json();
+  await page.getByRole('button', { name: '支出影响案例', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '目标影响提醒' });
+  await expect(dialog.getByRole('heading', { name: /日本旅行可能延期/ })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /方案 A/ })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: '示例方案 · 不修改当前账户' })).toBeDisabled();
+  await page.screenshot({path: testInfo.outputPath('impact-case.png')});
+  await page.keyboard.press('Escape');
+  const after = await (await page.request.get('/api/session')).json();
+  expect(after.goal).toEqual(before.goal);
+  expect(after.finance).toEqual(before.finance);
+  expect(after.pendingImpact).toEqual(before.pendingImpact);
+});
+
 test('expense popup uses recorded evidence and server plans without changing the goal before confirmation', async ({ page }, testInfo) => {
   await page.goto('/demo-control');
   expect((await page.request.post('/api/demo/load-japan')).ok()).toBeTruthy();
