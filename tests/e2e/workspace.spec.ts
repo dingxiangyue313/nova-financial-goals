@@ -143,7 +143,7 @@ test('首页与空工作台使用同一透明 NOVA 标志', async ({ page }) => 
   await expect(workspaceMark).toHaveAttribute('data-transparent', 'true');
 });
 
-test('目标画布由 NOVA 核算多个候选并逐项解释', async ({ page }) => {
+test('目标画布由 NOVA 核算多个候选并逐项解释', async ({ page }, testInfo) => {
   await openApp(page);
   await openWorkspace(page);
   await page.getByRole('textbox',{name:'告诉 NOVA 你的需求'})
@@ -152,8 +152,16 @@ test('目标画布由 NOVA 核算多个候选并逐项解释', async ({ page }) 
   const card = page.locator('article').filter({ hasText: '已核验的参考方案' }).first();
   await expect(card).toBeVisible();
   await expect(card.getByRole('button', { name: '选择此候选并核对确认' })).toHaveCount(3);
-  await card.getByText('看看计算依据').first().click();
+  await expect(card.getByRole('region', {name: '目标可行性结论'})).toBeVisible();
+  await expect(card.getByRole('region', {name: '推演与推进阶段'})).toBeVisible();
+  await expect(card.locator('details[open]')).toHaveCount(3);
+  await expect(card.getByText(/适合能稳定按月存|适合这个月想留点余地/).first()).toBeVisible();
   await expect(card.getByText(/首月可动用额度/).first()).toBeVisible();
+  const firstChoice = card.getByRole('radio').first();
+  await firstChoice.check();
+  await expect(firstChoice).toBeChecked();
+  await expect(card.getByRole('radio').nth(1)).not.toBeChecked();
+  await card.screenshot({path: testInfo.outputPath('candidate-layout.png')});
   await expect(page.getByTestId('assumption-editor')).toHaveCount(0);
   await card.getByRole('button', { name: '选择此候选并核对确认' }).first().click();
   await expect(page.getByText('核对并激活候选方案').first()).toBeVisible();

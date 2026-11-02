@@ -1,3 +1,4 @@
+import { GoalCandidateRecommendations } from './GoalCandidateRecommendations';
 import { useEffect, useState } from 'react';
 import type { AgentComponent, GoalAssumptions, RiskPreferences, Snapshot } from '../../shared/contracts';
 import { normalizeAgentComponent } from '../../shared/generative';
@@ -8,12 +9,6 @@ const money = (cents: number) => `¥${(cents / 100).toLocaleString('zh-CN')}`;
 const sourceName = { bank: '银行卡', wechat_pay: '微信支付', alipay: '支付宝' } as const;
 const fieldSourceName: Record<string, string> = { user_provided: '用户提供', connected_data: '连接数据',
   system_calculated: '系统计算', default_assumption: '默认假设' };
-const planReason: Record<string, string> = {
-  MONTHLY_CAPACITY_EXCEEDED: '超过每月可投入金额', FIRST_MONTH_BUFFER_NEGATIVE: '首月可用金额不足',
-  PROTECTED_FUNDS_UNAVAILABLE: '会影响保护资金', INSUFFICIENT_DATA: '需要补充数据',
-  GOAL_PRIORITY_CONFLICT: '与其他目标的预算冲突', FORECAST_HORIZON_INCOMPLETE: '超出当前可核算日期范围',
-  GOAL_DEADLINE_PASSED: '目标日期已过', AMBIGUOUS_SCHEDULE: '需要核对存款安排',
-};
 const tone = {
   neutral: 'border-[#E5E8EB] bg-white', good: 'border-emerald-200 bg-emerald-50',
   warning: 'border-amber-200 bg-amber-50', danger: 'border-rose-200 bg-rose-50',
@@ -227,28 +222,7 @@ export function AgentComponentRenderer({ value, onAction, onCancel, onSelectCand
     <h4 className="text-[13px] font-bold">{component.title}</h4><p className="mt-1 text-[11px] text-[#5A616B]">{component.body}</p>
     <button type="button" disabled={busy} onClick={() => onFollowup(component.taskThreadId)} className="mt-2 min-h-11 w-full rounded-xl border border-[#0F6B6D] bg-white px-3 text-[11px] font-semibold text-[#0F6B6D] disabled:opacity-50">安排下个月跟进</button>
   </article>;
-  if (component.type === 'candidate_recommendations') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-3 shadow-sm">
-    <h4 className="text-[13px] font-bold">{component.title}</h4><p className="mt-1 whitespace-pre-line text-[11px] leading-relaxed text-[#5A616B]">{component.body}</p>
-    <div className="mt-2 space-y-2">{component.conditionalPlan && <div className="rounded-xl border border-[#D8E7E7] bg-[#F5FAFA] p-2.5 text-[11px]">
-      <div className="flex justify-between font-semibold"><span>保守方案</span><span className="text-amber-700">需调整日期</span></div>
-      <p className="mt-1">每月存 {money(component.conditionalPlan.monthlyContributionCents)} · 预计 {component.conditionalPlan.projectedDate} 完成</p>
-      <p className="mt-1 text-[#5A616B]">每月留给日常的钱更多，但赶不上原目标日 {component.conditionalPlan.targetDate}。愿意延期的话，先修改目标日期再选择。</p>
-    </div>}{component.items.map((item, index) => <div key={item.resultId ?? `user-${index}`} className="rounded-xl border border-[#D8E7E7] bg-[#F5FAFA] p-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-1 text-[12px] font-semibold"><span>{item.label || `方案 ${index + 1}`}</span><span className={item.status === 'on_track' ? 'text-emerald-700' : 'text-amber-700'}>{item.status === 'on_track' ? '预计按时' : '存在延期风险'}</span></div>
-      <p className="mt-1 text-[11px] text-[#36404A]">{item.firstMonthContributionCents === undefined ? `每月存 ${money(item.monthlyContributionCents)}` : `首月存 ${money(item.firstMonthContributionCents)}，之后每月存 ${money(item.monthlyContributionCents)}`} · 预计 {item.projectedDate ?? '待补充数据'} 完成</p>
-      <p className="mt-1 text-[11px] text-[#5A616B]">首月可用余量 {money(item.bufferCents)}。{item.firstMonthContributionCents === undefined ? '每个月保持同一笔存款。' : '先给这个月留出更多空间，之后再恢复月存。'}</p>
-      <p className="mt-1 text-[11px] text-[#5A616B]">{item.firstMonthContributionCents === undefined
-        ? '适合能稳定按月存这笔钱、想早一点完成的人。'
-        : '适合这个月想留点余地，同时仍想赶上原定日期的人。'} 收入和日常支出若有变化，可以再重新计算。</p>
-      <details className="mt-2 text-[11px] text-[#5A616B]"><summary className="cursor-pointer text-[#0F6B6D]">看看计算依据</summary>
-        <p className="mt-1 whitespace-pre-line leading-relaxed">{item.explanation}</p></details>
-      {item.source === 'both' && <p className="mt-1 text-xs font-semibold text-[#0F6B6D]">你的方案 · NOVA 推荐</p>}
-      {item.delayDays > 0 && <p className="mt-1 text-xs text-amber-800">原目标日 {item.originalTargetDate}，预计晚 {item.delayDays} 天；确认时同时调整目标日期。</p>}
-      {!item.selectable && <p role="status" className="mt-1 text-xs text-rose-700">暂不可选：{item.blockingReasons.map(reason => planReason[reason] ?? '请核对当前数据和目标条件').join('；')}</p>}
-      <button type="button" disabled={busy || !item.selectable || !item.resultId} onClick={() => item.resultId && onSelectCandidate(item.resultId, component.taskThreadId)} className="mt-2 min-h-11 w-full rounded-xl border border-[#0F6B6D] bg-white px-3 text-[11px] font-semibold text-[#0F6B6D] disabled:opacity-50">选择此候选并核对确认</button>
-    </div>)}</div><p className="mt-2 text-[11px] text-[#5A616B]">你更想这个月轻松一些，还是早点完成？</p>
-    <p className="mt-2 text-xs text-[#5A616B]">想换一个月存金额？直接告诉 NOVA，我会重新计算。</p>
-  </article>;
+  if (component.type === 'candidate_recommendations') return <GoalCandidateRecommendations component={component} onSelectCandidate={onSelectCandidate} busy={busy} />;
   if (component.type === 'stress_analysis') return <article className="rounded-2xl border border-[#D8E7E7] bg-white p-3 shadow-sm">
     <h4 className="text-[13px] font-bold">{component.title}</h4>
     <p className="mt-1 text-[11px] leading-relaxed text-[#5A616B]">{component.body}</p>
