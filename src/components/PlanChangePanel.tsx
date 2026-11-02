@@ -2,14 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { GoalPlanChangeDraftSchema, GoalPlanChangePreviewSchema, SnapshotSchema,
   type Snapshot, type GoalPlanChangePreview, type GoalPlanChangeDraft } from '../../shared/contracts';
 import { api } from '../api';
+import { money, PlanCandidateCard, PlanDifferenceTable, TargetDateConfirmation } from './PlanConfirmation';
 
-const money = (value: number) => `¥${(value / 100).toLocaleString('zh-CN')}`;
-const reasons: Record<string, string> = {
-  MONTHLY_CAPACITY_EXCEEDED: '超过每月可投入金额', FIRST_MONTH_BUFFER_NEGATIVE: '首月可用金额不足',
-  PROTECTED_FUNDS_UNAVAILABLE: '保护资金不足', INSUFFICIENT_DATA: '数据不足，暂时不能确认',
-  PLAN_NOT_AVAILABLE: '当前条件下不可执行', GOAL_DEADLINE_PASSED: '目标日期已过',
-  FORECAST_HORIZON_INCOMPLETE: '目标日期超出当前可核算范围', AMBIGUOUS_SCHEDULE: '需重新核对存款安排',
-};
 export function PlanChangePanel({ snapshot, onApplied, onRefresh, onCancel }: {
   snapshot: Snapshot; onApplied: (snapshot: Snapshot, review: boolean) => void;
   onRefresh: (snapshot: Snapshot) => void; onCancel: () => void;
@@ -81,27 +75,20 @@ export function PlanChangePanel({ snapshot, onApplied, onRefresh, onCancel }: {
       <button disabled={busy} className="min-h-11 w-full rounded-xl bg-[#0F6B6D] px-3 text-white">{busy ? '正在计算…' : '重新计算'}</button>
     </form> : <>
       <p role="status" className="text-xs">已生成 {candidates.length} 个方案，请选择并核对变更。</p>
-      {candidates.map(candidate => <button type="button" key={candidate.id} disabled={busy || !candidate.selectable}
-        aria-pressed={selected === candidate.id} onClick={() => { setSelected(candidate.id); setAccepted(false); }}
-        className={`min-h-11 w-full rounded-xl border p-3 text-left disabled:opacity-60 ${selected === candidate.id ? 'border-[#0F6B6D] bg-[#F2FAFA]' : 'border-[#D0D5DD]'}`}>
-        <strong className="block text-sm">{candidate.label}{candidate.source === 'both' ? ' · NOVA 推荐' : ''} · {money(candidate.monthlyCents)}/月</strong>
-        <span className="block text-xs mt-1">{candidate.explanation}</span>
-        <span className="block text-xs mt-1">预计完成 {candidate.projectedDate ?? '待补充数据'}</span>
-        <span className="block text-xs mt-1">首月缓冲 {money(candidate.safeToSpendCents)}</span>
-        {candidate.firstMonthContributionCents !== undefined && candidate.firstMonthContributionCents !== candidate.monthlyCents && <span className="block text-xs mt-1">首月合计投入 {money(candidate.firstMonthContributionCents)}</span>}
-        {candidate.blockingReasons.length > 0 && <span className="block text-xs mt-1">{candidate.blockingReasons.map(reason => reasons[reason] ?? '需核对当前数据').join('；')}</span>}
-      </button>)}
+      {candidates.map(candidate => <PlanCandidateCard key={candidate.id} candidate={candidate}
+        selected={selected === candidate.id} busy={busy}
+        onSelect={() => { setSelected(candidate.id); setAccepted(false); }} />)}
       {chosen && <div className="rounded-xl bg-[#F5F7F8] p-3 space-y-2 text-xs">
         <h3 className="font-bold text-sm">确认变更</h3>
-        {[
+        <PlanDifferenceTable rows={[
           ['目标金额', money(snapshot.goal.targetCents), money(draft.targetCents)],
           ['目标日期', snapshot.goal.targetDate, chosen.effectiveTargetDate],
           ['已存金额', money(snapshot.goal.savedCents), money(draft.savedCents)],
           ['保护资金', money(snapshot.goal.protectedCents), money(draft.protectedCents)],
           ['每月投入', money(snapshot.goal.monthlyContributionCents), money(chosen.monthlyCents)],
           ['允许浮动', `${snapshot.goal.flexibilityWeeks} 周`, `${draft.flexibilityWeeks} 周`],
-        ].map(([label, before, after]) => <p key={label}>{label}：{before} → {after}</p>)}
-        {chosen.requiresTargetDateChange && <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={accepted} onChange={event => setAccepted(event.target.checked)} />同意将目标日期调整为 {chosen.effectiveTargetDate}（晚 {chosen.delayDays} 天）</label>}
+        ]} />
+        <TargetDateConfirmation candidate={chosen} accepted={accepted} onChange={setAccepted} />
       </div>}
       <button type="button" disabled={busy || !chosen?.selectable || Boolean(stale) || Boolean(chosen?.requiresTargetDateChange && !accepted)} onClick={() => void apply()} className="min-h-11 w-full rounded-xl bg-[#0F6B6D] px-3 text-white disabled:opacity-50">{busy ? '正在保存…' : '确认修改方案'}</button>
       <button type="button" disabled={busy} onClick={() => { setPreview(null); setError(''); }} className="min-h-11 w-full rounded-xl border border-[#D0D5DD]">返回编辑</button>

@@ -83,7 +83,8 @@ test('对话故事二：显著支出自动创建未读风险会话', async ({ pa
   await expect(page.getByText('降低未来可选支出')).toBeVisible();
   await expect(page.getByText('增加目标投入')).toBeVisible();
   await expect(page.getByText('3. 调整目标日期', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '确认方案 B' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看调整方案' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /确认方案 [AB]/ })).toHaveCount(0);
 });
 
 test('主动询问支出时展示只读对比，不新增模拟流水', async ({ page }) => {

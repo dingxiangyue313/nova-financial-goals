@@ -2,11 +2,11 @@ import { assertAiWriteAllowed } from './ai-safety-control.ts';
 import { z } from 'zod';
 import { applyConfirmedAccountSnapshot } from './account-snapshots.ts';
 import { AgentTurnSchema, GoalAssumptionsSchema, type AgentComponent, type AgentIntent,
-  type AgentTurn, type DemoState, type GoalAssumptions, type GoalDraft, type TransferScheduleInput } from '../shared/contracts.ts';
+  type AgentMessage, type AgentTurn, type DemoState, type GoalAssumptions, type GoalDraft, type TransferScheduleInput } from '../shared/contracts.ts';
 import { interpretAgentRequest } from './agent.ts';
 import { understandGoalMessage, type Understanding } from './understanding.ts';
-import { buildWeeklyRiskSummary, markActiveRiskSignal, notificationDelivery } from './risk.ts';
-import { assessGoal, availableMonthly, resolveImpact } from './domain.ts';
+import { buildWeeklyRiskSummary, notificationDelivery } from './risk.ts';
+import { assessGoal, availableMonthly } from './domain.ts';
 import { runBankingTool } from './banking.ts';
 import { SubscriptionCancellationParametersSchema } from '../shared/contracts.ts';
 import { persistSubscriptionDecision, subscriptionCancellationParameters } from './subscription-service.ts';
@@ -26,6 +26,21 @@ import {
 
 const yuan = (value: number) => `¥${(value / 100).toLocaleString('zh-CN')}`;
 const componentId = () => crypto.randomUUID();
+
+export function decorateAgentMessageActions(sessionId: string, messages: AgentMessage[]): AgentMessage[] {
+  return messages.map(message => ({ ...message, components: message.components.map(component => {
+    if (component.type !== 'confirmation') return component;
+    try {
+      const action = getAgentAction(sessionId, component.action.actionId);
+      if (action.actionType === 'resolve_impact') return { ...component,
+        unavailableReason: '旧方案已停用，请使用“查看调整方案”重新核验。' };
+      if (action.status !== 'pending') return { ...component, unavailableReason: '这项操作已经处理，历史内容仅供查看。' };
+    } catch {
+      return { ...component, unavailableReason: '这项历史操作已不可执行。' };
+    }
+    return component;
+  }) }));
+}
 
 function detectIntent(message: string): AgentIntent {
   if (/(执行|Execute|Ask|Block|人工复核|外部.*请求|Agent 请求)/i.test(message)) return 'external_agent_request';
@@ -168,20 +183,14 @@ function impactComponents(sessionId: string, threadId: string, state: DemoState)
     body: '当前没有需要处理的目标风险。小额波动会保持安静。', tone: 'good' }];
   const impact = state.pendingImpact;
   const components: AgentComponent[] = [];
-  const signal = state.riskSignals.find(item => item.status === 'active' || item.status === 'later');
+  const signal = state.riskSignals.find(item => item.impactId === impact.id);
   const pattern = signal && state.spendingPatterns.find(item => item.id === signal.patternId);
   if (signal && pattern) components.push({ id: componentId(), type: 'risk_signal',
     title: signal.title, signal, pattern, protectedCents: state.finance.emergencyCents });
   components.push({ id: componentId(), type: 'impact_summary',
     title: `${impact.title}可能影响目标`, impact, protectedCents: state.finance.emergencyCents });
-  if (impact.optionAAvailable) components.push(confirmation(sessionId, threadId, state, 'resolve_impact', { decision: 'A' },
-    '方案 A · 保持目标日期', `将月存调整为 ${yuan(impact.optionAContributionCents)}，应急金保持隔离。`, '确认方案 A'));
-  components.push(confirmation(sessionId, threadId, state, 'resolve_impact', { decision: 'B' },
-    '方案 B · 调整目标日期', `保持当前月存，目标日期调整到 ${impact.optionBDate}。`, '确认方案 B'));
-  components.push(confirmation(sessionId, threadId, state, 'resolve_impact', { decision: 'later' },
-    '稍后处理', '保留这条风险会话，不修改目标。', '稍后处理'));
-  components.push(confirmation(sessionId, threadId, state, 'resolve_impact', { decision: 'dismiss' },
-    '忽略本次提示', '隐藏当前信号；底层事实不变前不会重复提醒。', '忽略本次提示'));
+  components.push({ id: componentId(), type: 'risk_repair_entry', impactId: impact.id,
+    title: '查看调整方案', body: '进入统一风险修复页，服务端会重新核算 A/B 方案；这里不会直接修改目标。' });
   return components;
 }
 
@@ -629,11 +638,7 @@ export function executeWorkspaceAction(sessionId: string, actionId: string, deci
     next = runBankingTool(confirmed.state, 'activate_goal', { planId, approvalToken: confirmed.result.approvalToken }).state;
     detail = '目标计划已激活，不会自动扣款。';
   } else if (action.actionType === 'resolve_impact') {
-    const decision = String(action.payload.decision) as 'A' | 'B' | 'later' | 'dismiss';
-    next = markActiveRiskSignal(resolveImpact(state, decision), decision, state.pendingImpact?.id);
-    detail = decision === 'later' ? '已保留风险会话，稍后可继续处理。'
-      : decision === 'dismiss' ? '已忽略本次提示；事实不变前不会重复提醒。'
-      : `已应用目标影响方案 ${decision}。`;
+    throw new Error('RISK_REPAIR_PREVIEW_REQUIRED');
   } else if (action.actionType === 'create_mandate') {
     const parameters = { agentId: String(action.payload.agentId), category: String(action.payload.category),
       maxPerOperationCents: Number(action.payload.maxPerOperationCents), totalLimitCents: Number(action.payload.totalLimitCents),

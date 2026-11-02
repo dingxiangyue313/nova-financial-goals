@@ -51,10 +51,14 @@ export function FinancialServicesScreen({onChanged,onBills,initialMessage='',ini
   const refresh=async()=>{const value=await api<FinancialServicesView>('/api/services');setView(value);setGoal(g=>g||value.goals[0]?.id||'');};
   useEffect(()=>{let live=true;api<FinancialServicesView>('/api/services').then(v=>{if(live){setView(v);setGoal(v.goals[0]?.id??'');}}).catch(e=>live&&setError(e.message));return()=>{live=false;};},[]);
   useEffect(()=>{
-    if(!confirmation)return;const previous=document.activeElement as HTMLElement|null;dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    if(!confirmation)return;const previous=document.activeElement as HTMLElement|null;
     const handle=(e:KeyboardEvent)=>{if(e.key!=='Tab')return;const list=Array.from(dialog.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')??[]),first=list[0],last=list.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}};
     document.addEventListener('keydown',handle);return()=>{document.removeEventListener('keydown',handle);previous?.focus();};
   },[confirmation]);
+  useEffect(()=>{
+    if(!confirmation||busy||dialog.current?.contains(document.activeElement))return;
+    dialog.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+  },[confirmation,busy]);
   const run=async<T,>(fn:()=>Promise<T>)=>{setBusy(true);setError('');try{const result=await fn();await refresh();onChanged();return result;}catch(e){const text=e instanceof Error?e.message:'请稍后重试';setError(copy[text]??`操作尚未完成：${text}`);}finally{setBusy(false);}};
   const prepare=(input:ServiceAction)=>run(async()=>{const r=await api<{confirmation:Confirmation}>('/api/services/prepare','POST',input);setConfirmation(r.confirmation);});
   const confirm=(decision:'confirm'|'cancel')=>run(async()=>{await api('/api/services/confirm','POST',{actionId:confirmation!.actionId,decision});setConfirmation(null);setNotice(decision==='confirm'?'已提交模拟操作，请前往动态查看结果与凭证。':'已取消，未执行金融操作。');});

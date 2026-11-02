@@ -66,11 +66,8 @@ test('monitor stays silent until opt-in and deduplicates a material risk notific
   assert.equal(notifications.filter(item => item.content.includes('预计目标可能延后')).length, 1);
   assert.ok(notifications.some(item => item.content.includes('依据：')));
   const repair = notifications.flatMap(item => item.components)
-    .find(component => component.type === 'candidate_recommendations');
-  assert.ok(repair && repair.type === 'candidate_recommendations');
-  const confirmation = prepareCandidateConfirmation(sessionId, threadId,
-    repair.items[0].resultId!, getState(sessionId));
-  assert.equal(confirmation.component.type, 'confirmation');
+    .find(component => component.type === 'risk_repair_entry');
+  assert.ok(repair && repair.type === 'risk_repair_entry');
   assert.equal(getState(sessionId).goal.targetDate, '2026-12-31');
   tickMonitorWorker(new Date());
   assert.equal(listAgentThreads(sessionId, true).filter(item => item.kind === 'risk')

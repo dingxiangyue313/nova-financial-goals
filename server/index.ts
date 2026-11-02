@@ -14,20 +14,21 @@ import { artifactCounts, createAgentThread, deleteAgentThread, getAgentAction, g
   monitorStatus, renameAgentThread, resetState, saveAgentMessage, saveStatementImportPreview, scheduleBonusFollowup,
   setAgentThreadStatus, setMonitorSubscription, updateAgentRun, updateAgentTask } from './store.ts';
 import { snapshot } from './presentation.ts';
-import { assessCandidateScenario, assessGoal, injectExpense, resolveImpact } from './domain.ts';
+import { assessCandidateScenario, assessGoal, injectExpense } from './domain.ts';
 import { runAgentReadTool } from './agent-read-tools.ts';
 import { composeUiCards, interpretGoal } from './agent.ts';
 import { quickConfirmOperation, retryOperation, verifyOperation } from './tools.ts';
 import { registerMcp } from './mcp.ts';
 import { DataSourceKindSchema, GoalAssumptionsSchema, GoalPlanChangeDraftSchema, GoalPlanChangeRequestSchema,
-  IsoDateSchema, RiskPreferencesPatchSchema, RiskPreferencesSchema,
+  IsoDateSchema, RiskPreferencesPatchSchema, RiskPreferencesSchema, RiskRepairApplyRequestSchema,
+  RiskRepairPreviewRequestSchema,
   type DataSyncResult, type DemoState } from '../shared/contracts.ts';
 import { bankingToolDefinitions, runBankingTool, type BankingToolName } from './banking.ts';
 import { appendAuditEvent, financialTwin, verifyAuditChain } from './governance.ts';
 import { containsPromptInjection, signExternalRequest, verifyExternalRequest } from './security.ts';
 import { createAgentTurn, createScenarioPreview, ensureImpactThread, ensureWeeklyRiskSummary,
-  executeWorkspaceAction, prepareCandidateConfirmation, prepareSubscriptionConfirmation, prepareTransferScheduleConfirmation } from './workspace.ts';
-import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, markActiveRiskSignal } from './risk.ts';
+  decorateAgentMessageActions, executeWorkspaceAction, prepareCandidateConfirmation, prepareSubscriptionConfirmation, prepareTransferScheduleConfirmation } from './workspace.ts';
+import { applySpendingTrendDemo, applyWeeklySummaryDemo, evaluateOneOffExpenseRisk, RISK_RULE_VERSION } from './risk.ts';
 import { installApiRateLimits, installRequestHardening, setStaticCacheHeaders } from './http-hardening.ts';
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
 import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, failDataSource, recoverDataSource, revokeDataSource } from './data-connections.ts';
@@ -51,6 +52,8 @@ import { registerFinancialServices } from './financial-services-routes.ts';
 import { tickFinancialServices,tickSubscriptionReminderQueue,tickGoalNoticeQueue } from './store.ts';
 import { applyGoalPlanChange, previewGoalPlanChange } from './scenario.ts';
 import { hasDatedCashflowEvidence } from './money-mission-plans.ts';
+import { applyRiskRepair, dismissRisk, invalidateGoalRisks, postponeRisk, previewRiskRepair,
+  type RiskRepairApplyResult } from './risk-repair.ts';
 
 const app = express();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -103,7 +106,7 @@ function failure(res: express.Response, error: unknown) {
   const message = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
   if (message === 'AI_SAFE_MODE_WRITE_BLOCKED') return res.status(409).json({ error: message });
   if (message === 'TARGET_DATE_CHANGE_CONFIRMATION_REQUIRED') return res.status(400).json({ error: message });
-  const bad = error instanceof z.ZodError || /^(SERVICE_|PLAN_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_|DATA_|STATEMENT_|IMPORT_|BILL_|EVIDENCE_|SUBSCRIPTION_|SCHEDULE_|FORECAST_)/.test(message);
+  const bad = error instanceof z.ZodError || /^(SERVICE_|PLAN_|RISK_|NO_PENDING|INVALID_|CONFIRMATION_|GOAL_|OPERATION_|INSUFFICIENT_|MANDATE_|IDEMPOTENCY_|APPROVAL_|TWIN_|EXTERNAL_|NONCE_|STALE_|RATE_|PROTECTED_|FX_|ACCOUNT_|CURRENCY_|UNKNOWN_TOOL|SUBJECT_|THREAD_|AGENT_|USER_|WEBAUTHN_|PASSKEY_|DATA_|STATEMENT_|IMPORT_|BILL_|EVIDENCE_|SUBSCRIPTION_|SCHEDULE_|FORECAST_)/.test(message);
   return res.status(bad ? 400 : 500).json({ error: bad ? message : '服务暂时不可用，请稍后重试。' });
 }
 function route(fn: (req: express.Request, res: express.Response) => Promise<unknown> | unknown): express.RequestHandler {
@@ -415,7 +418,7 @@ app.delete('/api/agent/threads/:id', route((req, res) => {
   deleteAgentThread(sessionId(req, res), req.params.id); res.json({ deleted: true });
 }));
 app.get('/api/agent/threads/:id/messages', route((req, res) => {
-  const id = sessionId(req, res); const messages = getAgentMessages(id, req.params.id);
+  const id = sessionId(req, res); const messages = decorateAgentMessageActions(id, getAgentMessages(id, req.params.id));
   markAgentThreadRead(id, req.params.id); res.json({ messages,
     monitor: MonitorStatusSchema.parse(monitorStatus(id, req.params.id)) });
 }));
@@ -655,7 +658,8 @@ app.post('/api/goals/:id/set-primary', route((req, res) => {
   const state = mutateState(sessionId(req, res), old => {
     const goal = old.goals.find(item => item.id === id);
     if (!goal) throw new Error('GOAL_NOT_FOUND');
-    return audit({ ...old, primaryGoalId: id, goal, twinVersion: old.twinVersion + 1 },
+    const current = invalidateGoalRisks(old, old.goal.id);
+    return audit({ ...current, primaryGoalId: id, goal, twinVersion: current.twinVersion + 1 },
       'primary_goal_changed', 'changed', `主目标已切换为 ${goal.title}`);
   });
   return respond(res, state);
@@ -690,7 +694,7 @@ app.post('/api/goals/current/plan-change', route((req, res) => {
     assertAiWriteAllowed();
     const changed = applyGoalPlanChange(current, body);
     scheduleReviewRequired = changed.scheduleReviewRequired;
-    return changed.state;
+    return invalidateGoalRisks(changed.state, changed.state.goal.id);
   });
   res.json({ snapshot: snapshot(state), scheduleReviewRequired });
 }));
@@ -718,8 +722,19 @@ app.post('/api/demo/expense', route((req, res) => {
     const result = injectExpense(old, body.amountCents, body.title);
     const decision = evaluateOneOffExpenseRisk(old, body.amountCents);
     const acceptedImpact = decision.outcome === 'immediate_signal' ? result.impact : null;
+    const transactionId = randomUUID();
+    const signal = acceptedImpact ? {
+      id: randomUUID(), goalId: old.goal.id, patternId: `one-off:${transactionId}`,
+      impactId: acceptedImpact.id, createdAt: old.clock,
+      title: `${body.title}影响${old.goal.title}`, decision: 'immediate_signal' as const,
+      evidence: [{ transactionId, date: old.clock, amountCents: body.amountCents }],
+      confidence: 'high' as const, ruleVersion: RISK_RULE_VERSION,
+      twinVersion: old.twinVersion + 1, impact: decision.goalImpact!, status: 'active' as const,
+      suppressionKey: `one-off:${old.goal.id}:${transactionId}`,
+    } : null;
     const withTransaction = { ...result.state, pendingImpact: acceptedImpact,
-      transactions: [{ id: randomUUID(), accountId: 'checking',
+      riskSignals: signal ? [...result.state.riskSignals, signal] : result.state.riskSignals,
+      transactions: [{ id: transactionId, accountId: 'checking',
       date: old.clock, title: body.title, category: 'expense', amountCents: -body.amountCents }, ...result.state.transactions] };
     return audit(withTransaction, 'simulate_expense', decision.outcome, body.title);
   });
@@ -738,12 +753,35 @@ app.post('/api/demo/deposit', route((req, res) => {
   });
   return respond(res, state);
 }));
+app.post('/api/impact/plan-preview', route((req, res) => {
+  const body = RiskRepairPreviewRequestSchema.parse(req.body);
+  const state = getState(sessionId(req, res));
+  res.json(previewRiskRepair(state, body));
+}));
+app.post('/api/impact/plan-apply', route((req, res) => {
+  const body = RiskRepairApplyRequestSchema.parse(req.body);
+  let outcome: RiskRepairApplyResult | undefined;
+  const state = mutateState(sessionId(req, res), old => {
+    assertAiWriteAllowed();
+    outcome = applyRiskRepair(old, body);
+    return outcome.state;
+  });
+  res.json({ snapshot: snapshot(state), receipt: outcome!.receipt,
+    scheduleReviewRequired: outcome!.scheduleReviewRequired, replayed: outcome!.replayed });
+}));
+app.post('/api/impact/plan-status', route((req, res) => {
+  const body = z.object({ impactId: z.string().min(1), idempotencyKey: z.string().min(1).max(160) }).strict().parse(req.body);
+  const state = getState(sessionId(req, res));
+  const receipt = state.riskRepairReceipts.find(item => item.impactId === body.impactId
+    && item.idempotencyKey === body.idempotencyKey) ?? null;
+  res.json({ applied: Boolean(receipt), receipt, twinVersion: state.twinVersion });
+}));
 app.post('/api/impact/decision', route((req, res) => {
   const decision = z.enum(['A','B','later','dismiss']).parse(req.body?.decision);
+  if (decision === 'A' || decision === 'B') throw new Error('RISK_REPAIR_PREVIEW_REQUIRED');
   const state = mutateState(sessionId(req, res), old => {
-    const impactId = old.pendingImpact?.id;
-    return audit(markActiveRiskSignal(resolveImpact(old, decision), decision, impactId),
-      'impact_decision', decision, `用户选择 ${decision}`);
+    const impactId = z.string().min(1).parse(req.body?.impactId ?? old.pendingImpact?.id);
+    return decision === 'later' ? postponeRisk(old, impactId) : dismissRisk(old, impactId);
   });
   return respond(res, state);
 }));

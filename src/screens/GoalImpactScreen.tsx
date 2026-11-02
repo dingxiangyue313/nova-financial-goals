@@ -1,292 +1,171 @@
-import React, { useState } from 'react';
-import { Goal, ImpactScenario } from '../types';
-import { readableDate, shortDate } from '../api';
+import { useEffect, useRef, useState } from 'react';
+import { RiskRepairPreviewSchema, SnapshotSchema, type RiskRepairPreview,
+  type RiskRepairStrategy, type Snapshot } from '../../shared/contracts';
+import { api } from '../api';
+import { money, PlanCandidateCard, PlanDifferenceTable, TargetDateConfirmation } from '../components/PlanConfirmation';
+import type { Goal } from '../types';
 
 interface GoalImpactScreenProps {
-  goal: Goal;
-  scenario: ImpactScenario;
-  onApplyOption: (option: 'A' | 'B') => void;
-  onLater: () => void;
-  onDismiss: () => void;
-  onBack: () => void;
+  snapshot: Snapshot; goal: Goal;
+  onRefresh: (snapshot: Snapshot) => void;
+  onResolved: (snapshot: Snapshot, destination: 'home' | 'money_mission') => void;
+  onManualAdjust: () => void; onLater: () => void; onDismiss: () => void;
 }
 
-export const GoalImpactScreen: React.FC<GoalImpactScreenProps> = ({
-  goal,
-  scenario,
-  onApplyOption,
-  onLater,
-  onDismiss,
-}) => {
-  const [selectedOption, setSelectedOption] = useState<'A' | 'B' | null>(null);
+const optionTitle: Record<RiskRepairStrategy, string> = {
+  keep_target_date: '方案 A · 保持目标日期',
+  keep_monthly_contribution: '方案 B · 保持每月投入',
+};
 
-  const handleSubmit = () => {
-    if (!selectedOption) return;
-    onApplyOption(selectedOption);
-  };
+function errorText(reason: unknown) {
+  if (reason instanceof Error && /TWIN_VERSION_CHANGED|PREVIEW_STALE/.test(reason.message))
+    return '数据已更新，请重新计算';
+  if (reason instanceof Error && /RISK_NOT_ACTIVE/.test(reason.message)) return '这条风险已处理或已过期';
+  return reason instanceof Error ? reason.message : '暂时无法核验调整方案';
+}
 
-  return (
-    <div className="flex-1 flex flex-col relative w-full pt-2 pb-4 px-4 overflow-y-auto no-scrollbar">
-      <div className="flex flex-col w-full min-h-full justify-between pb-1 space-y-3">
-        {/* Top Header Section */}
-        <section className="flex flex-col space-y-2.5 pt-0.5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[20px] font-bold text-[#1F2329] tracking-tight">
-              {goal.title}可能延期 {scenario.impactDays} 天
-            </h2>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#E6F2F2] text-[#0F6B6D] text-[12px] font-semibold">
-              <span className="material-symbols-outlined text-[14px]">psychology</span>
-              NOVA 洞察
-            </span>
-          </div>
+export function GoalImpactScreen({ snapshot, goal, onRefresh, onResolved, onManualAdjust,
+  onLater, onDismiss }: GoalImpactScreenProps) {
+  const impactId = snapshot.pendingImpact!.id;
+  const [previews, setPreviews] = useState<Record<RiskRepairStrategy, RiskRepairPreview> | null>(null);
+  const [selected, setSelected] = useState<RiskRepairStrategy | null>(null);
+  const [accepted, setAccepted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [success, setSuccess] = useState<{ snapshot: Snapshot; review: boolean } | null>(null);
+  const idempotencyKey = useRef(crypto.randomUUID());
 
-          <p className="text-[14px] text-[#5A616B] leading-relaxed">
-            本月新增 ¥{scenario.expenseAmount.toLocaleString()} {scenario.expenseTitle}
-            ，影响了原有储蓄节奏。你可以增加月存金额，或调整出发日期。
-          </p>
+  async function recoverLatest() {
+    const live = SnapshotSchema.parse(await api<Snapshot>('/api/session'));
+    setPreviews(null); setSelected(null); setAccepted(false);
+    idempotencyKey.current = crypto.randomUUID();
+    onRefresh(live);
+    setRefreshKey(value => value + 1);
+  }
 
-          <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#EBF7F2] border border-[#276B4E]/20 text-[#1F2329]">
-            <span className="material-symbols-outlined text-[#276B4E] text-[18px] shrink-0">
-              verified_user
-            </span>
-            <div className="flex-1 flex items-center justify-between text-[13px]">
-              <span className="text-[#1F2329] font-semibold">
-                ¥{scenario.emergencyFundAmount.toLocaleString()} 应急金未受影响
-              </span>
-              <span className="text-[#276B4E] font-medium flex items-center gap-1 text-[12px]">
-                <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                安全隔离
-              </span>
-            </div>
-          </div>
-        </section>
+  useEffect(() => {
+    let active = true;
+    setLoading(true); setError(''); setPreviews(null); setSelected(null); setAccepted(false);
+    Promise.all((['keep_target_date', 'keep_monthly_contribution'] as const).map(async strategy => {
+      const result = await api('/api/impact/plan-preview', 'POST', {
+        impactId, expectedTwinVersion: snapshot.twinVersion, strategy,
+      });
+      return RiskRepairPreviewSchema.parse(result);
+    })).then(([keepTargetDate, keepMonthlyContribution]) => {
+      if (!active) return;
+      if (keepTargetDate.baseTwinVersion !== keepMonthlyContribution.baseTwinVersion)
+        throw new Error('TWIN_VERSION_CHANGED');
+      setError('');
+      setPreviews({ keep_target_date: keepTargetDate,
+        keep_monthly_contribution: keepMonthlyContribution });
+    }).catch(async reason => {
+      if (!active) return;
+      setError(errorText(reason));
+      if (reason instanceof Error && /TWIN_VERSION_CHANGED/.test(reason.message)) {
+        try { await recoverLatest(); } catch { setError('数据已更新，暂时无法重新加载；请稍后重试。'); }
+      }
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [impactId, snapshot.twinVersion, onRefresh, refreshKey]);
 
-        {/* Section: 为什么会受影响 */}
-        <section className="p-3.5 rounded-xl bg-white border border-[#E5E8EB] flex flex-col space-y-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] font-bold text-[#1F2329] tracking-wide uppercase">
-              为什么会受影响
-            </span>
-            <span className="text-[11px] text-[#5A616B] bg-[#F5F7F8] border border-[#E5E8EB] px-2 py-0.5 rounded-full">
-              基于当前模拟数据估算
-            </span>
-          </div>
+  const chosen = selected && previews ? previews[selected] : null;
+  const verified = previews?.keep_monthly_contribution ?? previews?.keep_target_date ?? null;
+  const evidenceTotal = verified?.evidence.transactions.reduce((sum, item) => sum + item.amountCents, 0) ?? 0;
 
-          <div className="relative pl-6 space-y-3.5 before:absolute before:left-[9px] before:top-2 before:bottom-2 before:w-[2px] before:bg-[#E5E8EB]">
-            {/* Step 1: 突发支出 */}
-            <div className="relative group">
-              <div className="absolute -left-[21px] top-1 w-3.5 h-3.5 rounded-full bg-white border border-[#CBD5E1] flex items-center justify-center">
-                <span className="w-2 h-2 rounded-full bg-[#C74242]"></span>
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-[13px] text-[#C74242] font-semibold">
-                    突发支出 · 触发点
-                  </span>
-                  <span className="text-[12px] text-[#8F959E]">{scenario.expenseDate}</span>
-                </div>
-                <p className="text-[14px] text-[#1F2329] mt-0.5">
-                  记录到「{scenario.expenseTitle}{' '}
-                  <span className="text-[15px] font-bold text-[#C74242]">
-                    ¥{scenario.expenseAmount.toLocaleString()}
-                  </span>
-                  」
-                </p>
-              </div>
-            </div>
+  async function checkStatus() {
+    const status = await api<{ applied: boolean; receipt: { scheduleReviewRequired: boolean } | null }>(
+      '/api/impact/plan-status', 'POST', { impactId, idempotencyKey: idempotencyKey.current });
+    if (!status.applied) return false;
+    const live = await api<Snapshot>('/api/session');
+    setSuccess({ snapshot: live, review: Boolean(status.receipt?.scheduleReviewRequired) });
+    return true;
+  }
 
-            {/* Step 2: 传导影响 */}
-            <div className="relative">
-              <div className="absolute -left-[21px] top-1 w-3.5 h-3.5 rounded-full bg-white border border-[#CBD5E1] flex items-center justify-center">
-                <span className="w-2 h-2 rounded-full bg-[#8F959E]"></span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[13px] text-[#5A616B] font-medium">
-                  传导影响 · 结余调整
-                </span>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[13px] text-[#8F959E] line-through">
-                    预计 ¥{scenario.previousMonthly}
-                  </span>
-                  <span className="material-symbols-outlined text-[14px] text-[#8F959E]">
-                    trending_flat
-                  </span>
-                  <span className="text-[14px] text-[#1F2329] font-bold">
-                    现降至 ¥{scenario.adjustedMonthlyRemaining}
-                  </span>
-                </div>
-              </div>
-            </div>
+  async function apply() {
+    if (!chosen || !chosen.candidate.selectable) return;
+    setBusy(true); setError('');
+    try {
+      const result = await api<{ snapshot: Snapshot; scheduleReviewRequired: boolean }>(
+        '/api/impact/plan-apply', 'POST', {
+          impactId, previewId: chosen.previewId, expectedTwinVersion: chosen.baseTwinVersion,
+          strategy: chosen.strategy, candidateId: chosen.candidate.id,
+          acceptTargetDateChange: accepted, idempotencyKey: idempotencyKey.current,
+        });
+      setSuccess({ snapshot: SnapshotSchema.parse(result.snapshot), review: result.scheduleReviewRequired });
+    } catch (reason) {
+      try { if (await checkStatus()) return; } catch { /* show original failure */ }
+      setError(errorText(reason));
+      if (reason instanceof Error && /TWIN_VERSION_CHANGED|PREVIEW_STALE/.test(reason.message)) {
+        try { await recoverLatest(); } catch { setError('数据已更新，暂时无法重新加载；请稍后重试。'); }
+      }
+    } finally { setBusy(false); }
+  }
 
-            {/* Step 3: 目标影响 */}
-            <div className="relative">
-              <div className="absolute -left-[21px] top-1 w-3.5 h-3.5 rounded-full bg-white border border-[#CBD5E1] flex items-center justify-center">
-                <span className="w-2 h-2 rounded-full bg-[#0F6B6D]"></span>
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-[13px] text-[#0F6B6D] font-bold">
-                    目标影响 · {goal.title}
-                  </span>
-                </div>
-                <p className="text-[13px] text-[#5A616B] mt-0.5">
-                  原 {readableDate(goal.originalDate || goal.targetDate)}{' '}
-                  <span className="text-[#1F2329] font-medium">
-                    → 预计 {readableDate(scenario.optionB.completionDate)}
-                  </span>
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
+  if (success) return <div className="flex-1 overflow-y-auto px-4 py-5">
+    <section className="rounded-xl border border-[#D8E7E7] bg-white p-5 shadow-sm">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#EBF7F2] text-[#276B4E]">
+        <span className="material-symbols-outlined">check_circle</span>
+      </div>
+      <h2 className="text-xl font-bold">计划已调整</h2>
+      <p className="mt-2 text-sm text-[#5A616B]">风险已标记为已处理，NOVA 会基于新计划继续守护。</p>
+      {success.review && <p className="mt-3 rounded-lg bg-[#FFF9ED] p-3 text-xs text-[#76551D]">已有自动转入安排保持不变，请单独核对金额与日期。</p>}
+      <button type="button" onClick={() => onResolved(success.snapshot, 'home')}
+        className="mt-4 min-h-11 w-full rounded-xl bg-[#0F6B6D] px-4 text-sm font-semibold text-white">返回目标</button>
+      {success.review && <button type="button" onClick={() => onResolved(success.snapshot, 'money_mission')}
+        className="mt-2 min-h-11 w-full rounded-xl border border-[#B9D9D8] px-4 text-sm font-semibold text-[#0F6B6D]">查看转账安排</button>}
+    </section>
+  </div>;
 
-        {/* Section: 方案选择 */}
-        <section className="flex flex-col space-y-2.5">
-          <div className="flex items-center gap-1.5 px-0.5">
-            <span className="material-symbols-outlined text-[#0F6B6D] text-[18px]">
-              lightbulb
-            </span>
-            <p className="text-[13px] text-[#1F2329] font-medium">
-              我有两个不动应急金的办法，由你来决定生活节奏：
-            </p>
-          </div>
-
-          <div className="flex flex-col space-y-2">
-            {/* Option A */}
-            <button type="button"
-              disabled={!scenario.optionA.available}
-              aria-pressed={selectedOption === 'A'}
-              onClick={() => scenario.optionA.available && setSelectedOption('A')}
-              className={`relative flex items-start gap-3 p-3.5 rounded-xl text-left transition-all cursor-pointer select-none shadow-sm ${
-                selectedOption === 'A'
-                  ? 'bg-[#F4FAF9] border-2 border-[#0F6B6D]'
-                  : `bg-white border border-[#E5E8EB] hover:border-[#0F6B6D]/40 ${scenario.optionA.available ? '' : 'opacity-50 cursor-not-allowed'}`
-              }`}
-            >
-              <div className="pt-0.5">
-                <div
-                  className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                    selectedOption === 'A'
-                      ? 'border-2 border-[#0F6B6D] bg-[#0F6B6D]'
-                      : 'border-2 border-[#CBD5E1] bg-white'
-                  }`}
-                >
-                  <div
-                    className={`w-2 h-2 rounded-full bg-white ${
-                      selectedOption === 'A' ? 'block' : 'hidden'
-                    }`}
-                  ></div>
-                </div>
-              </div>
-              <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-[14px] font-bold text-[#1F2329]">
-                    {scenario.optionA.title}
-                  </span>
-                </div>
-                <p className="text-[13px] text-[#5A616B] mt-1 leading-relaxed">
-                  后续微调每月存入{' '}
-                  <span className="text-[#1F2329] font-semibold">
-                    ¥{scenario.optionA.newMonthly.toLocaleString()}
-                  </span>
-                  ，{scenario.optionA.available ? '预计可在' : '超出可用月结余，暂不可选；原目标日'}{' '}
-                  <span className="text-[#1F2329] font-semibold">{shortDate(scenario.optionA.completionDate)}</span> 出发。
-                </p>
-              </div>
-            </button>
-
-            {/* Option B */}
-            <button type="button"
-              aria-pressed={selectedOption === 'B'}
-              onClick={() => setSelectedOption('B')}
-              className={`relative flex items-start gap-3 p-3.5 rounded-xl text-left transition-all cursor-pointer select-none shadow-sm ${
-                selectedOption === 'B'
-                  ? 'bg-[#F4FAF9] border-2 border-[#0F6B6D]'
-                  : 'bg-white border border-[#E5E8EB] hover:border-[#0F6B6D]/40'
-              }`}
-            >
-              <div className="pt-0.5">
-                <div
-                  className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                    selectedOption === 'B'
-                      ? 'border-2 border-[#0F6B6D] bg-[#0F6B6D]'
-                      : 'border-2 border-[#CBD5E1] bg-white'
-                  }`}
-                >
-                  <div
-                    className={`w-2 h-2 rounded-full bg-white ${
-                      selectedOption === 'B' ? 'block' : 'hidden'
-                    }`}
-                  ></div>
-                </div>
-              </div>
-              <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-[14px] font-bold text-[#1F2329]">
-                    {scenario.optionB.title}
-                  </span>
-                </div>
-                <p className="text-[13px] text-[#5A616B] mt-1 leading-relaxed">
-                  维持每月存入{' '}
-                  <span className="text-[#1F2329] font-semibold">
-                    ¥{scenario.optionB.newMonthly.toLocaleString()}
-                  </span>
-                  ，平移出行窗口至{' '}
-                  <span className="text-[#1F2329] font-semibold">{readableDate(scenario.optionB.completionDate)}</span>。
-                </p>
-              </div>
-            </button>
-          </div>
-        </section>
-
-        {/* CTA & Actions */}
-        <section className="flex flex-col space-y-2 pt-1">
-          <button
-            disabled={!selectedOption}
-            onClick={handleSubmit}
-            className={`w-full py-3.5 px-5 rounded-xl text-[15px] font-semibold transition-all flex items-center justify-center gap-2 shadow-sm ${
-              selectedOption
-                ? 'bg-[#0F6B6D] text-white hover:bg-[#084C4E] active:scale-[0.99] cursor-pointer'
-                : 'bg-[#E5E8EB] text-[#8F959E] cursor-not-allowed'
-            }`}
-          >
-            <span>
-              {selectedOption === 'A'
-                ? '确认应用：方案 A（保持原日期）'
-                : selectedOption === 'B'
-                ? `确认应用：方案 B（延后 ${scenario.optionB.delayDays} 天）`
-                : '请选择一个方案'}
-            </span>
-            {selectedOption && (
-              <span className="material-symbols-outlined text-[18px]">
-                arrow_forward
-              </span>
-            )}
-          </button>
-
-          <p className="text-[11px] text-[#8F959E] text-center">
-            选择方案只会调整提醒与节奏，不会自动划扣资金
-          </p>
-
-          <div className="flex items-center justify-center gap-6 pt-0.5">
-            <button
-              onClick={onLater}
-              className="text-[13px] font-medium text-[#5A616B] hover:text-[#0F6B6D] transition-colors py-1 flex items-center gap-1 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[15px]">schedule</span>
-              稍后处理
-            </button>
-            <span className="w-1 h-1 rounded-full bg-[#CBD5E1]"></span>
-            <button
-              onClick={onDismiss}
-              className="text-[13px] font-medium text-[#5A616B] hover:text-[#C74242] transition-colors py-1 flex items-center gap-1 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[15px]">close</span>
-              忽略本次提示
-            </button>
-          </div>
-        </section>
+  return <div className="flex-1 overflow-y-auto px-4 py-2">
+    <div className="space-y-3 pb-5">
+      {verified && <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-[19px] font-bold">{goal.title}可能延期 {verified.candidate.delayDays} 天</h2>
+          <span className="shrink-0 rounded-full bg-[#E6F2F2] px-2 py-1 text-[11px] font-semibold text-[#0F6B6D]">NOVA 洞察</span>
+        </div>
+        <p className="text-sm leading-relaxed text-[#5A616B]">{verified.evidence.title}；{verified.evidence.transactions.length} 笔核验流水累计 {money(evidenceTotal)}，影响了原有储蓄节奏。</p>
+        <p className={`rounded-lg p-2.5 text-xs font-semibold ${verified.protection.satisfied ? 'bg-[#EBF7F2] text-[#276B4E]' : 'bg-rose-50 text-rose-700'}`}>
+          保护资金 {money(verified.protection.requiredCents)} · 可用 {money(verified.protection.availableCents)} · {verified.protection.satisfied ? '安全隔离' : '当前不足'}
+        </p>
+      </section>}
+      {verified && <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
+        <h3 className="text-sm font-bold">为什么会受影响</h3>
+        <p className="text-xs text-[#5A616B]">数据截至 {verified.evidence.dataAsOf} · 风险识别于 {verified.evidence.detectedAt} · 置信度 {verified.evidence.confidence}</p>
+        <p className="text-xs text-[#5A616B]">原计划 {verified.comparison.before.targetDate}，保持当前月投入后预计 {verified.comparison.after.projectedDate ?? '仍需补充数据'} 完成，延期 {verified.candidate.delayDays} 天。</p>
+        <p className="text-[11px] text-[#5A616B]">证据、金额与日期均来自同一服务端预览；选择方案后仍需最终确认。</p>
+      </section>}
+      <section aria-label="调整方案" className="space-y-2.5">
+        <h3 className="text-sm font-bold">比较两个不动保护资金的方案</h3>
+        {loading && <p role="status" className="rounded-xl bg-white p-4 text-sm">正在核验方案…</p>}
+        {previews && (Object.keys(optionTitle) as RiskRepairStrategy[]).map(strategy =>
+          <PlanCandidateCard key={strategy} candidate={previews[strategy].candidate}
+            title={optionTitle[strategy]} selected={selected === strategy} busy={busy}
+            onSelect={() => { setSelected(strategy); setAccepted(false); }} />)}
+      </section>
+      {chosen && <section className="space-y-2 rounded-xl border border-[#D8E7E7] bg-white p-3.5">
+        <h3 className="text-sm font-bold">确认调整内容</h3>
+        <PlanDifferenceTable rows={[
+          ['每月投入', money(chosen.comparison.before.monthlyContributionCents), money(chosen.comparison.after.monthlyContributionCents)],
+          ['目标日期', chosen.comparison.before.targetDate, chosen.comparison.after.targetDate],
+          ['预计完成', chosen.comparison.before.projectedDate ?? '待核对', chosen.comparison.after.projectedDate ?? '待核对'],
+          ['保护资金', money(chosen.protection.requiredCents), chosen.protection.satisfied ? '保持隔离' : '不足'],
+        ]} />
+        <TargetDateConfirmation candidate={chosen.candidate} accepted={accepted} onChange={setAccepted} />
+      </section>}
+      {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
+      <button type="button" disabled={busy || !chosen?.candidate.selectable
+        || Boolean(chosen?.candidate.requiresTargetDateChange && !accepted)} onClick={() => void apply()}
+        className="min-h-11 w-full rounded-xl bg-[#0F6B6D] px-4 text-sm font-semibold text-white disabled:bg-[#D0D5DD]">
+        {busy ? '正在确认…' : '确认调整计划'}
+      </button>
+      <p className="text-center text-[11px] text-[#5A616B]">仅模拟数据，不会自动扣款</p>
+      <button type="button" onClick={onManualAdjust} className="min-h-11 w-full rounded-xl border border-[#B9D9D8] text-sm text-[#0F6B6D]">手动调整目标参数</button>
+      <div className="flex justify-center gap-5">
+        <button type="button" onClick={onLater} className="min-h-11 text-sm text-[#5A616B]">稍后处理</button>
+        <button type="button" onClick={onDismiss} className="min-h-11 text-sm text-[#5A616B]">忽略本次提示</button>
       </div>
     </div>
-  );
-};
+  </div>;
+}

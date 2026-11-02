@@ -8,8 +8,9 @@ import { runAgentTask, type DecisionProvider } from './agent-runner.ts';
 import { executeWorkspaceAction, prepareCandidateConfirmation } from './workspace.ts';
 import { applySpendingTrendDemo } from './risk.ts';
 import { tickMonitorWorker } from './monitor-worker.ts';
+import { previewRiskRepair } from './risk-repair.ts';
 
-test('offline acceptance: investigate, revise, confirm, monitor, repair and confirm again', async () => {
+test('offline acceptance: investigate, revise, confirm, monitor and route repair without bypass', async () => {
   const sessionId = randomUUID();
   const threadId = createAgentThread(sessionId, { title: '旅行目标' }).id;
   const draftId = randomUUID();
@@ -73,12 +74,15 @@ test('offline acceptance: investigate, revise, confirm, monitor, repair and conf
   tickMonitorWorker(new Date());
   const repair = listAgentThreads(sessionId, true).filter(item => item.kind === 'risk')
     .flatMap(item => getAgentMessages(sessionId, item.id))
-    .flatMap(item => item.components).find(item => item.type === 'candidate_recommendations');
-  assert.ok(repair && repair.type === 'candidate_recommendations');
+    .flatMap(item => item.components).find(item => item.type === 'risk_repair_entry');
+  assert.ok(repair && repair.type === 'risk_repair_entry');
   assert.equal(getState(sessionId).goal.targetDate, '2026-12-31');
-  const repairAction = prepareCandidateConfirmation(sessionId, threadId,
-    repair.items[0].resultId!, getState(sessionId));
-  mutateState(sessionId, old => executeWorkspaceAction(sessionId, repairAction.action.id, 'confirm', old).state);
-  assert.equal(getState(sessionId).goal.targetDate, repair.items[0].targetDate);
+  const riskState = getState(sessionId);
+  const previews = (['keep_target_date', 'keep_monthly_contribution'] as const).map(strategy =>
+    previewRiskRepair(riskState, { impactId: repair.impactId,
+      expectedTwinVersion: riskState.twinVersion, strategy }));
+  assert.equal(previews.every(item => !item.candidate.selectable), true);
+  assert.equal(getState(sessionId).riskSignals.at(-1)?.status, 'active');
+  assert.equal(getState(sessionId).goal.targetDate, '2026-12-31');
   assert.equal(getState(sessionId).finance.emergencyCents, beforeRisk.finance.emergencyCents);
 });
