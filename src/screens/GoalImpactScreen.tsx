@@ -6,6 +6,7 @@ import { money, PlanCandidateCard, PlanDifferenceTable, TargetDateConfirmation }
 import type { Goal } from '../types';
 
 interface GoalImpactScreenProps {
+  compact?: boolean;
   snapshot: Snapshot; goal: Goal;
   onRefresh: (snapshot: Snapshot) => void;
   onResolved: (snapshot: Snapshot, destination: 'home' | 'money_mission') => void;
@@ -24,7 +25,7 @@ function errorText(reason: unknown) {
   return reason instanceof Error ? reason.message : '暂时无法核验调整方案';
 }
 
-export function GoalImpactScreen({ snapshot, goal, onRefresh, onResolved, onManualAdjust,
+export function GoalImpactScreen({ compact = false, snapshot, goal, onRefresh, onResolved, onManualAdjust,
   onLater, onDismiss }: GoalImpactScreenProps) {
   const impactId = snapshot.pendingImpact!.id;
   const [previews, setPreviews] = useState<Record<RiskRepairStrategy, RiskRepairPreview> | null>(null);
@@ -120,7 +121,7 @@ export function GoalImpactScreen({ snapshot, goal, onRefresh, onResolved, onManu
 
   return <div className="flex-1 overflow-y-auto px-4 py-2">
     <div className="space-y-3 pb-5">
-      {verified && <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
+      {verified && <section className={`space-y-2 ${compact ? 'py-2' : 'rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm'}`}>
         <div className="flex items-start justify-between gap-2">
           <h2 className="text-[19px] font-bold">{goal.title}可能延期 <span className="whitespace-nowrap">{verified.candidate.delayDays} 天</span></h2>
           <span className="shrink-0 rounded-full bg-[#E6F2F2] px-2 py-1 text-[11px] font-semibold text-[#0F6B6D]">NOVA 洞察</span>
@@ -130,17 +131,34 @@ export function GoalImpactScreen({ snapshot, goal, onRefresh, onResolved, onManu
           保护资金 {money(verified.protection.requiredCents)} · 可用 {money(verified.protection.availableCents)} · {verified.protection.satisfied ? '安全隔离' : '当前不足'}
         </p>
       </section>}
-      {verified && <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
+      {verified && compact && <section className="rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-1"><h3 className="text-sm font-bold">为什么会受影响</h3><span className="text-[10px] text-[#5A616B]">截至 {verified.evidence.dataAsOf} · 基于模拟流水</span></div>
+        <ol className="ml-2 space-y-3 border-l-2 border-[#E5E8EB] pl-4 text-xs">
+          <li className="relative"><span className="absolute -left-[23px] top-1 h-3 w-3 rounded-full border-2 border-white bg-[#EF6464]"/><b className="text-[#D64F4F]">突发支出 · 触发点</b><p className="mt-1 leading-5">记录到 {snapshot.pendingImpact!.title}支出 <strong className="text-[#D64F4F]">{money(evidenceTotal)}</strong></p></li>
+          <li className="relative"><span className="absolute -left-[23px] top-1 h-3 w-3 rounded-full border-2 border-white bg-[#8F959E]"/><b className="text-[#5A616B]">传导影响 · 储蓄节奏</b><p className="mt-1 leading-5">当前每月投入 {money(verified.comparison.before.monthlyContributionCents)}，NOVA 按更新后的资金条件重新核算。</p></li>
+          <li className="relative"><span className="absolute -left-[23px] top-1 h-3 w-3 rounded-full border-2 border-white bg-[#0F6B6D]"/><b className="text-[#0F6B6D]">目标影响 · {goal.title}</b><p className="mt-1 leading-5">原计划 {verified.comparison.before.targetDate} → 预计 <strong>{verified.candidate.projectedDate ?? '仍需补充数据'}</strong></p></li>
+        </ol>
+      </section>}
+      {verified && !compact && <section className="space-y-2 rounded-xl border border-[#E5E8EB] bg-white p-3.5 shadow-sm">
         <h3 className="text-sm font-bold">为什么会受影响</h3>
         <p className="text-xs text-[#5A616B]">数据截至 {verified.evidence.dataAsOf} · 风险识别于 {verified.evidence.detectedAt} · 置信度 {{ high: '高', medium: '中', low: '低' }[verified.evidence.confidence]}</p>
         <p className="text-xs text-[#5A616B]">原计划 {verified.comparison.before.targetDate}，保持当前月投入后预计 {verified.comparison.after.projectedDate ?? '仍需补充数据'} 完成，延期 {verified.candidate.delayDays} 天。</p>
         <p className="text-[11px] text-[#5A616B]">证据、金额与日期均来自同一服务端预览；选择方案后仍需最终确认。</p>
       </section>}
       <section aria-label="调整方案" className="space-y-2.5">
-        <h3 className="text-sm font-bold">比较两个不动保护资金的方案</h3>
+        <h3 className="text-sm font-bold">{compact ? '两个不动保护资金的办法，由你决定生活节奏：' : '比较两个不动保护资金的方案'}</h3>
         {loading && <p role="status" className="rounded-xl bg-white p-4 text-sm">正在核验方案…</p>}
         {previews && (Object.keys(optionTitle) as RiskRepairStrategy[]).map(strategy =>
-          <PlanCandidateCard key={strategy} candidate={previews[strategy].candidate}
+          compact ? <button key={strategy} type="button" disabled={busy || !previews[strategy].candidate.selectable}
+            aria-pressed={selected === strategy} onClick={() => { setSelected(strategy); setAccepted(false); }}
+            className={`flex w-full gap-3 rounded-xl border bg-white p-3 text-left disabled:opacity-50 ${selected === strategy ? 'border-[#0F6B6D] ring-1 ring-[#0F6B6D]' : 'border-[#E5E8EB]'}`}>
+            <span aria-hidden="true" className={`mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 ${selected === strategy ? 'border-[#0F6B6D] bg-[#0F6B6D] shadow-[inset_0_0_0_4px_white]' : 'border-[#CCD5DE]'}`}/>
+            <span className="space-y-1"><strong className="block text-sm">{optionTitle[strategy]}</strong>
+              <span className="block text-xs leading-5 text-[#5A616B]">每月投入 <b className="text-[#1F2329]">{money(previews[strategy].candidate.monthlyCents)}</b> · 预计 {previews[strategy].candidate.projectedDate ?? '待补充数据'} 完成</span>
+              {strategy === 'keep_target_date' && <span className="block text-xs text-[#5A616B]">较当前每月{previews[strategy].candidate.monthlyCents >= verified!.comparison.before.monthlyContributionCents ? '增加' : '减少'} {money(Math.abs(previews[strategy].candidate.monthlyCents - verified!.comparison.before.monthlyContributionCents))}</span>}
+              {!previews[strategy].candidate.selectable && <span className="block text-xs text-rose-700">当前资金条件下不可采用，请手动调整目标参数。</span>}
+            </span>
+          </button> : <PlanCandidateCard key={strategy} candidate={previews[strategy].candidate}
             title={optionTitle[strategy]} selected={selected === strategy} busy={busy}
             onSelect={() => { setSelected(strategy); setAccepted(false); }} />)}
       </section>
@@ -162,7 +180,7 @@ export function GoalImpactScreen({ snapshot, goal, onRefresh, onResolved, onManu
       <button type="button" disabled={busy || !chosen?.candidate.selectable
         || Boolean(chosen?.candidate.requiresTargetDateChange && !accepted)} onClick={() => void apply()}
         className="min-h-11 w-full rounded-xl bg-[#0F6B6D] px-4 text-sm font-semibold text-white disabled:bg-[#D0D5DD]">
-        {busy ? '正在确认…' : '确认调整计划'}
+        {busy ? '正在确认…' : compact && !chosen ? '请选择一个方案' : '确认调整计划'}
       </button>
       <p className="text-center text-[11px] text-[#5A616B]">仅模拟数据，不会自动扣款</p>
       <button type="button" onClick={onManualAdjust} className="min-h-11 w-full rounded-xl border border-[#B9D9D8] text-sm text-[#0F6B6D]">手动调整目标参数</button>

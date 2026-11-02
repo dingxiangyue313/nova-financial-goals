@@ -6,6 +6,7 @@ interface TopBarProps {
   isHome?: boolean;
   onBack?: () => void;
   onOpenSimulateModal?: () => void;
+  simulateLabel?: string;
   onOpenProfile?: () => void;
 }
 
@@ -14,6 +15,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   isHome = false,
   onBack,
   onOpenSimulateModal,
+  simulateLabel = '模拟数据',
   onOpenProfile,
 }) => {
   return (
@@ -48,7 +50,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             title={onOpenSimulateModal ? "查看模拟时间与自动同步" : "所有操作仅使用模拟数据"}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#8F959E]"></span>
-            <span>模拟数据</span>
+            <span>{simulateLabel}</span>
           </button>
 
           <button

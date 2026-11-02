@@ -7,10 +7,6 @@ test('expense popup uses recorded evidence and server plans without changing the
   await page.reload();
   await page.getByRole('button', { name: '模拟数据', exact: true }).click();
   await page.getByRole('button', { name: /模拟一笔.*支出并查看提醒/ }).click();
-  const dialog = page.getByRole('dialog', { name: '模拟一笔大额支出' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel('支出金额（元）').fill('900');
-  await dialog.getByRole('button', { name: '确认记录模拟支出并核算' }).click();
   const impact = page.getByRole('dialog', { name: '目标影响提醒' });
   await expect(impact.getByRole('button', { name: /方案 B/ })).toBeVisible();
   const state = await (await page.request.get('/api/session')).json();
@@ -24,7 +20,7 @@ test('expense popup uses recorded evidence and server plans without changing the
   expect(preview.evidence.transactions.reduce((sum: number, item: {amountCents: number}) => sum + item.amountCents, 0)).toBe(90000);
   await expect(impact.getByRole('heading', { name: `${state.goal.title}可能延期 ${preview.candidate.delayDays} 天` })).toBeVisible();
   await expect(impact.getByRole('button', { name: /方案 B/ })).toContainText(preview.candidate.projectedDate);
-  await expect(impact.getByRole('button', { name: '确认调整计划' })).toBeDisabled();
+  await expect(impact.getByRole('button', { name: '请选择一个方案' })).toBeDisabled();
   await expect(impact).toContainText('¥900');
   await page.screenshot({path: testInfo.outputPath('expense-dialog.png')});
   await page.keyboard.press('Escape');

@@ -51,6 +51,9 @@ export default function App() {
   const [deviceFrame, setDeviceFrame] = useState<boolean>(true);
   const [showSimulateModal, setShowSimulateModal] = useState<boolean>(false);
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
+  const [expenseStatus, setExpenseStatus] = useState<'loading' | 'impact' | 'quiet' | 'inactive' | 'error'>('loading');
+  const [expenseError, setExpenseError] = useState('');
+  const expenseInFlight = useRef(false);
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
   const [workspaceStarter, setWorkspaceStarter] = useState('');
@@ -353,8 +356,20 @@ export default function App() {
     } else showToast('自动同步完成；本次变化保持安静');
   };
   const handleUnexpectedExpenseDemo = async () => {
+    if (expenseInFlight.current) return;
     setShowSimulateModal(false);
     setShowExpenseDialog(true);
+    if (activeImpact && activeImpactSignal) { setExpenseStatus('impact'); return; }
+    if (snapshot?.goal.status !== 'active') { setExpenseStatus('inactive'); return; }
+    expenseInFlight.current = true;
+    setExpenseStatus('loading'); setExpenseError('');
+    try {
+      const next = await mutate('/api/demo/expense', 'POST', { amountCents: 90000, title: '汽车保养' });
+      setExpenseStatus(next.pendingImpact && next.pendingImpact.id !== snapshot.pendingImpact?.id ? 'impact' : 'quiet');
+    } catch (error) {
+      setExpenseError(error instanceof Error ? error.message : '暂时无法核算，请查看账户最新状态');
+      setExpenseStatus('error');
+    } finally { expenseInFlight.current = false; }
   };
   const handleConfirmPlan = async (planId: string) => {
     await mutate('/api/goals/activate', 'POST', { planId });
@@ -549,7 +564,8 @@ export default function App() {
           isHome={isHomeScreen}
           title={getScreenTitle()}
           onBack={handleBack}
-          onOpenSimulateModal={demoEnabled ? () => demoControl ? setShowSimulateModal(true) : setShowExpenseDialog(true) : undefined}
+          onOpenSimulateModal={demoEnabled ? () => demoControl ? setShowSimulateModal(true) : void handleUnexpectedExpenseDemo() : undefined}
+          simulateLabel={demoEnabled && !demoControl ? activeImpact ? '查看支出影响' : '模拟 ¥900 支出' : '模拟数据'}
           onOpenProfile={() => navigateTo('profile')}
         />
 
@@ -737,13 +753,9 @@ export default function App() {
 
         {/* Modal: 模拟数据控制器 */}
         {showExpenseDialog && <ExpenseImpactDialog
-          onClose={() => setShowExpenseDialog(false)} active={snapshot.goal.status === 'active'}
-          onSimulate={async (amountCents, title) => {
-            const previousImpact = snapshot.pendingImpact?.id;
-            const next = await mutate('/api/demo/expense', 'POST', { amountCents, title });
-            return Boolean(next.pendingImpact && next.pendingImpact.id !== previousImpact);
-          }}>
-          {goal && scenario ? <GoalImpactScreen snapshot={snapshot} goal={goal} onRefresh={setSnapshot}
+          onClose={() => setShowExpenseDialog(false)} status={expenseStatus} error={expenseError}
+          onActivate={() => { setShowExpenseDialog(false); navigateTo('feasibility'); }}>
+          {goal && scenario ? <GoalImpactScreen compact snapshot={snapshot} goal={goal} onRefresh={setSnapshot}
             onResolved={(next, destination) => { setSnapshot(next); setShowExpenseDialog(false); setCurrentScreen(destination); }}
             onManualAdjust={() => { setShowExpenseDialog(false); navigateTo('plan_change'); }}
             onLater={() => { void handleLater().then(() => setShowExpenseDialog(false)).catch(error => showToast(error instanceof Error ? error.message : '请重试')); }}
