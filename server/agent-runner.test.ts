@@ -192,6 +192,26 @@ const candidate = (monthlyContributionCents: number) => ({ targetCents: 800000,
   targetDate: '2026-12-31', monthlyContributionCents, protectedCents: 2000000,
   scenario: { kind: 'baseline' }, evidenceResultIds: [] });
 
+test('past goal date produces an explicit correction question without model calls or financial writes', async () => {
+  const { updateAgentTask } = await import('./store.ts');
+  const { sessionId, threadId, run } = setup();
+  const task = getAgentTaskForThread(sessionId, threadId)!;
+  updateAgentTask(sessionId, task.taskId, task.taskRevision, {
+    facts: { ...task.facts, originalTargetDate: '2026-08-01' },
+    constraints: { ...task.constraints, latestAllowedDate: '2026-08-01' },
+  });
+  const before = getState(sessionId);
+  let calls = 0;
+  const finished = await runAgentTask(sessionId, threadId, run.runId, async () => {
+    calls++; return { type: 'ask_user', question: '请补充信息' };
+  });
+  assert.equal(calls, 0);
+  assert.equal(finished.status, 'awaiting_user');
+  assert.match(finished.question!, /2026-08-01.*2026-09-21/);
+  assert.deepEqual(getState(sessionId), before);
+  assert.equal(getAgentTaskForThread(sessionId, threadId)!.facts.savedCents, 0);
+});
+
 test('scripted decisions inspect failure, revise candidate and recommend only verified result', async () => {
   const { sessionId, threadId, run } = setup();
   const before = getState(sessionId);
