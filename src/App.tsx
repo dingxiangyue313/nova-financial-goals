@@ -53,7 +53,7 @@ export default function App() {
   const [showExpenseDialog, setShowExpenseDialog] = useState(false);
   const [expenseStatus, setExpenseStatus] = useState<'loading' | 'impact' | 'quiet' | 'inactive' | 'error'>('loading');
   const [expenseError, setExpenseError] = useState('');
-  const [expenseCase, setExpenseCase] = useState<import('../shared/contracts').ExpenseImpactCase | null>(null);
+  const [expenseCaseAccount, setExpenseCaseAccount] = useState(() => sessionStorage.getItem('nova-expense-case-account') === '1');
   const expenseInFlight = useRef(false);
   const [isAnalyzingGoal, setIsAnalyzingGoal] = useState<boolean>(false);
   const [draftChanges, setDraftChanges] = useState<Partial<Goal>>({});
@@ -360,11 +360,12 @@ export default function App() {
     if (expenseInFlight.current) return;
     setShowSimulateModal(false);
     setShowExpenseDialog(true);
-    setExpenseCase(null);
+
     if (example) {
       expenseInFlight.current = true; setExpenseStatus('loading');
       try {
-        setExpenseCase(await api<import('../shared/contracts').ExpenseImpactCase>('/api/demo/expense-impact-case'));
+        const live = await api<Snapshot>('/api/demo/expense-impact-case/start', 'POST', { confirmed: true });
+        setSnapshot(live); setExpenseCaseAccount(true); sessionStorage.setItem('nova-expense-case-account', '1');
         setExpenseStatus('impact');
       } catch (error) { setExpenseError(error instanceof Error ? error.message : '案例暂时无法加载'); setExpenseStatus('error'); }
       finally { expenseInFlight.current = false; }
@@ -581,6 +582,7 @@ export default function App() {
         />
 
         {/* Content Body */}
+        {expenseCaseAccount && <div className="flex items-center justify-between gap-2 border-b border-[#B9D9D8] bg-[#E6F2F2] px-4 py-2 text-xs text-[#0F6B6D]"><span>日本旅行案例账户 · 确认方案后可更新计划</span><button className="min-h-11 shrink-0 font-semibold underline" onClick={() => { void api<Snapshot>('/api/demo/expense-impact-case/exit', 'POST', {}).then(live => { setSnapshot(live); setExpenseCaseAccount(false); sessionStorage.removeItem('nova-expense-case-account'); setShowExpenseDialog(false); navigateTo('home'); }).catch(error => showToast(error instanceof Error ? error.message : '切换失败')); }}>返回原账户</button></div>}
         <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar relative w-full bg-[#F5F7F8]"><Suspense fallback={<p role="status" className="p-4">正在打开任务…</p>}>
           {!goal && ['home', 'feasibility', 'profile'].includes(currentScreen) && (
             <section className="m-4 rounded-2xl border border-[#D8E7E7] bg-white p-5 shadow-sm">
@@ -766,10 +768,7 @@ export default function App() {
         {showExpenseDialog && <ExpenseImpactDialog
           onClose={() => setShowExpenseDialog(false)} status={expenseStatus} error={expenseError}
           onActivate={() => { setShowExpenseDialog(false); navigateTo('feasibility'); }}>
-          {expenseCase ? <><p className="px-4 pt-3 text-xs leading-5 text-[#5A616B]">日本旅行演示案例：¥900 汽车保养支出影响储蓄节奏。仅展示案例，不改动你的账户或目标。</p><GoalImpactScreen compact examplePreviews={expenseCase.previews}
-            snapshot={expenseCase.snapshot} goal={displayGoal(expenseCase.snapshot)} onRefresh={() => {}}
-            onResolved={() => setShowExpenseDialog(false)} onManualAdjust={() => setShowExpenseDialog(false)}
-            onLater={() => setShowExpenseDialog(false)} onDismiss={() => setShowExpenseDialog(false)} /></> : goal && scenario ? <GoalImpactScreen compact snapshot={snapshot} goal={goal} onRefresh={setSnapshot}
+          {goal && scenario ? <GoalImpactScreen compact snapshot={snapshot} goal={goal} onRefresh={setSnapshot}
             onResolved={(next, destination) => { setSnapshot(next); setShowExpenseDialog(false); setCurrentScreen(destination); }}
             onManualAdjust={() => { setShowExpenseDialog(false); navigateTo('plan_change'); }}
             onLater={() => { void handleLater().then(() => setShowExpenseDialog(false)).catch(error => showToast(error instanceof Error ? error.message : '请重试')); }}

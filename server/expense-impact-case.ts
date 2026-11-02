@@ -6,7 +6,7 @@ import { snapshot } from './presentation.ts';
 import { ExpenseImpactCaseSchema, type DemoState } from '../shared/contracts.ts';
 
 // A read-only example, independent of the user's current simulated account.
-export function expenseImpactCase() {
+export function expenseImpactCaseState() {
   const before = activatePlan(createFixture(), 'balanced');
   const expense = injectExpense(before, 90000, '汽车保养');
   const decision = evaluateOneOffExpenseRisk(before, 90000);
@@ -20,7 +20,14 @@ export function expenseImpactCase() {
       decision: 'immediate_signal', evidence: [{transactionId: 'expense-case-transaction', date: before.clock, amountCents: 90000}],
       confidence: 'high', ruleVersion: RISK_RULE_VERSION, twinVersion: before.twinVersion + 1,
       impact: decision.goalImpact, status: 'active', suppressionKey: 'expense-case' }] };
-  const request = { impactId: expense.impact.id, expectedTwinVersion: state.twinVersion };
+  state.accounts = state.accounts.map(account => account.id === 'checking'
+    ? { ...account, balanceCents: state.finance.checkingCents } : account);
+  return state;
+}
+
+export function expenseImpactCase() {
+  const state = expenseImpactCaseState();
+  const request = { impactId: state.pendingImpact!.id, expectedTwinVersion: state.twinVersion };
   return ExpenseImpactCaseSchema.parse({ snapshot: snapshot(state), previews: {
     keep_target_date: previewRiskRepair(state, { ...request, strategy: 'keep_target_date' }),
     keep_monthly_contribution: previewRiskRepair(state, { ...request, strategy: 'keep_monthly_contribution' }),

@@ -33,7 +33,7 @@ import { installApiRateLimits, installRequestHardening, setStaticCacheHeaders } 
 import { authenticationOptions, passkeyStatus, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn.ts';
 import { connectDataSources, DATA_SOURCE_LABELS, ensureDataSync, failDataSource, recoverDataSource, revokeDataSource } from './data-connections.ts';
 import { createFixture } from './fixtures.ts';
-import { expenseImpactCase } from './expense-impact-case.ts';
+import { expenseImpactCase, expenseImpactCaseState } from './expense-impact-case.ts';
 import { AgentRunCancelRequestSchema, AgentRunStatusResponseSchema, AgentTurnWithRunSchema,
   MonitorStatusSchema } from '../shared/contracts.ts';
 import { getAgentRunStatus, startAgentRun, stopAgentRun } from './agent-runner.ts';
@@ -633,6 +633,34 @@ app.post('/api/demo/load-japan', route((req, res) => {
 app.get('/api/demo/expense-impact-case', route((_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json(expenseImpactCase());
+}));
+app.post('/api/demo/expense-impact-case/start', route((req, res) => {
+  assertAiWriteAllowed();
+  z.object({ confirmed: z.literal(true) }).strict().parse(req.body);
+  const original = sessionId(req, res);
+  const id = randomUUID();
+  const state = mutateState(id, () => audit(expenseImpactCaseState(), 'expense_case_started', 'executed',
+    '载入日本旅行案例账户，记录汽车保养模拟支出 ¥900；原账户保留。'));
+  const previous = (req.headers.cookie || '').split(';').map(item => item.trim())
+    .find(item => item.startsWith('nova_expense_previous='))?.slice('nova_expense_previous='.length);
+  res.setHeader('Set-Cookie', [
+    `nova_demo_sid=${id}.${sign(id)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${production ? '; Secure' : ''}`,
+    `nova_expense_previous=${previous || `${original}.${sign(original)}`}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${production ? '; Secure' : ''}`,
+  ]);
+  return respond(res, state);
+}));
+app.post('/api/demo/expense-impact-case/exit', route((req, res) => {
+  const raw = (req.headers.cookie || '').split(';').map(item => item.trim())
+    .find(item => item.startsWith('nova_expense_previous='))?.slice('nova_expense_previous='.length);
+  const [id, mac] = (raw || '').split('.');
+  const expected = id && sign(id);
+  if (!id || !mac || !expected || mac.length !== expected.length || !timingSafeEqual(Buffer.from(mac), Buffer.from(expected)))
+    throw new Error('INVALID_PREVIOUS_ACCOUNT');
+  res.setHeader('Set-Cookie', [
+    `nova_demo_sid=${id}.${sign(id)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${production ? '; Secure' : ''}`,
+    `nova_expense_previous=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${production ? '; Secure' : ''}`,
+  ]);
+  return respond(res, getState(id));
 }));
 app.patch('/api/goals/current', route((req, res) => {
   const changes = z.object({ title: z.string().min(1).max(60).optional(), targetCents: z.number().int().positive().optional(),

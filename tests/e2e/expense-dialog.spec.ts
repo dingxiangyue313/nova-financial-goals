@@ -1,15 +1,30 @@
 import { expect, test } from './fixtures';
 
-test('impact example works without an active user goal and leaves the current account untouched', async ({ page }, testInfo) => {
+test('case account applies a confirmed plan, persists it, and restores the original account', async ({ page }, testInfo) => {
   await page.goto('/');
   const before = await (await page.request.get('/api/session')).json();
   await page.getByRole('button', { name: '支出影响案例', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '目标影响提醒' });
   await expect(dialog.getByRole('heading', { name: /日本旅行可能延期/ })).toBeVisible();
   await expect(dialog.getByRole('button', { name: /方案 A/ })).toBeEnabled();
-  await expect(dialog.getByRole('button', { name: '示例方案 · 不修改当前账户' })).toBeDisabled();
+  const caseBefore = await (await page.request.get('/api/session')).json();
+  await dialog.getByRole('button', { name: /方案 A/ }).click();
+  await expect(dialog.getByRole('button', { name: '确认调整计划' })).toBeEnabled();
   await page.screenshot({path: testInfo.outputPath('impact-case.png')});
-  await page.keyboard.press('Escape');
+  await dialog.getByRole('button', { name: '确认调整计划' }).click();
+  await expect(dialog.getByRole('heading', { name: '计划已调整' })).toBeVisible();
+  const applied = await (await page.request.get('/api/session')).json();
+  expect(applied.goal.monthlyContributionCents).toBe(200000);
+  expect(applied.goal.targetDate).toBe('2026-12-15');
+  expect(applied.pendingImpact).toBeNull();
+  expect(applied.finance).toEqual(caseBefore.finance);
+  expect(applied.audit.some((item: {action: string}) => item.action === 'goal_plan_changed')).toBeTruthy();
+  await dialog.getByRole('button', { name: '返回目标', exact: true }).click();
+  await page.reload();
+  const persisted = await (await page.request.get('/api/session')).json();
+  expect(persisted.goal.monthlyContributionCents).toBe(200000);
+  await page.getByRole('button', { name: '返回原账户', exact: true }).click();
+  await expect(page.getByRole('button', { name: '返回原账户', exact: true })).toHaveCount(0);
   const after = await (await page.request.get('/api/session')).json();
   expect(after.goal).toEqual(before.goal);
   expect(after.finance).toEqual(before.finance);
