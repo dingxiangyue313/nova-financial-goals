@@ -26,7 +26,7 @@ const Suggested = z.object({ kind: z.enum(['create', 'supplement', 'modify', 're
 const numerals: Record<string, number> = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
 
 export function parseYuan(raw: string): number | null {
-  const text = raw.replace(/[\s,，¥元人民币]/g, '');
+  const text = raw.replace(/[\s,，¥￥元人民币块钱]/g, '');
   if (text === '零' || text === '〇') return 0;
   const scaled = text.match(/^(\d+(?:\.\d{1,2})?)(万|千)$/);
   if (scaled) {
@@ -167,6 +167,12 @@ export async function understandGoalMessage(text: string, clock: string, task: A
       else { unknowns.push('targetDate'); ambiguity = '请给我一个有效的目标日期（年、月、日）。'; }
     }
     const vagueDate=text.match(/(?:今年|明年|后年)?(?:暑假|寒假|夏天|冬天|春节|国庆)/)?.[0];
+    const monthOnly=text.match(/(?:20\d{2}\s*年\s*|今年|明年|后年)?(?:1[0-2]|0?[1-9]|十一|十二|十|[一二三四五六七八九])\s*月/)?.[0];
+    if(monthOnly&&!datePhrase&&!vagueDate){
+      changes.targetDate={op:'clear'};
+      unknowns.push(`目标时间：${monthOnly}`);
+      ambiguity=`已记下${monthOnly}，你希望在这个月的几号前准备好资金？`;
+    }
     if (vagueDate && !datePhrase) {
       changes.targetDate={op:'clear'};
       unknowns.push(`目标时间：${vagueDate}`);
@@ -193,13 +199,17 @@ export async function understandGoalMessage(text: string, clock: string, task: A
   for(const patch of patches){
     if(parsed.changes[patch.field])continue;
     const cents=parseYuan(patch.quote);
+    // A budget quote alone cannot also establish an existing savings balance.
+    if(patch.field==='savedCents'&&parsed.changes.targetCents?.op==='set'
+      &&parsed.changes.targetCents.value===cents
+      &&!/(?:已存|已经|存了|攒了|现有|已有|现在有|手上有|手里有|余额|积蓄|存款)/.test(text))continue;
     if(cents!==null&&(patch.field!=='targetCents'||cents>0))parsed.changes[patch.field]={op:'set',value:cents};
   }
   if (suggestion.dateQuote && !parsed.changes.targetDate) {
     const date = dateForMessage(suggestion.dateQuote);
     if (date) parsed.changes.targetDate = { op: 'set', value: date };
   }
-  if(suggestion.datePrecision==='approximate'&&suggestion.dateQuote&& !parseGoalDate(suggestion.dateQuote,clock)){
+  if(!parsed.ambiguity&&suggestion.datePrecision==='approximate'&&suggestion.dateQuote&& !parseGoalDate(suggestion.dateQuote,clock)){
     parsed.changes.targetDate={op:'clear'};
     parsed.ambiguity=`你说的“${suggestion.dateQuote}”具体是几月几日？可以先确认月份。`;
   }

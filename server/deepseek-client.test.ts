@@ -67,7 +67,7 @@ test('shared DeepSeek client handles configuration, schema validation, and HTTP 
     } }] }), { status: 200 });
     assert.deepEqual(await client.requestDeepSeekJson(schema, {
       messages: [{ role: 'user', content: '目标能按时完成吗？' }], maxTokens: 50,
-    }), { ok: false, reason: 'DEEPSEEK_INVALID_OR_TIMEOUT' });
+    }), { ok: false, reason: 'DEEPSEEK_SCHEMA_ERROR' });
   } finally {
     process.env.DEEPSEEK_API_KEY = previousKey;
     globalThis.fetch = previousFetch;

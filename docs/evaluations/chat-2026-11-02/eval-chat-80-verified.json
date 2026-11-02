@@ -1,0 +1,1603 @@
+{
+  "summary": {
+    "total": 80,
+    "passed": 77
+  },
+  "rows": [
+    {
+      "group": "goal",
+      "message": "明年攒一万去旅游",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "年底前存5000买礼物",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "我想在2027年6月去日本，预算¥8,000。",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "计划明年换电脑，需要12000元",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "想存三万元应急金",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "半年攒两万",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "我要买车，预算十万",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "创建留学目标，五万元",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "明年六月去日本玩，预计花八千元",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "2027年6月30日前攒8000",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "日本旅行目标预算改成9000",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_adjust",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "已经存了2000元",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "每个月最多存1500",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "日本旅行目标时间改成2027年7月15日",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_adjust",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "一共10000，明年暑假去",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": null
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "我想给父母攒一万元旅游基金",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "不动应急金，明年想买电脑",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "买手机预算6000，我已经存了两千",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "先不聊AA了，规划明年旅行预算8000",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "transfer",
+      "message": "给林夏转500元",
+      "mode": "navigate",
+      "destination": "transfer",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "transfer",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {
+            "recipientQuery": "林夏",
+            "amount": "500元"
+          }
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal",
+      "message": "想为孩子攒学费，明年需要三万",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "transfer",
+      "message": "帮我打钱给小陈",
+      "mode": "navigate",
+      "destination": "transfer",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "transfer",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {
+            "recipientQuery": "小陈"
+          }
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "aa_create",
+      "message": "我要和同事A钱",
+      "mode": "navigate",
+      "destination": "aa_create",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "aa_create",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "aa_create",
+      "message": "饭钱我们四个人平摊",
+      "mode": "navigate",
+      "destination": "aa_create",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "aa_create",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": null
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "aa_records",
+      "message": "看看谁还没付AA钱",
+      "mode": "navigate",
+      "destination": "aa_records",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "aa_records",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "aa_records",
+      "message": "查看AA收款记录",
+      "mode": "navigate",
+      "destination": "aa_records",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "aa_records",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "investment_products",
+      "message": "看看有哪些理财产品",
+      "mode": "navigate",
+      "destination": "investment_products",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "investment_products",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "investment_products",
+      "message": "我要买理财",
+      "mode": "navigate",
+      "destination": "investment_products",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "investment_products",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "investment_holdings",
+      "message": "我要赎回持仓",
+      "mode": "navigate",
+      "destination": "investment_holdings",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "investment_holdings",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "investment_profile",
+      "message": "做一下风险评估",
+      "mode": "navigate",
+      "destination": "investment_profile",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "investment_profile",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "investment_holdings",
+      "message": "看看我买的理财",
+      "mode": "navigate",
+      "destination": "investment_holdings",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "investment_holdings",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "investment_profile",
+      "message": "评测我的投资风险偏好",
+      "mode": "navigate",
+      "destination": "investment_profile",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "investment_profile",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "cards",
+      "message": "我的银行卡在哪",
+      "mode": "navigate",
+      "destination": "cards",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "cards",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "cards",
+      "message": "我要挂失银行卡",
+      "mode": "navigate",
+      "destination": "cards",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "cards",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "card_apply",
+      "message": "我想申请信用卡",
+      "mode": "navigate",
+      "destination": "card_apply",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "card_apply",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "card_apply",
+      "message": "办一张新的银行卡",
+      "mode": "navigate",
+      "destination": "card_apply",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "card_apply",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "subscription_card",
+      "message": "更换订阅付款卡",
+      "mode": "navigate",
+      "destination": "subscription_card",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "subscription_card",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "subscription_card",
+      "message": "云盘扣款换张卡",
+      "mode": "navigate",
+      "destination": "subscription_card",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "subscription_card",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "bills",
+      "message": "看看本月账单",
+      "mode": "navigate",
+      "destination": "bills",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "bills",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "spending",
+      "message": "钱主要花在哪里",
+      "mode": "navigate",
+      "destination": "spending",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "spending",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "bills",
+      "message": "打开月账单",
+      "mode": "navigate",
+      "destination": "bills",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "bills",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "spending",
+      "message": "这个月餐饮花费增加了吗",
+      "mode": "navigate",
+      "destination": "spending",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "spending",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "subscriptions",
+      "message": "帮我取消自动续费",
+      "mode": "navigate",
+      "destination": "subscriptions",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "subscriptions",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "subscriptions",
+      "message": "看看我有哪些订阅",
+      "mode": "navigate",
+      "destination": "subscriptions",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "subscriptions",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "bill_import",
+      "message": "我要导入账单",
+      "mode": "navigate",
+      "destination": "bill_import",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "bill_import",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "bill_import",
+      "message": "上传一份交易流水",
+      "mode": "navigate",
+      "destination": "bill_import",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "bill_import",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "travel_quotes",
+      "message": "找一下日本机票和酒店报价",
+      "mode": "navigate",
+      "destination": "travel_quotes",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "travel_quotes",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "travel_quotes",
+      "message": "查看旅行报价请求",
+      "mode": "navigate",
+      "destination": "travel_quotes",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "travel_quotes",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "travel_mandate",
+      "message": "设置旅行预算授权",
+      "mode": "navigate",
+      "destination": "travel_mandate",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "travel_mandate",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": null
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "travel_mandate",
+      "message": "调整旅行付款授权额度",
+      "mode": "navigate",
+      "destination": "travel_mandate",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "travel_mandate",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "travel_payment",
+      "message": "核对旅行付款",
+      "mode": "navigate",
+      "destination": "travel_payment",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "travel_payment",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "travel_payment",
+      "message": "我要支付已选机票和酒店",
+      "mode": "navigate",
+      "destination": "travel_payment",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "travel_payment",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "travel_orders",
+      "message": "查看旅行订单",
+      "mode": "navigate",
+      "destination": "travel_orders",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "travel_orders",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "travel_orders",
+      "message": "查一下酒店退款进度",
+      "mode": "navigate",
+      "destination": "travel_orders",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "travel_orders",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal_allocation",
+      "message": "调整目标资金分配",
+      "mode": "navigate",
+      "destination": "goal_allocation",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_allocation",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal_allocation",
+      "message": "查看目标可支付金额",
+      "mode": "navigate",
+      "destination": "goal_allocation",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_allocation",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal_transfer",
+      "message": "设置工资到账后存入目标",
+      "mode": "navigate",
+      "destination": "goal_transfer",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_transfer",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal_transfer",
+      "message": "安排目标每月转入",
+      "mode": "navigate",
+      "destination": "goal_transfer",
+      "pass": false,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_adjust",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "cashflow",
+      "message": "试算一下未来收支",
+      "mode": "navigate",
+      "destination": "cashflow",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "cashflow",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "cashflow",
+      "message": "这笔额外支出对余额有什么影响",
+      "mode": "navigate",
+      "destination": "cashflow",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "cashflow",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal_adjust",
+      "message": "修改目标储蓄计划",
+      "mode": "navigate",
+      "destination": "goal_adjust",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_adjust",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "goal_adjust",
+      "message": "调整所有目标的月度投入方案",
+      "mode": "navigate",
+      "destination": "goal_adjust",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_adjust",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "knowledge",
+      "message": "转账和AA有什么区别",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "转账是你把钱直接转给某个联系人；AA分账是把一笔共同消费按人数平摊，系统帮你算出每人应付多少，并可分别收款或付款。",
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "knowledge",
+      "message": "什么是基金赎回",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "基金赎回是把持有的基金份额卖出，按当日净值确认金额，资金通常几个工作日后到账，可能涉及赎回费。",
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "knowledge",
+      "message": "退款在途是什么意思",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "退款在途指商家或平台已发起退款，资金正在退回途中，尚未到账。通常需几个工作日，具体以银行或支付渠道处理时间为准。",
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "knowledge",
+      "message": "什么是目标资金分配",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "目标资金分配是把账户里的钱划出一部分，指定用于某个生活目标（如旅行、买房），让这部分资金专款专用。",
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "knowledge",
+      "message": "信用卡和借记卡有什么区别",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "信用卡先用银行额度后还款，借记卡直接花账户里的钱。信用卡可累积信用、有免息期但逾期有费用；借记卡不透支，消费受账户余额限制。",
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "knowledge",
+      "message": "为什么订阅涨价了",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "订阅涨价通常源于服务方调价、套餐变更或促销期结束，也可能因税费或汇率变化。可在订阅管理页查看当前价格与续费记录，具体以账单为准。",
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "knowledge",
+      "message": "什么是应急金",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "应急金是为突发情况（如失业、医疗急用）预留的现金储备，通常建议覆盖3-6个月必要开支，放在随时可取、风险低的地方。",
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "knowledge",
+      "message": "授权和实际付款有什么区别",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "授权是预先设定旅行或目标可用的额度，只是允许范围内支付，不会扣款；实际付款才真正从账户扣钱并生成交易。",
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "ambiguous",
+      "message": "帮我转账同时申请信用卡",
+      "mode": "clarify",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "clarify",
+          "destination": null,
+          "question": "你想先办转账，还是先申请信用卡？",
+          "chatIntent": "clarification",
+          "answer": null,
+          "memoryAction": null,
+          "draft": null
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "ambiguous",
+      "message": "我要买理财还要取消订阅",
+      "mode": "clarify",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "clarify",
+          "destination": null,
+          "question": "你是想先看看理财产品，还是先管理订阅并取消自动续费？",
+          "chatIntent": "clarification",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "ambiguous",
+      "message": "帮我处理一下",
+      "mode": "clarify",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "clarify",
+          "destination": null,
+          "question": "你想处理哪方面？比如转账、AA分账、账单、卡片、理财或旅行。",
+          "chatIntent": "clarification",
+          "answer": null,
+          "memoryAction": null,
+          "draft": null
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "ambiguous",
+      "message": "我要弄那个东西",
+      "mode": "clarify",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "clarify",
+          "destination": null,
+          "question": "你想办理哪个功能？例如转账、AA分账、查看卡片或账单等。",
+          "chatIntent": "clarification",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "ambiguous",
+      "message": "帮我挂失卡同时导入账单",
+      "mode": "clarify",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "clarify",
+          "destination": null,
+          "question": "你要先办挂失卡，还是先导入账单？",
+          "chatIntent": "clarification",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "ambiguous",
+      "message": "给朋友转钱还是AA我还没想好",
+      "mode": "clarify",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "clarify",
+          "destination": null,
+          "question": "你想先选哪种方式：直接转给朋友，还是发起AA分账？",
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": null,
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "negative",
+      "message": "不要帮我转账",
+      "notNavigate": true,
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "好的，我不会发起任何转账。如有其他需要，可以告诉我。",
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "negative",
+      "message": "我不想申请信用卡",
+      "notNavigate": true,
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "好的，不会为你发起信用卡申请。需要看已有卡片、账单或其他功能时告诉我。",
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "negative",
+      "message": "先别帮我取消订阅",
+      "notNavigate": true,
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "clarification",
+          "answer": "好的，我不会取消你的订阅。如需查看或管理订阅，随时告诉我。",
+          "memoryAction": "continue",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "group": "negative",
+      "message": "不要给我订机票",
+      "notNavigate": true,
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "clarify",
+          "destination": null,
+          "question": "明白，不会为你订机票。需要我帮你做什么？",
+          "chatIntent": "clarification",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    }
+  ]
+}

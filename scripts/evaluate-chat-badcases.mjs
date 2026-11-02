@@ -1,0 +1,6 @@
+import {request} from '@playwright/test';import fs from 'node:fs';
+const r=await request.newContext({baseURL:'http://127.0.0.1:3000',timeout:90000});
+for(let i=0;i<20;i++){try{if((await r.get('/api/session')).ok())break;}catch{}await new Promise(r=>setTimeout(r,1000));}
+const cases=[['日本旅行目标预算改成9000','chat','goal_planning'],['日本旅行目标时间改成2027年7月15日','chat','goal_planning'],['安排目标每月转入','navigate','goal_transfer'],['修改目标储蓄计划','navigate','goal_adjust'],['调整目标资金分配','navigate','goal_allocation'],['查看目标可支付金额','navigate','goal_allocation'],['这笔额外支出对余额有什么影响','navigate','cashflow'],['我想给父母攒一万元旅游基金','chat','goal_planning'],['买手机预算6000，我已经存了两千','chat','goal_planning'],['想为孩子攒学费，明年需要三万','chat','goal_planning'],['我要挂失银行卡','navigate','cards'],['查看旅行报价请求','navigate','travel_quotes']];
+const rows=[];for(const [message,mode,target]of cases){const res=await r.post('/api/agent/route',{data:{message}});const d=await res.json();const pass=d.provider!=='unavailable'&&d.decision?.mode===mode&&(mode==='chat'?d.decision.chatIntent:d.decision.destination)===target;rows.push({message,pass,response:d});console.log(JSON.stringify({message,pass}));await new Promise(r=>setTimeout(r,2300));}
+const summary={total:rows.length,passed:rows.filter(x=>x.pass).length};fs.writeFileSync(process.argv[2],JSON.stringify({summary,rows},null,2));console.log(JSON.stringify(summary));await r.dispose();

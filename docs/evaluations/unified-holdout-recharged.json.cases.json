@@ -1,0 +1,259 @@
+[
+  [
+    {
+      "text": "准备2027年11月带妈妈去三亚，花费预算一万二千元",
+      "goal": {
+        "targetCents": 1200000
+      }
+    },
+    {
+      "text": "为这趟旅行已经留了2800块钱",
+      "goal": {
+        "targetCents": 1200000,
+        "savedCents": 280000
+      }
+    }
+  ],
+  [
+    {
+      "text": "2027年4月想买台洗碗机，预算4800元",
+      "goal": {
+        "targetCents": 480000
+      }
+    },
+    {
+      "text": "金额说错了，应当是5300元",
+      "goal": {
+        "targetCents": 530000
+      }
+    }
+  ],
+  [
+    {
+      "text": "2027年12月参加培训，费用15000元，现已存5000元",
+      "goal": {
+        "targetCents": 1500000,
+        "savedCents": 500000
+      }
+    },
+    {
+      "text": "每月最多再存850元",
+      "goal": {
+        "targetCents": 1500000,
+        "savedCents": 500000,
+        "monthlyContributionCapCents": 85000
+      }
+    }
+  ],
+  [
+    {
+      "text": "我计划2027年3月20日去武汉，预算3000元",
+      "goal": {
+        "targetDate": "2027-03-20",
+        "targetCents": 300000
+      }
+    },
+    {
+      "text": "推到4月12日，其他条件不变",
+      "goal": {
+        "targetDate": "2027-04-12",
+        "targetCents": 300000
+      }
+    }
+  ],
+  [
+    {
+      "text": "2027年十月去桂林，准备七千元",
+      "goal": {
+        "targetCents": 700000
+      }
+    },
+    {
+      "text": "10月9号那天走",
+      "goal": {
+        "targetDate": "2027-10-09",
+        "targetCents": 700000
+      }
+    }
+  ],
+  [
+    {
+      "text": "准备装修卧室，预算25000元，已存8000元",
+      "goal": {
+        "targetCents": 2500000,
+        "savedCents": 800000
+      }
+    },
+    {
+      "text": "另外开一个买冰箱目标，预算3500元",
+      "goal": {
+        "targetCents": 350000
+      },
+      "kind": "goal"
+    },
+    {
+      "text": "回到装修卧室那个",
+      "goal": {
+        "targetCents": 2500000,
+        "savedCents": 800000
+      }
+    }
+  ],
+  [
+    {
+      "text": "2027年底学潜水，费用6500元",
+      "goal": {
+        "targetCents": 650000
+      }
+    },
+    {
+      "text": "先去看看我的卡",
+      "capability": "cards"
+    },
+    {
+      "text": "继续潜水计划",
+      "goal": {
+        "targetCents": 650000
+      }
+    }
+  ],
+  [
+    {
+      "text": "给周晴转180元",
+      "capability": "transfer",
+      "amountCents": 18000,
+      "recipientQuery": "周晴"
+    },
+    {
+      "text": "改为220元",
+      "capability": "transfer",
+      "amountCents": 22000,
+      "recipientQuery": "周晴"
+    }
+  ],
+  [
+    {
+      "text": "给方明转620元",
+      "capability": "transfer",
+      "amountCents": 62000
+    },
+    {
+      "text": "新开一笔给江宁的，不要沿用之前金额",
+      "capability": "transfer",
+      "recipientQuery": "江宁",
+      "amountCents": null
+    }
+  ],
+  [
+    {
+      "text": "我要向叶青转260元",
+      "capability": "transfer",
+      "amountCents": 26000
+    },
+    {
+      "text": "取消当前草稿",
+      "status": "cancelled",
+      "mode": "clarify"
+    }
+  ],
+  [
+    {
+      "text": "团建的饭钱想让五个人平摊",
+      "capability": "aa_create"
+    },
+    {
+      "text": "看看发出去的AA哪些已到账",
+      "capability": "aa_records"
+    }
+  ],
+  [
+    {
+      "text": "我持有的理财目前有哪些",
+      "capability": "investment_holdings"
+    },
+    {
+      "text": "我想看看能买的其他理财产品",
+      "capability": "investment_products"
+    }
+  ],
+  [
+    {
+      "text": "把这张卡临时锁住的功能在哪",
+      "capability": "cards"
+    },
+    {
+      "text": "改一下网盘订阅使用的付款卡",
+      "capability": "subscription_card"
+    }
+  ],
+  [
+    {
+      "text": "给我看看月度账单汇总",
+      "capability": "bills"
+    },
+    {
+      "text": "再看看日常支出主要分类",
+      "capability": "spending"
+    }
+  ],
+  [
+    {
+      "text": "我有一份流水文件想导进来",
+      "capability": "bill_import"
+    },
+    {
+      "text": "看下我付费订阅的服务",
+      "capability": "subscriptions"
+    }
+  ],
+  [
+    {
+      "text": "设置旅行消费的授权预算",
+      "capability": "travel_mandate"
+    },
+    {
+      "text": "核对选中的机票和酒店付款",
+      "capability": "travel_payment"
+    }
+  ],
+  [
+    {
+      "text": "我要查看我的机票酒店订单",
+      "capability": "travel_orders"
+    },
+    {
+      "text": "重新看看旅行报价",
+      "capability": "travel_quotes"
+    }
+  ],
+  [
+    {
+      "text": "设置每次工资到账以后存钱进目标",
+      "capability": "goal_transfer"
+    },
+    {
+      "text": "看看我在不同目标分配了多少资金",
+      "capability": "goal_allocation"
+    }
+  ],
+  [
+    {
+      "text": "我想试算下工资晚发时账户钱够不够用",
+      "capability": "cashflow"
+    },
+    {
+      "text": "打开各目标每月投入的调整方案",
+      "capability": "goal_adjust"
+    }
+  ],
+  [
+    {
+      "text": "AA分账和普通转款有什么不同",
+      "mode": "chat"
+    },
+    {
+      "text": "我只咨询，暂时不转款也不发起AA",
+      "mode": "notNavigate"
+    }
+  ]
+]

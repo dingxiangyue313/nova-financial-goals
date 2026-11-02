@@ -1,0 +1,3225 @@
+{
+  "summary": {
+    "conversations": 20,
+    "passed": 19
+  },
+  "rows": [
+    {
+      "index": 0,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "准备2027年11月带妈妈去三亚，花费预算一万二千元",
+            "goal": {
+              "targetCents": 1200000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "77b78e39-2b03-42d3-884a-d0c9774f2af7",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "c67e7201-60cf-4c2b-bc2e-014cd7619ee4",
+              "thread": {
+                "id": "77b78e39-2b03-42d3-884a-d0c9774f2af7",
+                "title": "准备2027年11月带妈妈去三亚，花费预算一万二千元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:53.214Z",
+                "updatedAt": "2026-11-02T03:52:55.105Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "dafacb10-afc1-4893-a353-426ded0daa8f",
+                "threadId": "77b78e39-2b03-42d3-884a-d0c9774f2af7",
+                "role": "assistant",
+                "content": "已记下：目标是带妈妈去三亚旅行，总额¥12,000。已记下2027-11，你希望具体哪一天准备好资金？",
+                "components": [
+                  {
+                    "id": "773989ca-c8f3-4671-9d9d-769fc0ab7af6",
+                    "type": "clarification",
+                    "title": "还需要一点信息",
+                    "body": "已记下：目标是带妈妈去三亚旅行，总额¥12,000。已记下2027-11，你希望具体哪一天准备好资金？",
+                    "suggestions": []
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:55.105Z"
+              },
+              "components": [
+                {
+                  "id": "773989ca-c8f3-4671-9d9d-769fc0ab7af6",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是带妈妈去三亚旅行，总额¥12,000。已记下2027-11，你希望具体哪一天准备好资金？",
+                  "suggestions": []
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "773989ca-c8f3-4671-9d9d-769fc0ab7af6",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是带妈妈去三亚旅行，总额¥12,000。已记下2027-11，你希望具体哪一天准备好资金？",
+                  "suggestions": []
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "490e1b32-7d38-4276-9d84-f13068ff2a96",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "带妈妈去三亚旅行",
+              "targetCents": 1200000
+            },
+            "timeHint": "2027-11",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "为这趟旅行已经留了2800块钱",
+            "goal": {
+              "targetCents": 1200000,
+              "savedCents": 280000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "77b78e39-2b03-42d3-884a-d0c9774f2af7",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "cb731523-46a5-4a1a-ba84-298858620220",
+              "thread": {
+                "id": "77b78e39-2b03-42d3-884a-d0c9774f2af7",
+                "title": "准备2027年11月带妈妈去三亚，花费预算一万二千元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:53.214Z",
+                "updatedAt": "2026-11-02T03:52:56.119Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "5ba60adc-fc20-4150-ae1e-a224274abc93",
+                "threadId": "77b78e39-2b03-42d3-884a-d0c9774f2af7",
+                "role": "assistant",
+                "content": "已记下：目标是带妈妈去三亚旅行，总额¥12,000，已存¥2,800。已记下2027-11，你希望具体哪一天准备好资金？",
+                "components": [
+                  {
+                    "id": "ef425696-3489-4eed-984d-541f30b4c7d5",
+                    "type": "clarification",
+                    "title": "还需要一点信息",
+                    "body": "已记下：目标是带妈妈去三亚旅行，总额¥12,000，已存¥2,800。已记下2027-11，你希望具体哪一天准备好资金？",
+                    "suggestions": []
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:56.119Z"
+              },
+              "components": [
+                {
+                  "id": "ef425696-3489-4eed-984d-541f30b4c7d5",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是带妈妈去三亚旅行，总额¥12,000，已存¥2,800。已记下2027-11，你希望具体哪一天准备好资金？",
+                  "suggestions": []
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "ef425696-3489-4eed-984d-541f30b4c7d5",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是带妈妈去三亚旅行，总额¥12,000，已存¥2,800。已记下2027-11，你希望具体哪一天准备好资金？",
+                  "suggestions": []
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "490e1b32-7d38-4276-9d84-f13068ff2a96",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "带妈妈去三亚旅行",
+              "targetCents": 1200000,
+              "savedCents": 280000
+            },
+            "timeHint": "2027-11",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "2027年12月参加培训，费用15000元，现已存5000元",
+            "goal": {
+              "targetCents": 1500000,
+              "savedCents": 500000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "52c3a75b-1860-4152-bfdb-ee43164cc439",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "23fab1e6-7c38-4c31-bcbd-e1d29f6ad1ce",
+              "thread": {
+                "id": "52c3a75b-1860-4152-bfdb-ee43164cc439",
+                "title": "2027年12月参加培训，费用15000元，现已存5000元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:53.453Z",
+                "updatedAt": "2026-11-02T03:52:55.206Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "677b7e69-5f5e-4aaa-8117-1318599cfce3",
+                "threadId": "52c3a75b-1860-4152-bfdb-ee43164cc439",
+                "role": "assistant",
+                "content": "已记下：目标是培训，总额¥15,000，已存¥5,000。培训的具体日期是哪一天？",
+                "components": [
+                  {
+                    "id": "4518c0e5-5950-4278-abb5-766a1a66205b",
+                    "type": "clarification",
+                    "title": "还需要一点信息",
+                    "body": "已记下：目标是培训，总额¥15,000，已存¥5,000。培训的具体日期是哪一天？",
+                    "suggestions": []
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:55.206Z"
+              },
+              "components": [
+                {
+                  "id": "4518c0e5-5950-4278-abb5-766a1a66205b",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是培训，总额¥15,000，已存¥5,000。培训的具体日期是哪一天？",
+                  "suggestions": []
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "4518c0e5-5950-4278-abb5-766a1a66205b",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是培训，总额¥15,000，已存¥5,000。培训的具体日期是哪一天？",
+                  "suggestions": []
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "a968b0f6-43e7-41dd-acc2-5b12c750160a",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "培训",
+              "targetCents": 1500000,
+              "savedCents": 500000,
+              "targetDate": null
+            },
+            "timeHint": "2027-12",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "每月最多再存850元",
+            "goal": {
+              "targetCents": 1500000,
+              "savedCents": 500000,
+              "monthlyContributionCapCents": 85000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "52c3a75b-1860-4152-bfdb-ee43164cc439",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "ad60d472-44fd-4b96-a299-65ea9fc51bfa",
+              "thread": {
+                "id": "52c3a75b-1860-4152-bfdb-ee43164cc439",
+                "title": "2027年12月参加培训，费用15000元，现已存5000元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:53.453Z",
+                "updatedAt": "2026-11-02T03:52:56.246Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "0d523153-d9f2-43bd-9d8a-c7c48ad5f9d2",
+                "threadId": "52c3a75b-1860-4152-bfdb-ee43164cc439",
+                "role": "assistant",
+                "content": "已记下：目标是培训，总额¥15,000，已存¥5,000。已记下2027-12，你希望具体哪一天准备好资金？",
+                "components": [
+                  {
+                    "id": "3ab54f88-1563-42c4-a083-d862ebbcb294",
+                    "type": "clarification",
+                    "title": "还需要一点信息",
+                    "body": "已记下：目标是培训，总额¥15,000，已存¥5,000。已记下2027-12，你希望具体哪一天准备好资金？",
+                    "suggestions": []
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:56.246Z"
+              },
+              "components": [
+                {
+                  "id": "3ab54f88-1563-42c4-a083-d862ebbcb294",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是培训，总额¥15,000，已存¥5,000。已记下2027-12，你希望具体哪一天准备好资金？",
+                  "suggestions": []
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "3ab54f88-1563-42c4-a083-d862ebbcb294",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是培训，总额¥15,000，已存¥5,000。已记下2027-12，你希望具体哪一天准备好资金？",
+                  "suggestions": []
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "a968b0f6-43e7-41dd-acc2-5b12c750160a",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "培训",
+              "targetCents": 1500000,
+              "savedCents": 500000,
+              "targetDate": null,
+              "monthlyContributionCapCents": 85000
+            },
+            "timeHint": "2027-12",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "2027年4月想买台洗碗机，预算4800元",
+            "goal": {
+              "targetCents": 480000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "a75e866a-ddc2-4eca-be45-6db3eba433e0",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "589a441f-1af0-4519-a1b0-a8b2287359e4",
+              "thread": {
+                "id": "a75e866a-ddc2-4eca-be45-6db3eba433e0",
+                "title": "2027年4月想买台洗碗机，预算4800元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:53.421Z",
+                "updatedAt": "2026-11-02T03:52:55.392Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "24a9b433-a29f-46b6-8a54-c3b40b129f73",
+                "threadId": "a75e866a-ddc2-4eca-be45-6db3eba433e0",
+                "role": "assistant",
+                "content": "已记下：目标是购买洗碗机，总额¥4,800。2027年4月想哪一天完成购买？",
+                "components": [
+                  {
+                    "id": "a95da204-82b2-484b-8b79-e1f417db9c2c",
+                    "type": "clarification",
+                    "title": "还需要一点信息",
+                    "body": "已记下：目标是购买洗碗机，总额¥4,800。2027年4月想哪一天完成购买？",
+                    "suggestions": []
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:55.392Z"
+              },
+              "components": [
+                {
+                  "id": "a95da204-82b2-484b-8b79-e1f417db9c2c",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是购买洗碗机，总额¥4,800。2027年4月想哪一天完成购买？",
+                  "suggestions": []
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "a95da204-82b2-484b-8b79-e1f417db9c2c",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是购买洗碗机，总额¥4,800。2027年4月想哪一天完成购买？",
+                  "suggestions": []
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "2ca9cd1c-c138-4627-8eda-674d35b8e914",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "购买洗碗机",
+              "targetCents": 480000,
+              "targetDate": null
+            },
+            "timeHint": "2027-04",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "金额说错了，应当是5300元",
+            "goal": {
+              "targetCents": 530000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "a75e866a-ddc2-4eca-be45-6db3eba433e0",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "753be5c0-c91e-4b89-95bf-b9d77c02b549",
+              "thread": {
+                "id": "a75e866a-ddc2-4eca-be45-6db3eba433e0",
+                "title": "2027年4月想买台洗碗机，预算4800元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:53.421Z",
+                "updatedAt": "2026-11-02T03:52:56.327Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "803801a9-2f14-4168-b92f-50e08981ee38",
+                "threadId": "a75e866a-ddc2-4eca-be45-6db3eba433e0",
+                "role": "assistant",
+                "content": "已记下：目标是购买洗碗机，总额¥5,300。已记下2027-04，你希望具体哪一天准备好资金？",
+                "components": [
+                  {
+                    "id": "5d5f4863-0a7c-4448-ab4e-cefe0938fdd0",
+                    "type": "clarification",
+                    "title": "还需要一点信息",
+                    "body": "已记下：目标是购买洗碗机，总额¥5,300。已记下2027-04，你希望具体哪一天准备好资金？",
+                    "suggestions": []
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:56.327Z"
+              },
+              "components": [
+                {
+                  "id": "5d5f4863-0a7c-4448-ab4e-cefe0938fdd0",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是购买洗碗机，总额¥5,300。已记下2027-04，你希望具体哪一天准备好资金？",
+                  "suggestions": []
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "5d5f4863-0a7c-4448-ab4e-cefe0938fdd0",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是购买洗碗机，总额¥5,300。已记下2027-04，你希望具体哪一天准备好资金？",
+                  "suggestions": []
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "2ca9cd1c-c138-4627-8eda-674d35b8e914",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "购买洗碗机",
+              "targetCents": 530000,
+              "targetDate": null
+            },
+            "timeHint": "2027-04",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "2027年十月去桂林，准备七千元",
+            "goal": {
+              "targetCents": 700000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "6b657010-d3e2-420f-b9ba-3c8a6bdef633",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "35008979-6c7d-4ef1-b130-95e74c77f9dd",
+              "thread": {
+                "id": "6b657010-d3e2-420f-b9ba-3c8a6bdef633",
+                "title": "2027年十月去桂林，准备七千元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:56.266Z",
+                "updatedAt": "2026-11-02T03:52:57.055Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "cfebc0ab-3966-4447-a773-3a59e3185563",
+                "threadId": "6b657010-d3e2-420f-b9ba-3c8a6bdef633",
+                "role": "assistant",
+                "content": "已记下：目标是桂林旅行，总额¥7,000。已记下2027-10，你希望具体哪一天准备好资金？",
+                "components": [
+                  {
+                    "id": "9b055aa4-ad52-4d49-9723-577f9fac9c4e",
+                    "type": "clarification",
+                    "title": "还需要一点信息",
+                    "body": "已记下：目标是桂林旅行，总额¥7,000。已记下2027-10，你希望具体哪一天准备好资金？",
+                    "suggestions": []
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:57.055Z"
+              },
+              "components": [
+                {
+                  "id": "9b055aa4-ad52-4d49-9723-577f9fac9c4e",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是桂林旅行，总额¥7,000。已记下2027-10，你希望具体哪一天准备好资金？",
+                  "suggestions": []
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "9b055aa4-ad52-4d49-9723-577f9fac9c4e",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是桂林旅行，总额¥7,000。已记下2027-10，你希望具体哪一天准备好资金？",
+                  "suggestions": []
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "f9cb25b1-f21f-435f-a944-60e3566aa9f9",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "桂林旅行",
+              "targetCents": 700000,
+              "targetDate": null
+            },
+            "timeHint": "2027-10",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "10月9号那天走",
+            "goal": {
+              "targetDate": "2027-10-09",
+              "targetCents": 700000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "6b657010-d3e2-420f-b9ba-3c8a6bdef633",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "c88f50f7-ecda-4bdc-b580-dc47899fa5a8",
+              "thread": {
+                "id": "6b657010-d3e2-420f-b9ba-3c8a6bdef633",
+                "title": "2027年十月去桂林，准备七千元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:56.266Z",
+                "updatedAt": "2026-11-02T03:52:58.201Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "59c2fc14-d6c9-4f5b-9120-5296dccda0ed",
+                "threadId": "6b657010-d3e2-420f-b9ba-3c8a6bdef633",
+                "role": "assistant",
+                "content": "我先记下目标。请连接模拟数据，并确认已存金额，再核算可选的存钱节奏。",
+                "components": [
+                  {
+                    "id": "1c97ac14-8943-42ea-aa45-c9ce977c0562",
+                    "type": "goal_input_card",
+                    "title": "NOVA 理解的目标",
+                    "goal": {
+                      "title": "桂林旅行",
+                      "targetCents": 700000,
+                      "savedCents": 0,
+                      "targetDate": "2027-10-09",
+                      "protectedCents": 2000000,
+                      "status": "draft"
+                    },
+                    "draftId": "f9cb25b1-f21f-435f-a944-60e3566aa9f9",
+                    "fieldSources": {
+                      "title": "user_provided",
+                      "targetCents": "user_provided",
+                      "targetDate": "user_provided",
+                      "savedCents": "default_assumption",
+                      "monthlyContributionCents": "system_calculated",
+                      "protectedCents": "connected_data",
+                      "flexibilityWeeks": "default_assumption"
+                    }
+                  },
+                  {
+                    "id": "88e25ac6-d6e2-48ed-a1ec-6ac8a744482d",
+                    "type": "data_connection_prompt",
+                    "title": "连接模拟数据后再核算",
+                    "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                    "threadId": "6b657010-d3e2-420f-b9ba-3c8a6bdef633"
+                  },
+                  {
+                    "id": "a7f05d6c-77d3-4686-bd4f-d036e37fbb87",
+                    "type": "clarification",
+                    "title": "请确认已存金额",
+                    "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                    "suggestions": [
+                      "已存 0 元",
+                      "已存 ¥3,500"
+                    ]
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:58.201Z"
+              },
+              "components": [
+                {
+                  "id": "1c97ac14-8943-42ea-aa45-c9ce977c0562",
+                  "type": "goal_input_card",
+                  "title": "NOVA 理解的目标",
+                  "goal": {
+                    "title": "桂林旅行",
+                    "targetCents": 700000,
+                    "savedCents": 0,
+                    "targetDate": "2027-10-09",
+                    "protectedCents": 2000000,
+                    "status": "draft"
+                  },
+                  "draftId": "f9cb25b1-f21f-435f-a944-60e3566aa9f9",
+                  "fieldSources": {
+                    "title": "user_provided",
+                    "targetCents": "user_provided",
+                    "targetDate": "user_provided",
+                    "savedCents": "default_assumption",
+                    "monthlyContributionCents": "system_calculated",
+                    "protectedCents": "connected_data",
+                    "flexibilityWeeks": "default_assumption"
+                  }
+                },
+                {
+                  "id": "88e25ac6-d6e2-48ed-a1ec-6ac8a744482d",
+                  "type": "data_connection_prompt",
+                  "title": "连接模拟数据后再核算",
+                  "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                  "threadId": "6b657010-d3e2-420f-b9ba-3c8a6bdef633"
+                },
+                {
+                  "id": "a7f05d6c-77d3-4686-bd4f-d036e37fbb87",
+                  "type": "clarification",
+                  "title": "请确认已存金额",
+                  "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                  "suggestions": [
+                    "已存 0 元",
+                    "已存 ¥3,500"
+                  ]
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "1c97ac14-8943-42ea-aa45-c9ce977c0562",
+                  "type": "goal_input_card",
+                  "title": "NOVA 理解的目标",
+                  "goal": {
+                    "title": "桂林旅行",
+                    "targetCents": 700000,
+                    "savedCents": 0,
+                    "targetDate": "2027-10-09",
+                    "protectedCents": 2000000,
+                    "status": "draft"
+                  },
+                  "draftId": "f9cb25b1-f21f-435f-a944-60e3566aa9f9",
+                  "fieldSources": {
+                    "title": "user_provided",
+                    "targetCents": "user_provided",
+                    "targetDate": "user_provided",
+                    "savedCents": "default_assumption",
+                    "monthlyContributionCents": "system_calculated",
+                    "protectedCents": "connected_data",
+                    "flexibilityWeeks": "default_assumption"
+                  }
+                },
+                {
+                  "id": "88e25ac6-d6e2-48ed-a1ec-6ac8a744482d",
+                  "type": "data_connection_prompt",
+                  "title": "连接模拟数据后再核算",
+                  "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                  "threadId": "6b657010-d3e2-420f-b9ba-3c8a6bdef633"
+                },
+                {
+                  "id": "a7f05d6c-77d3-4686-bd4f-d036e37fbb87",
+                  "type": "clarification",
+                  "title": "请确认已存金额",
+                  "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                  "suggestions": [
+                    "已存 0 元",
+                    "已存 ¥3,500"
+                  ]
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "f9cb25b1-f21f-435f-a944-60e3566aa9f9",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "桂林旅行",
+              "targetCents": 700000,
+              "targetDate": "2027-10-09"
+            },
+            "timeHint": "2027-10-09",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "我计划2027年3月20日去武汉，预算3000元",
+            "goal": {
+              "targetDate": "2027-03-20",
+              "targetCents": 300000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "1194d0a7-8acb-4dac-9041-579362eb18fc",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "ecbf4844-7249-45cf-a108-c536d5856313",
+              "thread": {
+                "id": "1194d0a7-8acb-4dac-9041-579362eb18fc",
+                "title": "我计划2027年3月20日去武汉，预算3000元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:56.138Z",
+                "updatedAt": "2026-11-02T03:52:57.114Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "814b351f-1ab7-41e0-b299-1b8e96db99de",
+                "threadId": "1194d0a7-8acb-4dac-9041-579362eb18fc",
+                "role": "assistant",
+                "content": "我先记下目标。请连接模拟数据，并确认已存金额，再核算可选的存钱节奏。",
+                "components": [
+                  {
+                    "id": "e9e9d6f2-d589-4eac-b9e5-246ad99fb244",
+                    "type": "goal_input_card",
+                    "title": "NOVA 理解的目标",
+                    "goal": {
+                      "title": "武汉旅行",
+                      "targetCents": 300000,
+                      "savedCents": 0,
+                      "targetDate": "2027-03-20",
+                      "protectedCents": 2000000,
+                      "status": "draft"
+                    },
+                    "draftId": "af6cc9c9-26d8-4e14-82da-a3114388b936",
+                    "fieldSources": {
+                      "title": "user_provided",
+                      "targetCents": "user_provided",
+                      "targetDate": "user_provided",
+                      "savedCents": "default_assumption",
+                      "monthlyContributionCents": "system_calculated",
+                      "protectedCents": "connected_data",
+                      "flexibilityWeeks": "default_assumption"
+                    }
+                  },
+                  {
+                    "id": "d1a09e18-13a8-4658-809e-98cb26ec7754",
+                    "type": "data_connection_prompt",
+                    "title": "连接模拟数据后再核算",
+                    "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                    "threadId": "1194d0a7-8acb-4dac-9041-579362eb18fc"
+                  },
+                  {
+                    "id": "108ed5d6-5a1f-4817-b04b-1bb824fff790",
+                    "type": "clarification",
+                    "title": "请确认已存金额",
+                    "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                    "suggestions": [
+                      "已存 0 元",
+                      "已存 ¥3,500"
+                    ]
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:57.114Z"
+              },
+              "components": [
+                {
+                  "id": "e9e9d6f2-d589-4eac-b9e5-246ad99fb244",
+                  "type": "goal_input_card",
+                  "title": "NOVA 理解的目标",
+                  "goal": {
+                    "title": "武汉旅行",
+                    "targetCents": 300000,
+                    "savedCents": 0,
+                    "targetDate": "2027-03-20",
+                    "protectedCents": 2000000,
+                    "status": "draft"
+                  },
+                  "draftId": "af6cc9c9-26d8-4e14-82da-a3114388b936",
+                  "fieldSources": {
+                    "title": "user_provided",
+                    "targetCents": "user_provided",
+                    "targetDate": "user_provided",
+                    "savedCents": "default_assumption",
+                    "monthlyContributionCents": "system_calculated",
+                    "protectedCents": "connected_data",
+                    "flexibilityWeeks": "default_assumption"
+                  }
+                },
+                {
+                  "id": "d1a09e18-13a8-4658-809e-98cb26ec7754",
+                  "type": "data_connection_prompt",
+                  "title": "连接模拟数据后再核算",
+                  "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                  "threadId": "1194d0a7-8acb-4dac-9041-579362eb18fc"
+                },
+                {
+                  "id": "108ed5d6-5a1f-4817-b04b-1bb824fff790",
+                  "type": "clarification",
+                  "title": "请确认已存金额",
+                  "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                  "suggestions": [
+                    "已存 0 元",
+                    "已存 ¥3,500"
+                  ]
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "e9e9d6f2-d589-4eac-b9e5-246ad99fb244",
+                  "type": "goal_input_card",
+                  "title": "NOVA 理解的目标",
+                  "goal": {
+                    "title": "武汉旅行",
+                    "targetCents": 300000,
+                    "savedCents": 0,
+                    "targetDate": "2027-03-20",
+                    "protectedCents": 2000000,
+                    "status": "draft"
+                  },
+                  "draftId": "af6cc9c9-26d8-4e14-82da-a3114388b936",
+                  "fieldSources": {
+                    "title": "user_provided",
+                    "targetCents": "user_provided",
+                    "targetDate": "user_provided",
+                    "savedCents": "default_assumption",
+                    "monthlyContributionCents": "system_calculated",
+                    "protectedCents": "connected_data",
+                    "flexibilityWeeks": "default_assumption"
+                  }
+                },
+                {
+                  "id": "d1a09e18-13a8-4658-809e-98cb26ec7754",
+                  "type": "data_connection_prompt",
+                  "title": "连接模拟数据后再核算",
+                  "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                  "threadId": "1194d0a7-8acb-4dac-9041-579362eb18fc"
+                },
+                {
+                  "id": "108ed5d6-5a1f-4817-b04b-1bb824fff790",
+                  "type": "clarification",
+                  "title": "请确认已存金额",
+                  "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                  "suggestions": [
+                    "已存 0 元",
+                    "已存 ¥3,500"
+                  ]
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "af6cc9c9-26d8-4e14-82da-a3114388b936",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "武汉旅行",
+              "targetCents": 300000,
+              "targetDate": "2027-03-20"
+            },
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "推到4月12日，其他条件不变",
+            "goal": {
+              "targetDate": "2027-04-12",
+              "targetCents": 300000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "1194d0a7-8acb-4dac-9041-579362eb18fc",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "f4770e1b-7dca-4e9a-9f7c-3ad316ad89a7",
+              "thread": {
+                "id": "1194d0a7-8acb-4dac-9041-579362eb18fc",
+                "title": "我计划2027年3月20日去武汉，预算3000元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:56.138Z",
+                "updatedAt": "2026-11-02T03:52:58.328Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "b82e7a86-1cd2-4cc3-b878-6bb099417b42",
+                "threadId": "1194d0a7-8acb-4dac-9041-579362eb18fc",
+                "role": "assistant",
+                "content": "我先记下目标。请连接模拟数据，并确认已存金额，再核算可选的存钱节奏。",
+                "components": [
+                  {
+                    "id": "ad68007d-148c-49ba-811f-74ae337bd1d6",
+                    "type": "goal_input_card",
+                    "title": "NOVA 理解的目标",
+                    "goal": {
+                      "title": "武汉旅行",
+                      "targetCents": 300000,
+                      "savedCents": 0,
+                      "targetDate": "2027-04-12",
+                      "protectedCents": 2000000,
+                      "status": "draft"
+                    },
+                    "draftId": "af6cc9c9-26d8-4e14-82da-a3114388b936",
+                    "fieldSources": {
+                      "title": "user_provided",
+                      "targetCents": "user_provided",
+                      "targetDate": "user_provided",
+                      "savedCents": "default_assumption",
+                      "monthlyContributionCents": "system_calculated",
+                      "protectedCents": "connected_data",
+                      "flexibilityWeeks": "default_assumption"
+                    }
+                  },
+                  {
+                    "id": "969f5ff8-1eb7-4ed9-9d1a-180913cb756f",
+                    "type": "data_connection_prompt",
+                    "title": "连接模拟数据后再核算",
+                    "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                    "threadId": "1194d0a7-8acb-4dac-9041-579362eb18fc"
+                  },
+                  {
+                    "id": "e119f682-de8a-40bb-8a47-719451ccc064",
+                    "type": "clarification",
+                    "title": "请确认已存金额",
+                    "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                    "suggestions": [
+                      "已存 0 元",
+                      "已存 ¥3,500"
+                    ]
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:58.328Z"
+              },
+              "components": [
+                {
+                  "id": "ad68007d-148c-49ba-811f-74ae337bd1d6",
+                  "type": "goal_input_card",
+                  "title": "NOVA 理解的目标",
+                  "goal": {
+                    "title": "武汉旅行",
+                    "targetCents": 300000,
+                    "savedCents": 0,
+                    "targetDate": "2027-04-12",
+                    "protectedCents": 2000000,
+                    "status": "draft"
+                  },
+                  "draftId": "af6cc9c9-26d8-4e14-82da-a3114388b936",
+                  "fieldSources": {
+                    "title": "user_provided",
+                    "targetCents": "user_provided",
+                    "targetDate": "user_provided",
+                    "savedCents": "default_assumption",
+                    "monthlyContributionCents": "system_calculated",
+                    "protectedCents": "connected_data",
+                    "flexibilityWeeks": "default_assumption"
+                  }
+                },
+                {
+                  "id": "969f5ff8-1eb7-4ed9-9d1a-180913cb756f",
+                  "type": "data_connection_prompt",
+                  "title": "连接模拟数据后再核算",
+                  "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                  "threadId": "1194d0a7-8acb-4dac-9041-579362eb18fc"
+                },
+                {
+                  "id": "e119f682-de8a-40bb-8a47-719451ccc064",
+                  "type": "clarification",
+                  "title": "请确认已存金额",
+                  "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                  "suggestions": [
+                    "已存 0 元",
+                    "已存 ¥3,500"
+                  ]
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "ad68007d-148c-49ba-811f-74ae337bd1d6",
+                  "type": "goal_input_card",
+                  "title": "NOVA 理解的目标",
+                  "goal": {
+                    "title": "武汉旅行",
+                    "targetCents": 300000,
+                    "savedCents": 0,
+                    "targetDate": "2027-04-12",
+                    "protectedCents": 2000000,
+                    "status": "draft"
+                  },
+                  "draftId": "af6cc9c9-26d8-4e14-82da-a3114388b936",
+                  "fieldSources": {
+                    "title": "user_provided",
+                    "targetCents": "user_provided",
+                    "targetDate": "user_provided",
+                    "savedCents": "default_assumption",
+                    "monthlyContributionCents": "system_calculated",
+                    "protectedCents": "connected_data",
+                    "flexibilityWeeks": "default_assumption"
+                  }
+                },
+                {
+                  "id": "969f5ff8-1eb7-4ed9-9d1a-180913cb756f",
+                  "type": "data_connection_prompt",
+                  "title": "连接模拟数据后再核算",
+                  "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                  "threadId": "1194d0a7-8acb-4dac-9041-579362eb18fc"
+                },
+                {
+                  "id": "e119f682-de8a-40bb-8a47-719451ccc064",
+                  "type": "clarification",
+                  "title": "请确认已存金额",
+                  "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                  "suggestions": [
+                    "已存 0 元",
+                    "已存 ¥3,500"
+                  ]
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "af6cc9c9-26d8-4e14-82da-a3114388b936",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "武汉旅行",
+              "targetCents": 300000,
+              "targetDate": "2027-04-12"
+            },
+            "timeHint": "2027-04-12",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "pass": false,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "准备装修卧室，预算25000元，已存8000元",
+            "goal": {
+              "targetCents": 2500000,
+              "savedCents": 800000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "bf8deb56-287a-4996-a340-570e969fc731",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "51983fde-48e4-4e87-adcd-5caa6e6a2871",
+              "thread": {
+                "id": "bf8deb56-287a-4996-a340-570e969fc731",
+                "title": "准备装修卧室，预算25000元，已存8000元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:56.345Z",
+                "updatedAt": "2026-11-02T03:52:57.454Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "1634f8b4-1e16-4dc6-810d-749070c51163",
+                "threadId": "bf8deb56-287a-4996-a340-570e969fc731",
+                "role": "assistant",
+                "content": "已记下：目标是装修卧室，总额¥25,000，已存¥8,000。请告诉我希望什么时候完成。",
+                "components": [
+                  {
+                    "id": "355c118b-9c26-4f28-8745-732203b132a8",
+                    "type": "clarification",
+                    "title": "还需要一点信息",
+                    "body": "已记下：目标是装修卧室，总额¥25,000，已存¥8,000。请告诉我希望什么时候完成。",
+                    "suggestions": [
+                      "12 月 15 日前",
+                      "今年年底前"
+                    ]
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:57.454Z"
+              },
+              "components": [
+                {
+                  "id": "355c118b-9c26-4f28-8745-732203b132a8",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是装修卧室，总额¥25,000，已存¥8,000。请告诉我希望什么时候完成。",
+                  "suggestions": [
+                    "12 月 15 日前",
+                    "今年年底前"
+                  ]
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "355c118b-9c26-4f28-8745-732203b132a8",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是装修卧室，总额¥25,000，已存¥8,000。请告诉我希望什么时候完成。",
+                  "suggestions": [
+                    "12 月 15 日前",
+                    "今年年底前"
+                  ]
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "502e0f99-4607-4a94-adc7-4b6b5d5bbba5",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "装修卧室",
+              "targetCents": 2500000,
+              "savedCents": 800000
+            },
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "另外开一个买冰箱目标，预算3500元",
+            "goal": {
+              "targetCents": 350000
+            },
+            "kind": "goal"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "bf8deb56-287a-4996-a340-570e969fc731",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "2013e964-dde2-4e18-94e8-106161f4c082",
+              "thread": {
+                "id": "bf8deb56-287a-4996-a340-570e969fc731",
+                "title": "准备装修卧室，预算25000元，已存8000元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:56.345Z",
+                "updatedAt": "2026-11-02T03:52:58.392Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "9dd63f52-ac34-47d3-8070-ce07248f2731",
+                "threadId": "bf8deb56-287a-4996-a340-570e969fc731",
+                "role": "assistant",
+                "content": "已记下：目标是买冰箱，总额¥3,500。请告诉我希望什么时候完成。",
+                "components": [
+                  {
+                    "id": "2bd810d0-b26e-4902-b7a7-7ae5ddc199cf",
+                    "type": "clarification",
+                    "title": "还需要一点信息",
+                    "body": "已记下：目标是买冰箱，总额¥3,500。请告诉我希望什么时候完成。",
+                    "suggestions": [
+                      "12 月 15 日前",
+                      "今年年底前"
+                    ]
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:58.392Z"
+              },
+              "components": [
+                {
+                  "id": "2bd810d0-b26e-4902-b7a7-7ae5ddc199cf",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是买冰箱，总额¥3,500。请告诉我希望什么时候完成。",
+                  "suggestions": [
+                    "12 月 15 日前",
+                    "今年年底前"
+                  ]
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "2bd810d0-b26e-4902-b7a7-7ae5ddc199cf",
+                  "type": "clarification",
+                  "title": "还需要一点信息",
+                  "body": "已记下：目标是买冰箱，总额¥3,500。请告诉我希望什么时候完成。",
+                  "suggestions": [
+                    "12 月 15 日前",
+                    "今年年底前"
+                  ]
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "a837edd9-abe1-41f5-ada5-8d040c19119b",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "买冰箱",
+              "targetCents": 350000
+            },
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "回到装修卧室那个",
+            "goal": {
+              "targetCents": 2500000,
+              "savedCents": 800000
+            }
+          },
+          "response": {
+            "decision": {
+              "mode": "clarify",
+              "destination": null,
+              "question": "你是想继续补充装修卧室目标的信息，还是想把它设为当前任务？请告诉我希望什么时候完成装修？",
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "bf8deb56-287a-4996-a340-570e969fc731",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "a837edd9-abe1-41f5-ada5-8d040c19119b",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "买冰箱",
+              "targetCents": 350000
+            },
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "给周晴转180元",
+            "capability": "transfer",
+            "amountCents": 18000,
+            "recipientQuery": "周晴"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "transfer",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "3f7173b6-1b36-4f08-b982-18a214c144b9",
+            "memory": {
+              "destination": "transfer",
+              "recipientQuery": "周晴",
+              "amountCents": 18000,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "7ddc1bce-3b04-4a26-9062-65cff0bc88b7",
+            "kind": "service",
+            "status": "active",
+            "capability": "transfer",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "周晴",
+            "amountCents": 18000,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "改为220元",
+            "capability": "transfer",
+            "amountCents": 22000,
+            "recipientQuery": "周晴"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "transfer",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "3f7173b6-1b36-4f08-b982-18a214c144b9",
+            "memory": {
+              "destination": "transfer",
+              "recipientQuery": "周晴",
+              "amountCents": 22000,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "7ddc1bce-3b04-4a26-9062-65cff0bc88b7",
+            "kind": "service",
+            "status": "active",
+            "capability": "transfer",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "周晴",
+            "amountCents": 22000,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "2027年底学潜水，费用6500元",
+            "goal": {
+              "targetCents": 650000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "ec82e383-eee0-48ae-834b-ed50ea221828",
+              "thread": {
+                "id": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da",
+                "title": "2027年底学潜水，费用6500元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:58.226Z",
+                "updatedAt": "2026-11-02T03:52:59.240Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "4c3002d0-f506-470c-98c1-a37bd7a0f7b0",
+                "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da",
+                "role": "assistant",
+                "content": "我先记下目标。请连接模拟数据，并确认已存金额，再核算可选的存钱节奏。",
+                "components": [
+                  {
+                    "id": "52ba6a47-5135-4cd5-bc16-e5bedb6f07a8",
+                    "type": "goal_input_card",
+                    "title": "NOVA 理解的目标",
+                    "goal": {
+                      "title": "学潜水",
+                      "targetCents": 650000,
+                      "savedCents": 0,
+                      "targetDate": "2026-12-31",
+                      "protectedCents": 2000000,
+                      "status": "draft"
+                    },
+                    "draftId": "f0abdb16-aef5-4c38-b619-88c6beace9bf",
+                    "fieldSources": {
+                      "title": "user_provided",
+                      "targetCents": "user_provided",
+                      "targetDate": "user_provided",
+                      "savedCents": "default_assumption",
+                      "monthlyContributionCents": "system_calculated",
+                      "protectedCents": "connected_data",
+                      "flexibilityWeeks": "default_assumption"
+                    }
+                  },
+                  {
+                    "id": "6ee5e50c-9b31-4a35-9f9a-82fb5a639eeb",
+                    "type": "data_connection_prompt",
+                    "title": "连接模拟数据后再核算",
+                    "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                    "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da"
+                  },
+                  {
+                    "id": "3d274b07-358f-4c42-b360-12c05053fb46",
+                    "type": "clarification",
+                    "title": "请确认已存金额",
+                    "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                    "suggestions": [
+                      "已存 0 元",
+                      "已存 ¥3,500"
+                    ]
+                  }
+                ],
+                "createdAt": "2026-11-02T03:52:59.240Z"
+              },
+              "components": [
+                {
+                  "id": "52ba6a47-5135-4cd5-bc16-e5bedb6f07a8",
+                  "type": "goal_input_card",
+                  "title": "NOVA 理解的目标",
+                  "goal": {
+                    "title": "学潜水",
+                    "targetCents": 650000,
+                    "savedCents": 0,
+                    "targetDate": "2026-12-31",
+                    "protectedCents": 2000000,
+                    "status": "draft"
+                  },
+                  "draftId": "f0abdb16-aef5-4c38-b619-88c6beace9bf",
+                  "fieldSources": {
+                    "title": "user_provided",
+                    "targetCents": "user_provided",
+                    "targetDate": "user_provided",
+                    "savedCents": "default_assumption",
+                    "monthlyContributionCents": "system_calculated",
+                    "protectedCents": "connected_data",
+                    "flexibilityWeeks": "default_assumption"
+                  }
+                },
+                {
+                  "id": "6ee5e50c-9b31-4a35-9f9a-82fb5a639eeb",
+                  "type": "data_connection_prompt",
+                  "title": "连接模拟数据后再核算",
+                  "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                  "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da"
+                },
+                {
+                  "id": "3d274b07-358f-4c42-b360-12c05053fb46",
+                  "type": "clarification",
+                  "title": "请确认已存金额",
+                  "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                  "suggestions": [
+                    "已存 0 元",
+                    "已存 ¥3,500"
+                  ]
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "52ba6a47-5135-4cd5-bc16-e5bedb6f07a8",
+                  "type": "goal_input_card",
+                  "title": "NOVA 理解的目标",
+                  "goal": {
+                    "title": "学潜水",
+                    "targetCents": 650000,
+                    "savedCents": 0,
+                    "targetDate": "2026-12-31",
+                    "protectedCents": 2000000,
+                    "status": "draft"
+                  },
+                  "draftId": "f0abdb16-aef5-4c38-b619-88c6beace9bf",
+                  "fieldSources": {
+                    "title": "user_provided",
+                    "targetCents": "user_provided",
+                    "targetDate": "user_provided",
+                    "savedCents": "default_assumption",
+                    "monthlyContributionCents": "system_calculated",
+                    "protectedCents": "connected_data",
+                    "flexibilityWeeks": "default_assumption"
+                  }
+                },
+                {
+                  "id": "6ee5e50c-9b31-4a35-9f9a-82fb5a639eeb",
+                  "type": "data_connection_prompt",
+                  "title": "连接模拟数据后再核算",
+                  "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                  "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da"
+                },
+                {
+                  "id": "3d274b07-358f-4c42-b360-12c05053fb46",
+                  "type": "clarification",
+                  "title": "请确认已存金额",
+                  "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                  "suggestions": [
+                    "已存 0 元",
+                    "已存 ¥3,500"
+                  ]
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "f0abdb16-aef5-4c38-b619-88c6beace9bf",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "学潜水",
+              "targetCents": 650000,
+              "targetDate": "2026-12-31"
+            },
+            "timeHint": "2027-12",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "先去看看我的卡",
+            "capability": "cards"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "cards",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da",
+            "memory": {
+              "destination": "cards",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "a54ddb67-f081-4ace-9eec-f051614b6f32",
+            "kind": "service",
+            "status": "active",
+            "capability": "cards",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "继续潜水计划",
+            "goal": {
+              "targetCents": 650000
+            }
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "goal_planning",
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "e5fb1879-80b4-4ef1-a2a7-dfa93a1ff398",
+              "thread": {
+                "id": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da",
+                "title": "2027年底学潜水，费用6500元",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:52:58.226Z",
+                "updatedAt": "2026-11-02T03:53:00.999Z"
+              },
+              "intent": "goal_planning",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "5c9d8b49-ef6d-4128-a9cc-8027ea53f862",
+                "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da",
+                "role": "assistant",
+                "content": "我先记下目标。请连接模拟数据，并确认已存金额，再核算可选的存钱节奏。",
+                "components": [
+                  {
+                    "id": "1f6f2e18-cd80-4c04-aa17-61ba0d8a73b7",
+                    "type": "goal_input_card",
+                    "title": "NOVA 理解的目标",
+                    "goal": {
+                      "title": "学潜水",
+                      "targetCents": 650000,
+                      "savedCents": 0,
+                      "targetDate": "2026-12-31",
+                      "protectedCents": 2000000,
+                      "status": "draft"
+                    },
+                    "draftId": "f0abdb16-aef5-4c38-b619-88c6beace9bf",
+                    "fieldSources": {
+                      "title": "user_provided",
+                      "targetCents": "user_provided",
+                      "targetDate": "user_provided",
+                      "savedCents": "default_assumption",
+                      "monthlyContributionCents": "system_calculated",
+                      "protectedCents": "connected_data",
+                      "flexibilityWeeks": "default_assumption"
+                    }
+                  },
+                  {
+                    "id": "67d1f6b2-4f09-4f4c-b3ea-d1f395164d1d",
+                    "type": "data_connection_prompt",
+                    "title": "连接模拟数据后再核算",
+                    "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                    "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da"
+                  },
+                  {
+                    "id": "b128eac2-bb0e-41e5-bdda-6cb736a97081",
+                    "type": "clarification",
+                    "title": "请确认已存金额",
+                    "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                    "suggestions": [
+                      "已存 0 元",
+                      "已存 ¥3,500"
+                    ]
+                  }
+                ],
+                "createdAt": "2026-11-02T03:53:00.999Z"
+              },
+              "components": [
+                {
+                  "id": "1f6f2e18-cd80-4c04-aa17-61ba0d8a73b7",
+                  "type": "goal_input_card",
+                  "title": "NOVA 理解的目标",
+                  "goal": {
+                    "title": "学潜水",
+                    "targetCents": 650000,
+                    "savedCents": 0,
+                    "targetDate": "2026-12-31",
+                    "protectedCents": 2000000,
+                    "status": "draft"
+                  },
+                  "draftId": "f0abdb16-aef5-4c38-b619-88c6beace9bf",
+                  "fieldSources": {
+                    "title": "user_provided",
+                    "targetCents": "user_provided",
+                    "targetDate": "user_provided",
+                    "savedCents": "default_assumption",
+                    "monthlyContributionCents": "system_calculated",
+                    "protectedCents": "connected_data",
+                    "flexibilityWeeks": "default_assumption"
+                  }
+                },
+                {
+                  "id": "67d1f6b2-4f09-4f4c-b3ea-d1f395164d1d",
+                  "type": "data_connection_prompt",
+                  "title": "连接模拟数据后再核算",
+                  "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                  "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da"
+                },
+                {
+                  "id": "b128eac2-bb0e-41e5-bdda-6cb736a97081",
+                  "type": "clarification",
+                  "title": "请确认已存金额",
+                  "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                  "suggestions": [
+                    "已存 0 元",
+                    "已存 ¥3,500"
+                  ]
+                }
+              ],
+              "suggestedPrompts": [],
+              "canvasComponents": [
+                {
+                  "id": "1f6f2e18-cd80-4c04-aa17-61ba0d8a73b7",
+                  "type": "goal_input_card",
+                  "title": "NOVA 理解的目标",
+                  "goal": {
+                    "title": "学潜水",
+                    "targetCents": 650000,
+                    "savedCents": 0,
+                    "targetDate": "2026-12-31",
+                    "protectedCents": 2000000,
+                    "status": "draft"
+                  },
+                  "draftId": "f0abdb16-aef5-4c38-b619-88c6beace9bf",
+                  "fieldSources": {
+                    "title": "user_provided",
+                    "targetCents": "user_provided",
+                    "targetDate": "user_provided",
+                    "savedCents": "default_assumption",
+                    "monthlyContributionCents": "system_calculated",
+                    "protectedCents": "connected_data",
+                    "flexibilityWeeks": "default_assumption"
+                  }
+                },
+                {
+                  "id": "67d1f6b2-4f09-4f4c-b3ea-d1f395164d1d",
+                  "type": "data_connection_prompt",
+                  "title": "连接模拟数据后再核算",
+                  "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+                  "threadId": "05dae2ba-cb75-4aff-a9cf-f8af9c0264da"
+                },
+                {
+                  "id": "b128eac2-bb0e-41e5-bdda-6cb736a97081",
+                  "type": "clarification",
+                  "title": "请确认已存金额",
+                  "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+                  "suggestions": [
+                    "已存 0 元",
+                    "已存 ¥3,500"
+                  ]
+                }
+              ],
+              "run": null
+            }
+          },
+          "task": {
+            "id": "f0abdb16-aef5-4c38-b619-88c6beace9bf",
+            "kind": "goal",
+            "status": "active",
+            "capability": null,
+            "goal": {
+              "title": "学潜水",
+              "targetCents": 650000,
+              "targetDate": "2026-12-31"
+            },
+            "timeHint": "2027-12",
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "给方明转620元",
+            "capability": "transfer",
+            "amountCents": 62000
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "transfer",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "c28a7a17-5f56-4cfa-a7ee-8c8f346ead44",
+            "memory": {
+              "destination": "transfer",
+              "recipientQuery": "方明",
+              "amountCents": 62000,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "8f7934ca-7f95-4184-bbac-12ed44346283",
+            "kind": "service",
+            "status": "active",
+            "capability": "transfer",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "方明",
+            "amountCents": 62000,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "新开一笔给江宁的，不要沿用之前金额",
+            "capability": "transfer",
+            "recipientQuery": "江宁",
+            "amountCents": null
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "transfer",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "c28a7a17-5f56-4cfa-a7ee-8c8f346ead44",
+            "memory": {
+              "destination": "transfer",
+              "recipientQuery": "江宁",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "c89c78d4-c897-4acc-a7de-48f9cd51e123",
+            "kind": "service",
+            "status": "active",
+            "capability": "transfer",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "江宁",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "我要向叶青转260元",
+            "capability": "transfer",
+            "amountCents": 26000
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "transfer",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "117593e1-4f1a-46f5-a504-a646fffd9074",
+            "memory": {
+              "destination": "transfer",
+              "recipientQuery": "叶青",
+              "amountCents": 26000,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "619bc842-bbd7-44af-af4c-21b694fa047d",
+            "kind": "service",
+            "status": "active",
+            "capability": "transfer",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "叶青",
+            "amountCents": 26000,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "取消当前草稿",
+            "status": "cancelled",
+            "mode": "clarify"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "clarify",
+              "destination": null,
+              "question": "已取消当前任务，未执行资金操作。",
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "117593e1-4f1a-46f5-a504-a646fffd9074",
+            "memory": {
+              "destination": "transfer",
+              "recipientQuery": "叶青",
+              "amountCents": 26000,
+              "sourceAccount": "",
+              "status": "cancelled"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "619bc842-bbd7-44af-af4c-21b694fa047d",
+            "kind": "service",
+            "status": "cancelled",
+            "capability": "transfer",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "叶青",
+            "amountCents": 26000,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "我持有的理财目前有哪些",
+            "capability": "investment_holdings"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "investment_holdings",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "df7df756-b86d-4b2b-9ac6-370e94539089",
+            "memory": {
+              "destination": "investment_holdings",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "15b66c6e-5004-4de4-8421-d59bbae9ae62",
+            "kind": "service",
+            "status": "active",
+            "capability": "investment_holdings",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "我想看看能买的其他理财产品",
+            "capability": "investment_products"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "investment_products",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "df7df756-b86d-4b2b-9ac6-370e94539089",
+            "memory": {
+              "destination": "investment_products",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "ec41ab47-8788-4892-a7fd-e7601445c380",
+            "kind": "service",
+            "status": "active",
+            "capability": "investment_products",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "团建的饭钱想让五个人平摊",
+            "capability": "aa_create"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "aa_create",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "54f47768-d9df-4ed6-88de-953de5cc1378",
+            "memory": {
+              "destination": "aa_create",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "9224edac-a1fe-4a4b-9f91-c82ab8bd2cd4",
+            "kind": "service",
+            "status": "active",
+            "capability": "aa_create",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "看看发出去的AA哪些已到账",
+            "capability": "aa_records"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "aa_records",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "54f47768-d9df-4ed6-88de-953de5cc1378",
+            "memory": {
+              "destination": "aa_records",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "91c9231d-509d-4c79-bfd0-682a7f9d89d4",
+            "kind": "service",
+            "status": "active",
+            "capability": "aa_records",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 12,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "把这张卡临时锁住的功能在哪",
+            "capability": "cards"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "cards",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "2ed502ad-eed4-4720-a16d-76bf463cec5a",
+            "memory": {
+              "destination": "cards",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "9954d795-7ca4-473b-8d99-011102f3a303",
+            "kind": "service",
+            "status": "active",
+            "capability": "cards",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "改一下网盘订阅使用的付款卡",
+            "capability": "subscription_card"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "subscription_card",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "2ed502ad-eed4-4720-a16d-76bf463cec5a",
+            "memory": {
+              "destination": "subscription_card",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "638484a8-60b8-4789-b9fd-92c03e315a98",
+            "kind": "service",
+            "status": "active",
+            "capability": "subscription_card",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 14,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "我有一份流水文件想导进来",
+            "capability": "bill_import"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "bill_import",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "b6cbc3a2-e4f7-42d2-9c79-f13bfb6ec6fb",
+            "memory": {
+              "destination": "bill_import",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "48d08f07-ed7e-48bf-9315-e591686a2b3c",
+            "kind": "service",
+            "status": "active",
+            "capability": "bill_import",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "看下我付费订阅的服务",
+            "capability": "subscriptions"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "subscriptions",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "b6cbc3a2-e4f7-42d2-9c79-f13bfb6ec6fb",
+            "memory": {
+              "destination": "subscriptions",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "abd43df4-dbee-440a-b241-08efb917f63f",
+            "kind": "service",
+            "status": "active",
+            "capability": "subscriptions",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 13,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "给我看看月度账单汇总",
+            "capability": "bills"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "bills",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "0424ac77-e724-48ae-b5b5-abf3897430f6",
+            "memory": {
+              "destination": "bills",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "a90908b2-c244-45d4-a18e-045e8587fac2",
+            "kind": "service",
+            "status": "active",
+            "capability": "bills",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "再看看日常支出主要分类",
+            "capability": "spending"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "spending",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "0424ac77-e724-48ae-b5b5-abf3897430f6",
+            "memory": {
+              "destination": "spending",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "1137b5c5-3bd6-417e-a38c-c9b8004280fd",
+            "kind": "service",
+            "status": "active",
+            "capability": "spending",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 15,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "设置旅行消费的授权预算",
+            "capability": "travel_mandate"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "travel_mandate",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "daa9215b-e6f0-4ca9-b3dc-16854aae09ee",
+            "memory": {
+              "destination": "travel_mandate",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "e18462d3-388d-48e1-8f33-9e3c3396e6ff",
+            "kind": "service",
+            "status": "active",
+            "capability": "travel_mandate",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "核对选中的机票和酒店付款",
+            "capability": "travel_payment"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "travel_payment",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "daa9215b-e6f0-4ca9-b3dc-16854aae09ee",
+            "memory": {
+              "destination": "travel_payment",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "22bf40fc-153b-40bf-9392-a21a4642f281",
+            "kind": "service",
+            "status": "active",
+            "capability": "travel_payment",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 16,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "我要查看我的机票酒店订单",
+            "capability": "travel_orders"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "travel_orders",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "0bb8e569-65e2-4857-8f58-92edb1d6b94f",
+            "memory": {
+              "destination": "travel_orders",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "bd5977d8-b74a-42f9-8f11-01ae84600cb3",
+            "kind": "service",
+            "status": "active",
+            "capability": "travel_orders",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "重新看看旅行报价",
+            "capability": "travel_quotes"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "travel_quotes",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "0bb8e569-65e2-4857-8f58-92edb1d6b94f",
+            "memory": {
+              "destination": "travel_quotes",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "cde3ff70-d738-4db3-8293-a12fee6c5442",
+            "kind": "service",
+            "status": "active",
+            "capability": "travel_quotes",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 17,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "设置每次工资到账以后存钱进目标",
+            "capability": "goal_transfer"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "goal_transfer",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "252212b1-f0b4-4b84-9538-5deb1c27a770",
+            "memory": {
+              "destination": "goal_transfer",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "c784d41c-0e64-4433-bac3-255dd45d4bae",
+            "kind": "service",
+            "status": "active",
+            "capability": "goal_transfer",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "看看我在不同目标分配了多少资金",
+            "capability": "goal_allocation"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "goal_allocation",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "252212b1-f0b4-4b84-9538-5deb1c27a770",
+            "memory": {
+              "destination": "goal_allocation",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "9d4c861d-d733-47cc-bde2-78d6e1fce206",
+            "kind": "service",
+            "status": "active",
+            "capability": "goal_allocation",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 18,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "我想试算下工资晚发时账户钱够不够用",
+            "capability": "cashflow"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "cashflow",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "c9cd5f67-b520-4d96-b35c-ae06365e1033",
+            "memory": {
+              "destination": "cashflow",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "bf019b4f-1b01-431e-b8e0-50648d664802",
+            "kind": "service",
+            "status": "active",
+            "capability": "cashflow",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        },
+        {
+          "step": {
+            "text": "打开各目标每月投入的调整方案",
+            "capability": "goal_adjust"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "navigate",
+              "destination": "goal_adjust",
+              "question": null,
+              "chatIntent": null,
+              "answer": null,
+              "memoryAction": "new"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "c9cd5f67-b520-4d96-b35c-ae06365e1033",
+            "memory": {
+              "destination": "goal_adjust",
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": null
+          },
+          "task": {
+            "id": "7f2f2035-ad1f-49d9-a04a-47d8e7dadde5",
+            "kind": "service",
+            "status": "active",
+            "capability": "goal_adjust",
+            "goal": {},
+            "timeHint": null,
+            "recipientQuery": "",
+            "amountCents": null,
+            "sourceAccount": ""
+          }
+        }
+      ]
+    },
+    {
+      "index": 19,
+      "pass": true,
+      "safe": true,
+      "turns": [
+        {
+          "step": {
+            "text": "AA分账和普通转款有什么不同",
+            "mode": "chat"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "clarification",
+              "answer": "普通转款是你把钱直接转给某个收款人，属于一对一的资金转移。AA分账（均摊）是面向一笔共同消费，把总金额按参与人数分摊，由你发起后向每位参与者分别收取各自应付的部分，并记录谁已付、谁未付。简单说：转款是主动付给别人；AA分账是把共同花销拆开向多人收款并跟踪分摊进度。",
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "dffe0a84-38ad-4ea9-b935-ee47b8e31d10",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "248efce6-fd8d-4298-892b-ed5b75e72ff9",
+              "thread": {
+                "id": "dffe0a84-38ad-4ea9-b935-ee47b8e31d10",
+                "title": "AA分账和普通转款有什么不同",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:53:06.622Z",
+                "updatedAt": "2026-11-02T03:53:07.923Z"
+              },
+              "intent": "clarification",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "98b25f9c-96fc-4a20-a755-206967c5ddd7",
+                "threadId": "dffe0a84-38ad-4ea9-b935-ee47b8e31d10",
+                "role": "assistant",
+                "content": "普通转款是你把钱直接转给某个收款人，属于一对一的资金转移。AA分账（均摊）是面向一笔共同消费，把总金额按参与人数分摊，由你发起后向每位参与者分别收取各自应付的部分，并记录谁已付、谁未付。简单说：转款是主动付给别人；AA分账是把共同花销拆开向多人收款并跟踪分摊进度。",
+                "components": [
+                  {
+                    "id": "935f63e7-8dcb-4ed9-8956-15e627274531",
+                    "type": "explanation",
+                    "title": "NOVA",
+                    "body": "普通转款是你把钱直接转给某个收款人，属于一对一的资金转移。AA分账（均摊）是面向一笔共同消费，把总金额按参与人数分摊，由你发起后向每位参与者分别收取各自应付的部分，并记录谁已付、谁未付。简单说：转款是主动付给别人；AA分账是把共同花销拆开向多人收款并跟踪分摊进度。",
+                    "tone": "neutral"
+                  }
+                ],
+                "createdAt": "2026-11-02T03:53:07.923Z"
+              },
+              "components": [
+                {
+                  "id": "935f63e7-8dcb-4ed9-8956-15e627274531",
+                  "type": "explanation",
+                  "title": "NOVA",
+                  "body": "普通转款是你把钱直接转给某个收款人，属于一对一的资金转移。AA分账（均摊）是面向一笔共同消费，把总金额按参与人数分摊，由你发起后向每位参与者分别收取各自应付的部分，并记录谁已付、谁未付。简单说：转款是主动付给别人；AA分账是把共同花销拆开向多人收款并跟踪分摊进度。",
+                  "tone": "neutral"
+                }
+              ],
+              "suggestedPrompts": [
+                "目标现在能按时完成吗？",
+                "这笔 ¥900 支出会影响目标吗？",
+                "允许旅行 Agent 在 ¥500 内订票"
+              ],
+              "canvasComponents": [
+                {
+                  "id": "935f63e7-8dcb-4ed9-8956-15e627274531",
+                  "type": "explanation",
+                  "title": "NOVA",
+                  "body": "普通转款是你把钱直接转给某个收款人，属于一对一的资金转移。AA分账（均摊）是面向一笔共同消费，把总金额按参与人数分摊，由你发起后向每位参与者分别收取各自应付的部分，并记录谁已付、谁未付。简单说：转款是主动付给别人；AA分账是把共同花销拆开向多人收款并跟踪分摊进度。",
+                  "tone": "neutral"
+                }
+              ],
+              "run": null
+            }
+          }
+        },
+        {
+          "step": {
+            "text": "我只咨询，暂时不转款也不发起AA",
+            "mode": "notNavigate"
+          },
+          "pass": true,
+          "response": {
+            "decision": {
+              "mode": "chat",
+              "destination": null,
+              "question": null,
+              "chatIntent": "clarification",
+              "answer": "明白，本次只是咨询，不进行转款，也不发起AA分账。",
+              "memoryAction": "continue"
+            },
+            "provider": "deepseek",
+            "reason": null,
+            "threadId": "dffe0a84-38ad-4ea9-b935-ee47b8e31d10",
+            "memory": {
+              "destination": null,
+              "recipientQuery": "",
+              "amountCents": null,
+              "sourceAccount": "",
+              "status": "active"
+            },
+            "turn": {
+              "id": "6fd139bd-8602-41de-8d35-ad2b3ffd7422",
+              "thread": {
+                "id": "dffe0a84-38ad-4ea9-b935-ee47b8e31d10",
+                "title": "AA分账和普通转款有什么不同",
+                "kind": "task",
+                "status": "active",
+                "unread": false,
+                "readOnly": false,
+                "createdAt": "2026-11-02T03:53:06.622Z",
+                "updatedAt": "2026-11-02T03:53:09.035Z"
+              },
+              "intent": "clarification",
+              "provider": "deepseek",
+              "fallbackReason": null,
+              "twinVersion": 1,
+              "message": {
+                "id": "9fb3bd06-0f55-4239-8c69-cefbef85c460",
+                "threadId": "dffe0a84-38ad-4ea9-b935-ee47b8e31d10",
+                "role": "assistant",
+                "content": "明白，本次只是咨询，不进行转款，也不发起AA分账。",
+                "components": [
+                  {
+                    "id": "a431da7d-62d6-4f64-b7bd-162d8cdd5c4c",
+                    "type": "explanation",
+                    "title": "NOVA",
+                    "body": "明白，本次只是咨询，不进行转款，也不发起AA分账。",
+                    "tone": "neutral"
+                  }
+                ],
+                "createdAt": "2026-11-02T03:53:09.035Z"
+              },
+              "components": [
+                {
+                  "id": "a431da7d-62d6-4f64-b7bd-162d8cdd5c4c",
+                  "type": "explanation",
+                  "title": "NOVA",
+                  "body": "明白，本次只是咨询，不进行转款，也不发起AA分账。",
+                  "tone": "neutral"
+                }
+              ],
+              "suggestedPrompts": [
+                "目标现在能按时完成吗？",
+                "这笔 ¥900 支出会影响目标吗？",
+                "允许旅行 Agent 在 ¥500 内订票"
+              ],
+              "canvasComponents": [
+                {
+                  "id": "a431da7d-62d6-4f64-b7bd-162d8cdd5c4c",
+                  "type": "explanation",
+                  "title": "NOVA",
+                  "body": "明白，本次只是咨询，不进行转款，也不发起AA分账。",
+                  "tone": "neutral"
+                }
+              ],
+              "run": null
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

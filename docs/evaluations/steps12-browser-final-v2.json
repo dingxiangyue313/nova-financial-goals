@@ -1,0 +1,760 @@
+[
+  {
+    "text": "2027年7月去青岛玩，预算4000元",
+    "response": {
+      "decision": {
+        "mode": "chat",
+        "destination": null,
+        "question": null,
+        "chatIntent": "goal_planning",
+        "answer": null,
+        "memoryAction": "new"
+      },
+      "provider": "deepseek",
+      "reason": null,
+      "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+      "memory": {
+        "destination": null,
+        "recipientQuery": "",
+        "amountCents": null,
+        "sourceAccount": "",
+        "status": "active"
+      },
+      "turn": {
+        "id": "39f91d19-6239-4c85-aed3-6969b826520e",
+        "thread": {
+          "id": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+          "title": "2027年7月去青岛玩，预算4000元",
+          "kind": "task",
+          "status": "active",
+          "unread": false,
+          "readOnly": false,
+          "createdAt": "2026-11-02T05:08:21.164Z",
+          "updatedAt": "2026-11-02T05:08:26.058Z"
+        },
+        "intent": "goal_planning",
+        "provider": "deepseek",
+        "fallbackReason": null,
+        "twinVersion": 3,
+        "message": {
+          "id": "31ded4e3-3a26-44ab-8ece-714acd7b78b2",
+          "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+          "role": "assistant",
+          "content": "已记下：目标是青岛旅行，总额¥4,000。已记下2027-07，你希望具体哪一天准备好资金？",
+          "components": [
+            {
+              "id": "3b3258dd-206b-4318-a158-de427d0d2d83",
+              "type": "clarification",
+              "title": "还需要一点信息",
+              "body": "已记下：目标是青岛旅行，总额¥4,000。已记下2027-07，你希望具体哪一天准备好资金？",
+              "suggestions": []
+            }
+          ],
+          "createdAt": "2026-11-02T05:08:26.058Z"
+        },
+        "components": [
+          {
+            "id": "3b3258dd-206b-4318-a158-de427d0d2d83",
+            "type": "clarification",
+            "title": "还需要一点信息",
+            "body": "已记下：目标是青岛旅行，总额¥4,000。已记下2027-07，你希望具体哪一天准备好资金？",
+            "suggestions": []
+          }
+        ],
+        "suggestedPrompts": [],
+        "canvasComponents": [
+          {
+            "id": "3b3258dd-206b-4318-a158-de427d0d2d83",
+            "type": "clarification",
+            "title": "还需要一点信息",
+            "body": "已记下：目标是青岛旅行，总额¥4,000。已记下2027-07，你希望具体哪一天准备好资金？",
+            "suggestions": []
+          }
+        ],
+        "run": null
+      }
+    }
+  },
+  {
+    "text": "七月22号出发",
+    "response": {
+      "decision": {
+        "mode": "chat",
+        "destination": null,
+        "question": null,
+        "chatIntent": "goal_planning",
+        "answer": null,
+        "memoryAction": "continue"
+      },
+      "provider": "deepseek",
+      "reason": null,
+      "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+      "memory": {
+        "destination": null,
+        "recipientQuery": "",
+        "amountCents": null,
+        "sourceAccount": "",
+        "status": "active"
+      },
+      "turn": {
+        "id": "e68cb786-ee41-4a27-bef2-8fab118761c2",
+        "thread": {
+          "id": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+          "title": "2027年7月去青岛玩，预算4000元",
+          "kind": "task",
+          "status": "active",
+          "unread": false,
+          "readOnly": false,
+          "createdAt": "2026-11-02T05:08:21.164Z",
+          "updatedAt": "2026-11-02T05:08:30.017Z"
+        },
+        "intent": "goal_planning",
+        "provider": "deepseek",
+        "fallbackReason": null,
+        "twinVersion": 3,
+        "message": {
+          "id": "e090b0cf-81c4-4045-8b3a-c693acefaeef",
+          "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+          "role": "assistant",
+          "content": "我先记下目标。请连接模拟数据，并确认已存金额，再核算可选的存钱节奏。",
+          "components": [
+            {
+              "id": "6f62bacb-e47c-432e-b4e6-f6f785d805d5",
+              "type": "goal_input_card",
+              "title": "NOVA 理解的目标",
+              "goal": {
+                "title": "青岛旅行",
+                "targetCents": 400000,
+                "savedCents": 0,
+                "targetDate": "2027-07-22",
+                "protectedCents": 2000000,
+                "status": "draft"
+              },
+              "draftId": "37930ddd-2ce8-4c66-be7c-e9d8f678b0a5",
+              "fieldSources": {
+                "title": "user_provided",
+                "targetCents": "user_provided",
+                "targetDate": "user_provided",
+                "savedCents": "default_assumption",
+                "monthlyContributionCents": "system_calculated",
+                "protectedCents": "connected_data",
+                "flexibilityWeeks": "default_assumption"
+              }
+            },
+            {
+              "id": "ef0a611d-55e7-41ff-a2df-a56e160c37d1",
+              "type": "data_connection_prompt",
+              "title": "连接模拟数据后再核算",
+              "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+              "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2"
+            },
+            {
+              "id": "f86b407e-1106-4b21-be02-cd12e9657588",
+              "type": "clarification",
+              "title": "请确认已存金额",
+              "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+              "suggestions": [
+                "已存 0 元",
+                "已存 ¥3,500"
+              ]
+            }
+          ],
+          "createdAt": "2026-11-02T05:08:30.017Z"
+        },
+        "components": [
+          {
+            "id": "6f62bacb-e47c-432e-b4e6-f6f785d805d5",
+            "type": "goal_input_card",
+            "title": "NOVA 理解的目标",
+            "goal": {
+              "title": "青岛旅行",
+              "targetCents": 400000,
+              "savedCents": 0,
+              "targetDate": "2027-07-22",
+              "protectedCents": 2000000,
+              "status": "draft"
+            },
+            "draftId": "37930ddd-2ce8-4c66-be7c-e9d8f678b0a5",
+            "fieldSources": {
+              "title": "user_provided",
+              "targetCents": "user_provided",
+              "targetDate": "user_provided",
+              "savedCents": "default_assumption",
+              "monthlyContributionCents": "system_calculated",
+              "protectedCents": "connected_data",
+              "flexibilityWeeks": "default_assumption"
+            }
+          },
+          {
+            "id": "ef0a611d-55e7-41ff-a2df-a56e160c37d1",
+            "type": "data_connection_prompt",
+            "title": "连接模拟数据后再核算",
+            "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+            "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2"
+          },
+          {
+            "id": "f86b407e-1106-4b21-be02-cd12e9657588",
+            "type": "clarification",
+            "title": "请确认已存金额",
+            "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+            "suggestions": [
+              "已存 0 元",
+              "已存 ¥3,500"
+            ]
+          }
+        ],
+        "suggestedPrompts": [],
+        "canvasComponents": [
+          {
+            "id": "6f62bacb-e47c-432e-b4e6-f6f785d805d5",
+            "type": "goal_input_card",
+            "title": "NOVA 理解的目标",
+            "goal": {
+              "title": "青岛旅行",
+              "targetCents": 400000,
+              "savedCents": 0,
+              "targetDate": "2027-07-22",
+              "protectedCents": 2000000,
+              "status": "draft"
+            },
+            "draftId": "37930ddd-2ce8-4c66-be7c-e9d8f678b0a5",
+            "fieldSources": {
+              "title": "user_provided",
+              "targetCents": "user_provided",
+              "targetDate": "user_provided",
+              "savedCents": "default_assumption",
+              "monthlyContributionCents": "system_calculated",
+              "protectedCents": "connected_data",
+              "flexibilityWeeks": "default_assumption"
+            }
+          },
+          {
+            "id": "ef0a611d-55e7-41ff-a2df-a56e160c37d1",
+            "type": "data_connection_prompt",
+            "title": "连接模拟数据后再核算",
+            "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+            "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2"
+          },
+          {
+            "id": "f86b407e-1106-4b21-be02-cd12e9657588",
+            "type": "clarification",
+            "title": "请确认已存金额",
+            "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+            "suggestions": [
+              "已存 0 元",
+              "已存 ¥3,500"
+            ]
+          }
+        ],
+        "run": null
+      }
+    }
+  },
+  {
+    "text": "先给苏禾转780元",
+    "response": {
+      "decision": {
+        "mode": "navigate",
+        "destination": "transfer",
+        "question": null,
+        "chatIntent": null,
+        "answer": null,
+        "memoryAction": "new"
+      },
+      "provider": "deepseek",
+      "reason": null,
+      "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+      "memory": {
+        "destination": "transfer",
+        "recipientQuery": "苏禾",
+        "amountCents": 78000,
+        "sourceAccount": "",
+        "status": "active"
+      },
+      "turn": null
+    }
+  },
+  {
+    "text": "继续青岛旅行那个目标",
+    "response": {
+      "decision": {
+        "mode": "chat",
+        "destination": null,
+        "question": null,
+        "chatIntent": "goal_planning",
+        "answer": null,
+        "memoryAction": "continue"
+      },
+      "provider": "deepseek",
+      "reason": null,
+      "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+      "memory": {
+        "destination": null,
+        "recipientQuery": "",
+        "amountCents": null,
+        "sourceAccount": "",
+        "status": "active"
+      },
+      "turn": {
+        "id": "1c9a314a-5e46-47b8-a75c-a4c64f631051",
+        "thread": {
+          "id": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+          "title": "2027年7月去青岛玩，预算4000元",
+          "kind": "task",
+          "status": "active",
+          "unread": false,
+          "readOnly": false,
+          "createdAt": "2026-11-02T05:08:21.164Z",
+          "updatedAt": "2026-11-02T05:08:36.323Z"
+        },
+        "intent": "goal_planning",
+        "provider": "deepseek",
+        "fallbackReason": null,
+        "twinVersion": 3,
+        "message": {
+          "id": "c2d2fa90-b598-4521-9da2-1bd7c1bd78b6",
+          "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+          "role": "assistant",
+          "content": "我先记下目标。请连接模拟数据，并确认已存金额，再核算可选的存钱节奏。",
+          "components": [
+            {
+              "id": "e504e930-5ef6-436f-85e7-85548ee17069",
+              "type": "goal_input_card",
+              "title": "NOVA 理解的目标",
+              "goal": {
+                "title": "青岛旅行",
+                "targetCents": 400000,
+                "savedCents": 0,
+                "targetDate": "2027-07-22",
+                "protectedCents": 2000000,
+                "status": "draft"
+              },
+              "draftId": "37930ddd-2ce8-4c66-be7c-e9d8f678b0a5",
+              "fieldSources": {
+                "title": "user_provided",
+                "targetCents": "user_provided",
+                "targetDate": "user_provided",
+                "savedCents": "default_assumption",
+                "monthlyContributionCents": "system_calculated",
+                "protectedCents": "connected_data",
+                "flexibilityWeeks": "default_assumption"
+              }
+            },
+            {
+              "id": "8cccc343-6aba-4cee-a3e4-a5a47ebbbb09",
+              "type": "data_connection_prompt",
+              "title": "连接模拟数据后再核算",
+              "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+              "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2"
+            },
+            {
+              "id": "2c4d370b-3994-40f3-8517-5ea0743b5162",
+              "type": "clarification",
+              "title": "请确认已存金额",
+              "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+              "suggestions": [
+                "已存 0 元",
+                "已存 ¥3,500"
+              ]
+            }
+          ],
+          "createdAt": "2026-11-02T05:08:36.323Z"
+        },
+        "components": [
+          {
+            "id": "e504e930-5ef6-436f-85e7-85548ee17069",
+            "type": "goal_input_card",
+            "title": "NOVA 理解的目标",
+            "goal": {
+              "title": "青岛旅行",
+              "targetCents": 400000,
+              "savedCents": 0,
+              "targetDate": "2027-07-22",
+              "protectedCents": 2000000,
+              "status": "draft"
+            },
+            "draftId": "37930ddd-2ce8-4c66-be7c-e9d8f678b0a5",
+            "fieldSources": {
+              "title": "user_provided",
+              "targetCents": "user_provided",
+              "targetDate": "user_provided",
+              "savedCents": "default_assumption",
+              "monthlyContributionCents": "system_calculated",
+              "protectedCents": "connected_data",
+              "flexibilityWeeks": "default_assumption"
+            }
+          },
+          {
+            "id": "8cccc343-6aba-4cee-a3e4-a5a47ebbbb09",
+            "type": "data_connection_prompt",
+            "title": "连接模拟数据后再核算",
+            "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+            "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2"
+          },
+          {
+            "id": "2c4d370b-3994-40f3-8517-5ea0743b5162",
+            "type": "clarification",
+            "title": "请确认已存金额",
+            "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+            "suggestions": [
+              "已存 0 元",
+              "已存 ¥3,500"
+            ]
+          }
+        ],
+        "suggestedPrompts": [],
+        "canvasComponents": [
+          {
+            "id": "e504e930-5ef6-436f-85e7-85548ee17069",
+            "type": "goal_input_card",
+            "title": "NOVA 理解的目标",
+            "goal": {
+              "title": "青岛旅行",
+              "targetCents": 400000,
+              "savedCents": 0,
+              "targetDate": "2027-07-22",
+              "protectedCents": 2000000,
+              "status": "draft"
+            },
+            "draftId": "37930ddd-2ce8-4c66-be7c-e9d8f678b0a5",
+            "fieldSources": {
+              "title": "user_provided",
+              "targetCents": "user_provided",
+              "targetDate": "user_provided",
+              "savedCents": "default_assumption",
+              "monthlyContributionCents": "system_calculated",
+              "protectedCents": "connected_data",
+              "flexibilityWeeks": "default_assumption"
+            }
+          },
+          {
+            "id": "8cccc343-6aba-4cee-a3e4-a5a47ebbbb09",
+            "type": "data_connection_prompt",
+            "title": "连接模拟数据后再核算",
+            "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+            "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2"
+          },
+          {
+            "id": "2c4d370b-3994-40f3-8517-5ea0743b5162",
+            "type": "clarification",
+            "title": "请确认已存金额",
+            "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+            "suggestions": [
+              "已存 0 元",
+              "已存 ¥3,500"
+            ]
+          }
+        ],
+        "run": null
+      }
+    }
+  },
+  {
+    "text": "另外建一个学吉他目标，预算6000元",
+    "response": {
+      "decision": {
+        "mode": "chat",
+        "destination": null,
+        "question": null,
+        "chatIntent": "goal_planning",
+        "answer": null,
+        "memoryAction": "new"
+      },
+      "provider": "deepseek",
+      "reason": null,
+      "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+      "memory": {
+        "destination": null,
+        "recipientQuery": "",
+        "amountCents": null,
+        "sourceAccount": "",
+        "status": "active"
+      },
+      "turn": {
+        "id": "983cf40a-27d2-4416-a118-b61e7993f9bd",
+        "thread": {
+          "id": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+          "title": "2027年7月去青岛玩，预算4000元",
+          "kind": "task",
+          "status": "active",
+          "unread": false,
+          "readOnly": false,
+          "createdAt": "2026-11-02T05:08:21.164Z",
+          "updatedAt": "2026-11-02T05:08:37.806Z"
+        },
+        "intent": "goal_planning",
+        "provider": "deepseek",
+        "fallbackReason": null,
+        "twinVersion": 3,
+        "message": {
+          "id": "f66c4e13-c84c-4e32-9f34-e4336163d59f",
+          "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+          "role": "assistant",
+          "content": "已记下：目标是学吉他，总额¥6,000。请告诉我希望什么时候完成。",
+          "components": [
+            {
+              "id": "fad3dc74-0211-47b4-8e9f-f138d41a6b93",
+              "type": "clarification",
+              "title": "还需要一点信息",
+              "body": "已记下：目标是学吉他，总额¥6,000。请告诉我希望什么时候完成。",
+              "suggestions": [
+                "12 月 15 日前",
+                "今年年底前"
+              ]
+            }
+          ],
+          "createdAt": "2026-11-02T05:08:37.806Z"
+        },
+        "components": [
+          {
+            "id": "fad3dc74-0211-47b4-8e9f-f138d41a6b93",
+            "type": "clarification",
+            "title": "还需要一点信息",
+            "body": "已记下：目标是学吉他，总额¥6,000。请告诉我希望什么时候完成。",
+            "suggestions": [
+              "12 月 15 日前",
+              "今年年底前"
+            ]
+          }
+        ],
+        "suggestedPrompts": [],
+        "canvasComponents": [
+          {
+            "id": "fad3dc74-0211-47b4-8e9f-f138d41a6b93",
+            "type": "clarification",
+            "title": "还需要一点信息",
+            "body": "已记下：目标是学吉他，总额¥6,000。请告诉我希望什么时候完成。",
+            "suggestions": [
+              "12 月 15 日前",
+              "今年年底前"
+            ]
+          }
+        ],
+        "run": null
+      }
+    }
+  },
+  {
+    "text": "回到青岛旅行目标",
+    "response": {
+      "decision": {
+        "mode": "chat",
+        "destination": null,
+        "question": null,
+        "chatIntent": "goal_planning",
+        "answer": null,
+        "memoryAction": "continue"
+      },
+      "provider": "deepseek",
+      "reason": null,
+      "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+      "memory": {
+        "destination": null,
+        "recipientQuery": "",
+        "amountCents": null,
+        "sourceAccount": "",
+        "status": "active"
+      },
+      "turn": {
+        "id": "f19aa55e-0b30-4300-81e0-7465bc8acbf8",
+        "thread": {
+          "id": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+          "title": "2027年7月去青岛玩，预算4000元",
+          "kind": "task",
+          "status": "active",
+          "unread": false,
+          "readOnly": false,
+          "createdAt": "2026-11-02T05:08:21.164Z",
+          "updatedAt": "2026-11-02T05:08:41.900Z"
+        },
+        "intent": "goal_planning",
+        "provider": "deepseek",
+        "fallbackReason": null,
+        "twinVersion": 3,
+        "message": {
+          "id": "fdf99d85-19c1-4263-8993-177aa104a1f6",
+          "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+          "role": "assistant",
+          "content": "我先记下目标。请连接模拟数据，并确认已存金额，再核算可选的存钱节奏。",
+          "components": [
+            {
+              "id": "c8991e7a-e487-4f2e-95df-b8e7f81d14e3",
+              "type": "goal_input_card",
+              "title": "NOVA 理解的目标",
+              "goal": {
+                "title": "青岛旅行",
+                "targetCents": 400000,
+                "savedCents": 0,
+                "targetDate": "2027-07-22",
+                "protectedCents": 2000000,
+                "status": "draft"
+              },
+              "draftId": "37930ddd-2ce8-4c66-be7c-e9d8f678b0a5",
+              "fieldSources": {
+                "title": "user_provided",
+                "targetCents": "user_provided",
+                "targetDate": "user_provided",
+                "savedCents": "default_assumption",
+                "monthlyContributionCents": "system_calculated",
+                "protectedCents": "connected_data",
+                "flexibilityWeeks": "default_assumption"
+              }
+            },
+            {
+              "id": "247fa2c5-c9bb-4381-8c50-59fe97a222fe",
+              "type": "data_connection_prompt",
+              "title": "连接模拟数据后再核算",
+              "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+              "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2"
+            },
+            {
+              "id": "d6bf5b19-93f8-4fde-b2e3-a13f8f5ee402",
+              "type": "clarification",
+              "title": "请确认已存金额",
+              "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+              "suggestions": [
+                "已存 0 元",
+                "已存 ¥3,500"
+              ]
+            }
+          ],
+          "createdAt": "2026-11-02T05:08:41.900Z"
+        },
+        "components": [
+          {
+            "id": "c8991e7a-e487-4f2e-95df-b8e7f81d14e3",
+            "type": "goal_input_card",
+            "title": "NOVA 理解的目标",
+            "goal": {
+              "title": "青岛旅行",
+              "targetCents": 400000,
+              "savedCents": 0,
+              "targetDate": "2027-07-22",
+              "protectedCents": 2000000,
+              "status": "draft"
+            },
+            "draftId": "37930ddd-2ce8-4c66-be7c-e9d8f678b0a5",
+            "fieldSources": {
+              "title": "user_provided",
+              "targetCents": "user_provided",
+              "targetDate": "user_provided",
+              "savedCents": "default_assumption",
+              "monthlyContributionCents": "system_calculated",
+              "protectedCents": "connected_data",
+              "flexibilityWeeks": "default_assumption"
+            }
+          },
+          {
+            "id": "247fa2c5-c9bb-4381-8c50-59fe97a222fe",
+            "type": "data_connection_prompt",
+            "title": "连接模拟数据后再核算",
+            "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+            "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2"
+          },
+          {
+            "id": "d6bf5b19-93f8-4fde-b2e3-a13f8f5ee402",
+            "type": "clarification",
+            "title": "请确认已存金额",
+            "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+            "suggestions": [
+              "已存 0 元",
+              "已存 ¥3,500"
+            ]
+          }
+        ],
+        "suggestedPrompts": [],
+        "canvasComponents": [
+          {
+            "id": "c8991e7a-e487-4f2e-95df-b8e7f81d14e3",
+            "type": "goal_input_card",
+            "title": "NOVA 理解的目标",
+            "goal": {
+              "title": "青岛旅行",
+              "targetCents": 400000,
+              "savedCents": 0,
+              "targetDate": "2027-07-22",
+              "protectedCents": 2000000,
+              "status": "draft"
+            },
+            "draftId": "37930ddd-2ce8-4c66-be7c-e9d8f678b0a5",
+            "fieldSources": {
+              "title": "user_provided",
+              "targetCents": "user_provided",
+              "targetDate": "user_provided",
+              "savedCents": "default_assumption",
+              "monthlyContributionCents": "system_calculated",
+              "protectedCents": "connected_data",
+              "flexibilityWeeks": "default_assumption"
+            }
+          },
+          {
+            "id": "247fa2c5-c9bb-4381-8c50-59fe97a222fe",
+            "type": "data_connection_prompt",
+            "title": "连接模拟数据后再核算",
+            "body": "目标金额和日期已经记下。先选择要连接的模拟来源，NOVA 才能根据余额与流水核对现金流；连接不会授权扣款。连接后会回到这个任务继续计算。",
+            "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2"
+          },
+          {
+            "id": "d6bf5b19-93f8-4fde-b2e3-a13f8f5ee402",
+            "type": "clarification",
+            "title": "请确认已存金额",
+            "body": "这个目标目前已经存了多少？可以先回复金额，也可以先连接模拟数据；NOVA 不会把总预算当成已存款。",
+            "suggestions": [
+              "已存 0 元",
+              "已存 ¥3,500"
+            ]
+          }
+        ],
+        "run": null
+      }
+    }
+  },
+  {
+    "text": "设置旅行消费的授权额度",
+    "response": {
+      "decision": {
+        "mode": "navigate",
+        "destination": "travel_mandate",
+        "question": null,
+        "chatIntent": null,
+        "answer": null,
+        "memoryAction": "continue"
+      },
+      "provider": "deepseek",
+      "reason": null,
+      "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+      "memory": {
+        "destination": "travel_mandate",
+        "recipientQuery": "",
+        "amountCents": null,
+        "sourceAccount": "",
+        "status": "active"
+      },
+      "turn": null
+    }
+  },
+  {
+    "text": "核对已选机票和酒店的付款",
+    "response": {
+      "decision": {
+        "mode": "navigate",
+        "destination": "travel_payment",
+        "question": null,
+        "chatIntent": null,
+        "answer": null,
+        "memoryAction": "continue"
+      },
+      "provider": "deepseek",
+      "reason": null,
+      "threadId": "bfb92a29-af63-4445-a7c8-6cfdfb3e3ee2",
+      "memory": {
+        "destination": "travel_payment",
+        "recipientQuery": "",
+        "amountCents": null,
+        "sourceAccount": "",
+        "status": "active"
+      },
+      "turn": null
+    }
+  }
+]

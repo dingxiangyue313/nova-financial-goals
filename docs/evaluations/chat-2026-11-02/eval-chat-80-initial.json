@@ -1,0 +1,638 @@
+{
+  "summary": {
+    "total": 80,
+    "passed": 0
+  },
+  "rows": [
+    {
+      "group": "goal",
+      "message": "我想在2027年6月去日本，预算¥8,000。",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 62\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "明年攒一万去旅游",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "年底前存5000买礼物",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 39\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "计划明年换电脑，需要12000元",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 52\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "想存三万元应急金",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "半年攒两万",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 29\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "我要买车，预算十万",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 41\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "创建留学目标，五万元",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 44\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "明年六月去日本玩，预计花八千元",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 59\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "2027年6月30日前攒8000",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 40\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "预算改成9000",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 30\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "已经存了2000元",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 33\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "每个月最多存1500",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 36\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "时间改成2027年7月15日",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 42\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "一共10000，明年暑假去",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 43\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "不动应急金，明年想买电脑",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 50\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "我想给父母攒一万元旅游基金",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 53\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "先不聊AA了，规划明年旅行预算8000",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 59\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "买手机预算6000，我已经存了两千",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 57\u001b[22m\n"
+    },
+    {
+      "group": "goal",
+      "message": "想为孩子攒学费，明年需要三万",
+      "mode": "chat",
+      "intent": "goal_planning",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 56\u001b[22m\n"
+    },
+    {
+      "group": "transfer",
+      "message": "给林夏转500元",
+      "mode": "navigate",
+      "destination": "transfer",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 32\u001b[22m\n"
+    },
+    {
+      "group": "transfer",
+      "message": "帮我打钱给小陈",
+      "mode": "navigate",
+      "destination": "transfer",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "aa_create",
+      "message": "我要和同事A钱",
+      "mode": "navigate",
+      "destination": "aa_create",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 33\u001b[22m\n"
+    },
+    {
+      "group": "aa_create",
+      "message": "饭钱我们四个人平摊",
+      "mode": "navigate",
+      "destination": "aa_create",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 41\u001b[22m\n"
+    },
+    {
+      "group": "aa_records",
+      "message": "查看AA收款记录",
+      "mode": "navigate",
+      "destination": "aa_records",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 34\u001b[22m\n"
+    },
+    {
+      "group": "aa_records",
+      "message": "看看谁还没付AA钱",
+      "mode": "navigate",
+      "destination": "aa_records",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 37\u001b[22m\n"
+    },
+    {
+      "group": "investment_products",
+      "message": "看看有哪些理财产品",
+      "mode": "navigate",
+      "destination": "investment_products",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 41\u001b[22m\n"
+    },
+    {
+      "group": "investment_products",
+      "message": "我要买理财",
+      "mode": "navigate",
+      "destination": "investment_products",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 29\u001b[22m\n"
+    },
+    {
+      "group": "investment_holdings",
+      "message": "看看我买的理财",
+      "mode": "navigate",
+      "destination": "investment_holdings",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "investment_holdings",
+      "message": "我要赎回持仓",
+      "mode": "navigate",
+      "destination": "investment_holdings",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 32\u001b[22m\n"
+    },
+    {
+      "group": "investment_profile",
+      "message": "做一下风险评估",
+      "mode": "navigate",
+      "destination": "investment_profile",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "investment_profile",
+      "message": "评测我的投资风险偏好",
+      "mode": "navigate",
+      "destination": "investment_profile",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 44\u001b[22m\n"
+    },
+    {
+      "group": "cards",
+      "message": "我的银行卡在哪",
+      "mode": "navigate",
+      "destination": "cards",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "cards",
+      "message": "我要挂失银行卡",
+      "mode": "navigate",
+      "destination": "cards",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "card_apply",
+      "message": "我想申请信用卡",
+      "mode": "navigate",
+      "destination": "card_apply",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "card_apply",
+      "message": "办一张新的银行卡",
+      "mode": "navigate",
+      "destination": "card_apply",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "subscription_card",
+      "message": "更换订阅付款卡",
+      "mode": "navigate",
+      "destination": "subscription_card",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "subscription_card",
+      "message": "云盘扣款换张卡",
+      "mode": "navigate",
+      "destination": "subscription_card",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "bills",
+      "message": "看看本月账单",
+      "mode": "navigate",
+      "destination": "bills",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 32\u001b[22m\n"
+    },
+    {
+      "group": "bills",
+      "message": "打开月账单",
+      "mode": "navigate",
+      "destination": "bills",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 29\u001b[22m\n"
+    },
+    {
+      "group": "spending",
+      "message": "钱主要花在哪里",
+      "mode": "navigate",
+      "destination": "spending",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "spending",
+      "message": "这个月餐饮花费增加了吗",
+      "mode": "navigate",
+      "destination": "spending",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 47\u001b[22m\n"
+    },
+    {
+      "group": "subscriptions",
+      "message": "帮我取消自动续费",
+      "mode": "navigate",
+      "destination": "subscriptions",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "subscriptions",
+      "message": "看看我有哪些订阅",
+      "mode": "navigate",
+      "destination": "subscriptions",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "bill_import",
+      "message": "我要导入账单",
+      "mode": "navigate",
+      "destination": "bill_import",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 32\u001b[22m\n"
+    },
+    {
+      "group": "bill_import",
+      "message": "上传一份交易流水",
+      "mode": "navigate",
+      "destination": "bill_import",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "travel_quotes",
+      "message": "找一下日本机票和酒店报价",
+      "mode": "navigate",
+      "destination": "travel_quotes",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 50\u001b[22m\n"
+    },
+    {
+      "group": "travel_quotes",
+      "message": "查看旅行报价请求",
+      "mode": "navigate",
+      "destination": "travel_quotes",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "travel_mandate",
+      "message": "设置旅行预算授权",
+      "mode": "navigate",
+      "destination": "travel_mandate",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "travel_mandate",
+      "message": "调整旅行付款授权额度",
+      "mode": "navigate",
+      "destination": "travel_mandate",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 44\u001b[22m\n"
+    },
+    {
+      "group": "travel_payment",
+      "message": "核对旅行付款",
+      "mode": "navigate",
+      "destination": "travel_payment",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 32\u001b[22m\n"
+    },
+    {
+      "group": "travel_payment",
+      "message": "我要支付已选机票和酒店",
+      "mode": "navigate",
+      "destination": "travel_payment",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 47\u001b[22m\n"
+    },
+    {
+      "group": "travel_orders",
+      "message": "查看旅行订单",
+      "mode": "navigate",
+      "destination": "travel_orders",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 32\u001b[22m\n"
+    },
+    {
+      "group": "travel_orders",
+      "message": "查一下酒店退款进度",
+      "mode": "navigate",
+      "destination": "travel_orders",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 41\u001b[22m\n"
+    },
+    {
+      "group": "goal_allocation",
+      "message": "调整目标资金分配",
+      "mode": "navigate",
+      "destination": "goal_allocation",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "goal_allocation",
+      "message": "查看目标可支付金额",
+      "mode": "navigate",
+      "destination": "goal_allocation",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 41\u001b[22m\n"
+    },
+    {
+      "group": "goal_transfer",
+      "message": "设置工资到账后存入目标",
+      "mode": "navigate",
+      "destination": "goal_transfer",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 47\u001b[22m\n"
+    },
+    {
+      "group": "goal_transfer",
+      "message": "安排目标每月转入",
+      "mode": "navigate",
+      "destination": "goal_transfer",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "cashflow",
+      "message": "试算一下未来收支",
+      "mode": "navigate",
+      "destination": "cashflow",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "cashflow",
+      "message": "这笔额外支出对余额有什么影响",
+      "mode": "navigate",
+      "destination": "cashflow",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 56\u001b[22m\n"
+    },
+    {
+      "group": "goal_adjust",
+      "message": "修改目标储蓄计划",
+      "mode": "navigate",
+      "destination": "goal_adjust",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "goal_adjust",
+      "message": "调整所有目标的月度投入方案",
+      "mode": "navigate",
+      "destination": "goal_adjust",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 53\u001b[22m\n"
+    },
+    {
+      "group": "knowledge",
+      "message": "转账和AA有什么区别",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 40\u001b[22m\n"
+    },
+    {
+      "group": "knowledge",
+      "message": "什么是基金赎回",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "knowledge",
+      "message": "退款在途是什么意思",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 41\u001b[22m\n"
+    },
+    {
+      "group": "knowledge",
+      "message": "什么是目标资金分配",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 41\u001b[22m\n"
+    },
+    {
+      "group": "knowledge",
+      "message": "信用卡和借记卡有什么区别",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 50\u001b[22m\n"
+    },
+    {
+      "group": "knowledge",
+      "message": "为什么订阅涨价了",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "knowledge",
+      "message": "什么是应急金",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 32\u001b[22m\n"
+    },
+    {
+      "group": "knowledge",
+      "message": "授权和实际付款有什么区别",
+      "mode": "chat",
+      "intent": "clarification",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 50\u001b[22m\n"
+    },
+    {
+      "group": "ambiguous",
+      "message": "帮我转账同时申请信用卡",
+      "mode": "clarify",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 47\u001b[22m\n"
+    },
+    {
+      "group": "ambiguous",
+      "message": "我要买理财还要取消订阅",
+      "mode": "clarify",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 47\u001b[22m\n"
+    },
+    {
+      "group": "ambiguous",
+      "message": "帮我处理一下",
+      "mode": "clarify",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 32\u001b[22m\n"
+    },
+    {
+      "group": "ambiguous",
+      "message": "我要弄那个东西",
+      "mode": "clarify",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    },
+    {
+      "group": "ambiguous",
+      "message": "给朋友转钱还是AA我还没想好",
+      "mode": "clarify",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 52\u001b[22m\n"
+    },
+    {
+      "group": "ambiguous",
+      "message": "帮我挂失卡同时导入账单",
+      "mode": "clarify",
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 47\u001b[22m\n"
+    },
+    {
+      "group": "negative",
+      "message": "不要帮我转账",
+      "notNavigate": true,
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 32\u001b[22m\n"
+    },
+    {
+      "group": "negative",
+      "message": "我不想申请信用卡",
+      "notNavigate": true,
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "negative",
+      "message": "先别帮我取消订阅",
+      "notNavigate": true,
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 38\u001b[22m\n"
+    },
+    {
+      "group": "negative",
+      "message": "不要给我订机票",
+      "notNavigate": true,
+      "pass": false,
+      "error": "apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:3000\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:3000/api/agent/route\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.64.0 (x64; windows 10.0) node/24.15\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - content-type: application/json\u001b[22m\n\u001b[2m    - content-length: 35\u001b[22m\n"
+    }
+  ]
+}

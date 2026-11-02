@@ -1,5 +1,6 @@
 import { verifyAuditChain } from './governance.ts';
 import { ChatMemorySchema } from '../shared/chat-routing.ts';
+import {ConversationStateSchema,ConversationTaskSchema,ReplyEvidenceSchema,type ConversationState,type ReplyEvidence} from '../shared/conversation.ts';
 import {tickGoalNotices} from './goal-notices.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -23,7 +24,43 @@ import { inspectEvidence } from './bill-analysis.ts';
 const dbPath = resolve(process.env.NOVA_DB_PATH || './data/nova.sqlite');
 mkdirSync(dirname(dbPath), { recursive: true });
 const db = new DatabaseSync(dbPath);
+// Set the wait policy before the first migration, including chat memory.
+db.exec('PRAGMA busy_timeout = 5000');
 db.exec('CREATE TABLE IF NOT EXISTS chat_navigation_memory (session_id TEXT NOT NULL, thread_id TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(session_id,thread_id))');
+db.exec('CREATE TABLE IF NOT EXISTS conversation_state (session_id TEXT NOT NULL, thread_id TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(session_id,thread_id))');
+db.exec('CREATE TABLE IF NOT EXISTS conversation_reply_evidence (session_id TEXT NOT NULL, thread_id TEXT NOT NULL, message_id TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(session_id,message_id))');
+export function saveReplyEvidence(sessionId:string,threadId:string,messageId:string,evidence:ReplyEvidence){
+ getAgentThread(sessionId,threadId);
+ const owned=db.prepare("SELECT id FROM agent_messages WHERE session_id=? AND thread_id=? AND id=? AND role='assistant'").get(sessionId,threadId,messageId);
+ if(!owned)throw Error('MESSAGE_NOT_FOUND');
+ db.prepare('INSERT INTO conversation_reply_evidence VALUES (?,?,?,?)').run(sessionId,threadId,messageId,JSON.stringify(ReplyEvidenceSchema.parse(evidence)));
+}
+export function getReplyEvidence(sessionId:string,threadId:string,messageId:string):ReplyEvidence{
+ getAgentThread(sessionId,threadId);
+ const row=db.prepare('SELECT payload FROM conversation_reply_evidence WHERE session_id=? AND thread_id=? AND message_id=?').get(sessionId,threadId,messageId) as {payload:string}|undefined;
+ return row?ReplyEvidenceSchema.parse(JSON.parse(row.payload)):[];
+}
+export function getConversationState(sessionId:string,threadId:string):ConversationState{
+ getAgentThread(sessionId,threadId);
+ const row=db.prepare('SELECT payload FROM conversation_state WHERE session_id=? AND thread_id=?').get(sessionId,threadId) as {payload:string}|undefined;
+ if(row)return ConversationStateSchema.parse(JSON.parse(row.payload));
+ // Import existing user drafts once; projections cease being the state owner.
+ const state=ConversationStateSchema.parse({}),draft=getGoalDraft(sessionId,threadId);
+ if(draft){state.tasks.push(ConversationTaskSchema.parse({id:draft.id,kind:'goal',status:'active',capability:null,
+  goal:{title:draft.title,targetCents:draft.targetCents,savedCents:draft.savedCents,targetDate:draft.targetDate,monthlyContributionCapCents:draft.monthlyContributionCapCents,protectedCents:draft.protectedCents},
+  timeHint:draft.targetDate,recipientQuery:'',amountCents:null,sourceAccount:'',name:draft.title??'未命名目标'}));state.activeTaskId=draft.id;}
+ const legacy=db.prepare('SELECT payload FROM chat_navigation_memory WHERE session_id=? AND thread_id=?').get(sessionId,threadId) as {payload:string}|undefined;
+ if(legacy){const m=ChatMemorySchema.parse(JSON.parse(legacy.payload));if(m.destination){const id='legacy:'+threadId;state.tasks.push(ConversationTaskSchema.parse({id,kind:'service',status:m.status,capability:m.destination,goal:{},timeHint:null,recipientQuery:m.recipientQuery,amountCents:m.amountCents,sourceAccount:m.sourceAccount}));state.activeTaskId=id;}}
+ return state;
+}
+export function saveConversationState(sessionId:string,threadId:string,state:ConversationState,expectedVersion:number){
+ getAgentThread(sessionId,threadId);const parsed=ConversationStateSchema.parse(state);
+ db.exec('BEGIN IMMEDIATE');try{
+  if(getConversationState(sessionId,threadId).version!==expectedVersion)throw Error('CONVERSATION_STATE_CHANGED');
+  db.prepare('INSERT INTO conversation_state VALUES (?,?,?) ON CONFLICT(session_id,thread_id) DO UPDATE SET payload=excluded.payload').run(sessionId,threadId,JSON.stringify(parsed));
+  db.exec('COMMIT');return parsed;
+ }catch(e){db.exec('ROLLBACK');throw e;}
+}
 export function getChatMemory(sessionId:string,threadId:string){
   getAgentThread(sessionId,threadId);
   const row=db.prepare('SELECT payload FROM chat_navigation_memory WHERE session_id=? AND thread_id=?').get(sessionId,threadId) as {payload:string}|undefined;
@@ -31,6 +68,13 @@ export function getChatMemory(sessionId:string,threadId:string){
 }
 export function saveChatMemory(sessionId:string,threadId:string,value:unknown){
   getAgentThread(sessionId,threadId);const memory=ChatMemorySchema.parse(value);
+  const state=getConversationState(sessionId,threadId),task=state.tasks.find(t=>t.id===state.activeTaskId);
+  if(task?.kind==='service'){
+   const changed=task.recipientQuery!==memory.recipientQuery||task.amountCents!==memory.amountCents||task.sourceAccount!==memory.sourceAccount;
+   Object.assign(task,{recipientQuery:memory.recipientQuery,amountCents:memory.amountCents,sourceAccount:memory.sourceAccount});
+   if(changed){task.revision++;task.updatedAt=new Date().toISOString();task.lastOperation='form_update';}
+   const expected=state.version;state.version++;saveConversationState(sessionId,threadId,state,expected);
+  }
   db.prepare('INSERT INTO chat_navigation_memory VALUES (?,?,?) ON CONFLICT(session_id,thread_id) DO UPDATE SET payload=excluded.payload').run(sessionId,threadId,JSON.stringify(memory));return memory;
 }
 db.exec('PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;');
@@ -828,6 +872,14 @@ export function createAgentTask(sessionId: string, threadId: string): AgentTask 
   return getAgentTaskForThread(sessionId, threadId)!;
 }
 
+export function resetAgentTaskProjection(sessionId:string,threadId:string){
+ const old=getAgentTaskForThread(sessionId,threadId),draft=getGoalDraft(sessionId,threadId);if(!old||!draft)return;
+ const next=AgentTaskSchema.parse({...old,...taskDraftFields(draft),goalDraftId:draft.id,goalId:draft.goalId,
+  phase:'understanding',waitingReason:null,taskRevision:old.taskRevision+1,readOnly:false,terminationReason:null,
+  constraints:{latestAllowedDate:null,monthlyContributionCapCents:draft.monthlyContributionCapCents,protectedCents:draft.protectedCents,preserveEssentialSpending:null},
+  preferences:[],candidateRefs:[],candidateTargetDate:null,pendingActionId:null,nextCheck:null,updatedAt:new Date().toISOString()});
+ db.prepare('UPDATE agent_tasks SET revision=?,phase=?,payload_json=?,updated_at=? WHERE task_id=? AND session_id=?').run(next.taskRevision,next.phase,JSON.stringify(next),next.updatedAt,next.taskId,sessionId);
+}
 export function getAgentTask(sessionId: string, taskId: string): AgentTask {
   const row = db.prepare('SELECT * FROM agent_tasks WHERE task_id=? AND session_id=?')
     .get(taskId, sessionId) as Record<string, unknown> | undefined;

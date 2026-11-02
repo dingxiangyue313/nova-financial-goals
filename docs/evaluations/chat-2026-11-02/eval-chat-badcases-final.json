@@ -1,0 +1,212 @@
+{
+  "summary": {
+    "total": 12,
+    "passed": 12
+  },
+  "rows": [
+    {
+      "message": "日本旅行目标预算改成9000",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "日本旅行目标时间改成2027年7月15日",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "安排目标每月转入",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_transfer",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "修改目标储蓄计划",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_adjust",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "调整目标资金分配",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_allocation",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": null,
+          "draft": null
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "查看目标可支付金额",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "goal_allocation",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "这笔额外支出对余额有什么影响",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "cashflow",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "我想给父母攒一万元旅游基金",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": null,
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "买手机预算6000，我已经存了两千",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "想为孩子攒学费，明年需要三万",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "chat",
+          "destination": null,
+          "question": null,
+          "chatIntent": "goal_planning",
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "我要挂失银行卡",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "cards",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    },
+    {
+      "message": "查看旅行报价请求",
+      "pass": true,
+      "response": {
+        "decision": {
+          "mode": "navigate",
+          "destination": "travel_quotes",
+          "question": null,
+          "chatIntent": null,
+          "answer": null,
+          "memoryAction": "new",
+          "draft": {}
+        },
+        "provider": "deepseek",
+        "reason": null
+      }
+    }
+  ]
+}
